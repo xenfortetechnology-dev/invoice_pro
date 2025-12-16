@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Revolutionary Invoice System{% endblock %}</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Feather Icons -->
+    <script src="https://unpkg.com/feather-icons"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Custom CSS -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/glassmorphism.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+
+    <style>
+        /* Sidebar styles */
+        .sidebar {
+            width: 250px;
+            min-height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background: rgba(48, 70, 214);
+            backdrop-filter: blur(12px);
+        }
+        .content {
+            margin-left: 250px;
+            padding: 2rem;
+        }
+    </style>
+    
+    {% block head %}{% endblock %}
+</head>
+<body class="bg-gradient">
+
+    {% if session.user_id %}
+    <!-- Sidebar -->
+    <nav class="glass-nav sidebar d-flex flex-column p-3">
+
+        <!-- Brand -->
+        <a class="navbar-brand fw-bold text-primary mb-4" href="{{ url_for('dashboard') }}">
+            <i data-feather="zap" class="me-2"></i>
+            Revolutionary Invoice
+        </a>
+
+        <!-- Nav Items -->
+        <ul class="nav nav-pills flex-column mb-auto">
+            <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
+                    <i data-feather="home" class="me-2"></i> Dashboard
+                </a>
+            </li>
+            <li>
+                <a class="nav-link {% if request.endpoint == 'invoice_management' %}active{% endif %}" href="{{ url_for('invoice_management') }}">
+                    <i data-feather="file-text" class="me-2"></i> Invoices
+                </a>
+            </li>
+            <li>
+                <a class="nav-link {% if request.endpoint == 'client_management' %}active{% endif %}" href="{{ url_for('client_management') }}">
+                    <i data-feather="users" class="me-2"></i> Clients
+                </a>
+            </li>
+            <li>
+                <a class="nav-link {% if request.endpoint == 'crm' %}active{% endif %}" href="{{ url_for('crm') }}">
+                    <i data-feather="briefcase" class="me-2"></i> CRM
+                </a>
+            </li>
+            <li>
+                <a class="nav-link {% if request.endpoint == 'analytics' %}active{% endif %}" href="{{ url_for('analytics') }}">
+                    <i data-feather="trending-up" class="me-2"></i> Analytics
+                </a>
+            </li>
+           <li class="nav-item">
+  <a class="nav-link d-flex justify-content-between align-items-center"
+     data-bs-toggle="collapse"
+     href="#deliveryMenu"
+     role="button"
+     aria-expanded="false"
+     aria-controls="deliveryMenu">
+    <span><i data-feather="truck" class="me-1"></i> Delivery</span>
+    <i data-feather="chevron-down" class="ms-auto"></i>
+  </a>
+  <div class="collapse ps-4" id="deliveryMenu">
+    <ul class="nav flex-column">
+      <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'create_challan' %}active{% endif %}"
+           href="{{ url_for('create_challan') }}">
+          Create Challan
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'delivery_challan' %}active{% endif %}"
+           href="{{ url_for('delivery_challan') }}">
+          View Challan
+        </a>
+      </li>
+    </ul>
+  </div>
+</li>
+
+
+            {% if ai_enabled %}
+            <li>
+                <a class="nav-link {% if request.endpoint == 'ai_assistant_page' %}active{% endif %}" href="{{ url_for('ai_assistant_page') }}">
+                    <i data-feather="cpu" class="me-2"></i> AI Assistant
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+
+        <hr>
+
+        <!-- Utility Buttons -->
+        <div class="d-flex flex-column gap-2 mb-3">
+            {% if ai_enabled %}
+            <button class="btn glass-btn w-100" id="voiceCommandBtn" title="Voice Commands">
+                <i data-feather="mic" id="micIcon"></i> Voice
+            </button>
+            {% endif %}
+
+            <button class="btn glass-btn w-100" id="themeToggle" title="Toggle Theme">
+                <i data-feather="sun" id="themeIcon"></i> Theme
+            </button>
+        </div>
+
+        <!-- User Menu -->
+        <div class="dropdown">
+            <button class="btn glass-btn dropdown-toggle w-100" type="button" data-bs-toggle="dropdown">
+                <i data-feather="user" class="me-2"></i>{{ session.username }}
+            </button>
+            <ul class="dropdown-menu glass-dropdown w-100">
+                <li><a class="dropdown-item" href="{{ url_for('settings') }}">
+                    <i data-feather="settings" class="me-2"></i> Settings
+                </a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                    <i data-feather="log-out" class="me-2"></i> Logout
+                </a></li>
+            </ul>
+        </div>
+
+    </nav>
+    {% endif %}
+
+    <!-- Main Content -->
+    <main class="content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="container mt-3">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show glass-card" role="alert">
+                            <i data-feather="{% if category == 'success' %}check-circle{% elif category == 'error' %}alert-circle{% else %}info{% endif %}" class="me-2"></i>
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="glass-footer mt-5 py-4 content">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="mb-0">&copy; 2025 Revolutionary Invoice Systems. All rights reserved.</p>
+                </div>
+                <div class="col-md-6 text-end">
+                    <p class="mb-0">
+                        {% if ai_enabled %}<span class="badge bg-success me-2">AI Enabled</span>{% endif %}
+                        {% if blockchain_enabled %}<span class="badge bg-info">Blockchain Secured</span>{% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% if ai_enabled %}
+    <script src="{{ url_for('static', filename='js/voice-commands.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ai-assistant.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/document-scanner.js') }}"></script>
+    {% endif %}
+    {% if blockchain_enabled %}
+    <script src="{{ url_for('static', filename='js/blockchain-verify.js') }}"></script>
+    {% endif %}
+    <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+    
+    {% block scripts %}{% endblock %}
+    
+    <script>
+        const themeToggle = document.getElementById("themeToggle");
+        const themeIcon = document.getElementById("themeIcon");
+        const root = document.documentElement;
+
+        const savedTheme = localStorage.getItem("theme") || "light";
+        root.setAttribute("data-theme", savedTheme);
+        themeIcon.setAttribute("data-feather", savedTheme === "dark" ? "moon" : "sun");
+        feather.replace();
+
+        themeToggle.addEventListener("click", () => {
+            const currentTheme = root.getAttribute("data-theme") || "light";
+            const newTheme = currentTheme === "light" ? "dark" : "light";
+
+            root.setAttribute("data-theme", newTheme);
+            localStorage.setItem("theme", newTheme);
+
+            themeIcon.setAttribute("data-feather", newTheme === "dark" ? "moon" : "sun");
+            feather.replace();
+        });
+    </script>
+</body>
+</html>
