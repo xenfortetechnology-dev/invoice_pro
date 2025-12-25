@@ -13,17 +13,16 @@
                         <h1 class="display-6 fw-bold text-primary mb-1">
                             <i data-feather="trending-up" class="me-2"></i>
                             Business Analytics
-                            
                         </h1>
                         <p class="text-muted mb-0">AI-powered insights and comprehensive business intelligence</p>
                     </div>
                     <div class="col-md-4 text-end">
                         <div class="d-flex gap-2 justify-content-end">
-                            <div class="dropdown">
+                            <div class="dropdown time-range-dropdown">
                                 <button class="btn btn-outline-primary glass-btn dropdown-toggle" data-bs-toggle="dropdown">
                                     <i data-feather="calendar" class="me-1"></i> Time Range
                                 </button>
-                                <ul class="dropdown-menu glass-dropdown">
+                                <ul class="dropdown-menu dropdown-menu-end">
                                     <li><a class="dropdown-item" href="?range=7d">Last 7 Days</a></li>
                                     <li><a class="dropdown-item" href="?range=30d">Last 30 Days</a></li>
                                     <li><a class="dropdown-item" href="?range=90d">Last 3 Months</a></li>
@@ -626,6 +625,10 @@ function generateReport(type) {
 // Add CSS animations
 const style = document.createElement('style');
 style.textContent = `
+.dropdown-menu {
+    position: fixed !important;
+    z-index: 9999 !important;
+}
 @keyframes slideUp {
     from {
         opacity: 0;
@@ -737,6 +740,19 @@ style.textContent = `
 
 .blockchain-stat {
     padding: 15px;
+}
+    /* FIX dropdown being covered by KPI cards */
+.glass-card {
+    position: relative;
+}
+
+.row.mb-4:first-of-type .glass-card {
+    z-index: 20;
+}
+
+.kpi-card {
+    position: relative;
+    z-index: 1;
 }
 `;
 document.head.appendChild(style);
