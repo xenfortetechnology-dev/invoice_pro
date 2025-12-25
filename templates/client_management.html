@@ -26,22 +26,24 @@
                                 <i data-feather="user-plus" class="me-1"></i> New Client
                             </a>
                             <div class="dropdown">
-                                <button class="btn btn-outline-secondary glass-btn dropdown-toggle" data-bs-toggle="dropdown">
-                                    <i data-feather="download" class="me-1"></i> Export
-                                </button><br>
-                                <ul class="dropdown-menu glass-dropdown">
-                                    <li><a class="dropdown-item" href="#" onclick="exportClientsToExcel()">
-                                        <i data-feather="file-text" class="me-2"></i> Excel
-                                    </a></li>
-                                    <li><a class="dropdown-item" href="#" onclick="exportClientsToPDF()">
-                                        <i data-feather="file" class="me-2"></i> PDF Report
-                                    </a></li>
-                                </ul>
-                            </div>
+    <button class="btn btn-success glass-btn dropdown-toggle" data-bs-toggle="dropdown">
+        <i data-feather="download" class="me-1"></i> Export
+    </button>
+    <ul class="dropdown-menu glass-dropdown dropdown-menu-end">
+        <li>
+            <a class="dropdown-item" href="#" onclick="exportAnalyticsToExcel()">
+                <i data-feather="file-text" class="me-2"></i> Excel
+            </a>
+        </li>
+        <li>
+            <a class="dropdown-item" href="#" onclick="exportAnalyticsToPDF()">
+                <i data-feather="file" class="me-2"></i> PDF Report
+            </a>
+        </li>
+    </ul>
+</div>
                         </div>
-                    </div><br><br>
-
-
+                    </div>
                 </div>
             </div>
         </div>
@@ -621,5 +623,17 @@ function clearFilters(event) {
 .metric-card:hover {
     transform: translateY(-3px);
 }
+.glass-card {
+    overflow: visible !important;
+}
+.row.mb-4:first-of-type .glass-card {
+    position: relative;
+    z-index: 100;
+}
+.metric-card {
+    position: relative;
+    z-index: 1;
+}
+
 </style>
 {% endblock %}
