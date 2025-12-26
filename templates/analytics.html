@@ -32,9 +32,24 @@
                                     <li><a class="dropdown-item" href="?range=all">All Time</a></li>
                                 </ul>
                             </div>
-                            <button class="btn btn-success glass-btn" onclick="exportAnalyticsReport()">
-                                <i data-feather="download" class="me-1"></i> Export Report
-                            </button>
+            <div class="dropdown">
+    <button class="btn btn-success glass-btn dropdown-toggle" data-bs-toggle="dropdown">
+        <i data-feather="download" class="me-1"></i> Export
+    </button>
+    <ul class="dropdown-menu glass-dropdown dropdown-menu-end">
+        <li>
+            <a class="dropdown-item" href="#" onclick="exportAnalyticsToExcel()">
+                <i data-feather="file-text" class="me-2"></i> Excel
+            </a>
+        </li>
+        <li>
+            <a class="dropdown-item" href="#" onclick="exportAnalyticsToPDF()">
+                <i data-feather="file" class="me-2"></i> PDF Report
+            </a>
+        </li>
+    </ul>
+</div>
+
                         </div>
                     </div>
 
@@ -595,22 +610,14 @@ function initializeCharts() {
     {% endif %}
 }
 
-function exportAnalyticsReport() {
-    // Create a loading state
-    const btn = event.target;
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generating...';
-    btn.disabled = true;
-    
-    // Simulate report generation
-    setTimeout(() => {
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-        
-        // In a real application, this would trigger a download
-        alert('Analytics report generated successfully!');
-    }, 2000);
+function exportAnalyticsToPDF() {
+    alert("Analytics PDF exported successfully (demo).");
 }
+
+function exportAnalyticsToExcel() {
+    alert("Analytics Excel exported successfully (demo).");
+}
+
 
 function generateReport(type) {
     const reportTypes = {
@@ -745,7 +752,6 @@ style.textContent = `
 .blockchain-stat {
     padding: 15px;
 }
-    /* FIX dropdown being covered by KPI cards */
 .glass-card {
     position: relative;
 }
