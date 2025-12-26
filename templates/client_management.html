@@ -19,8 +19,7 @@
                     </div>
 
                     
-                  <div class="col-md-6 text-end mt-n1 ">
-
+                    <div class="col-md-6 text-end">
                         <div class="d-flex gap-2 justify-content-end">
                             <a href="{{ url_for('create_client') }}" class="btn btn-primary glass-btn-primary">
                                 <i data-feather="user-plus" class="me-1"></i> New Client
@@ -28,18 +27,43 @@
                             <div class="dropdown">
                                 <button class="btn btn-outline-secondary glass-btn dropdown-toggle" data-bs-toggle="dropdown">
                                     <i data-feather="download" class="me-1"></i> Export
-                                </button><br>
+                                </button>
                                 <ul class="dropdown-menu glass-dropdown">
                                     <li><a class="dropdown-item" href="#" onclick="exportClientsToExcel()">
-                                        <i data-feather="file-text" class="me-2"></i> Excel
+                                        <i data-feather="file-text" class="me-1"></i> Excel
                                     </a></li>
                                     <li><a class="dropdown-item" href="#" onclick="exportClientsToPDF()">
-                                        <i data-feather="file" class="me-2"></i> PDF Report
+                                        <i data-feather="file" class="me-1"></i> PDF Report
                                     </a></li>
                                 </ul>
                             </div>
                         </div>
-                    </div><br><br>
+                    </div>
+
+   <!-- <div class="col-md-4 text-end">
+                        <div class="d-flex gap-2 justify-content-end">
+                            <div class="dropdown time-range-dropdown">
+                                <button class="btn btn-outline-primary glass-btn dropdown-toggle" data-bs-toggle="dropdown">
+                                    <i data-feather="calendar" class="me-1"></i> Time Range
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="?range=7d">Last 7 Days</a></li>
+                                    <li><a class="dropdown-item" href="?range=30d">Last 30 Days</a></li>
+                                    <li><a class="dropdown-item" href="?range=90d">Last 3 Months</a></li>
+                                    <li><a class="dropdown-item" href="?range=12m" class="active">Last 12 Months</a></li>
+                                    <li><a class="dropdown-item" href="?range=all">All Time</a></li>
+                                </ul>
+                            </div>
+                            <button class="btn btn-success glass-btn" onclick="exportAnalyticsReport()">
+                                <i data-feather="download" class="me-1"></i> Export Report
+                            </button>
+                        </div>
+                    </div> -->
+
+
+
+
+
 
 
                 </div>
