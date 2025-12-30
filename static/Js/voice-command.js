@@ -1,6 +1,7 @@
 {% raw %}
 <script>
     // ----- Check browser support -----
+    
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
@@ -95,15 +96,25 @@
                             rate = base;
                         }
                     }
+addItemRow();
 
-                    if (typeof addItemRow === "function") {
-                        addItemRow({ description, quantity, unit_price: rate });
-                        console.log(`🛒 Item சேர்க்கப்பட்டது: ${description}, Qty: ${quantity}, Rate: ${rate}`);
-                        calculateItemAmounts();
-                        if (typeof updateInvoiceSummary === "function") updateInvoiceSummary();
-                    } else {
-                        console.warn("⚠️ addItemRow() function not found.");
-                    }
+setTimeout(() => {
+    const row = getLastItemRow();
+    if (!row) {
+        console.error("❌ No row found after addItemRow()");
+        return;
+    }
+
+    row.querySelector('[name="description"]').value = description;
+    row.querySelector('[name="quantity"]').value = quantity;
+    row.querySelector('[name="unit_price"]').value = rate;
+
+    calculateItemAmount(row);
+    updateInvoiceSummary();
+
+    console.log("✅ Voice autofilled:", description, quantity, rate);
+}, 50);
+    
                 });
             }
 
@@ -136,10 +147,27 @@
                 recognition.start();
             }
         };
+        function getLastItemRow() {
+    const rows = document.querySelectorAll('.item-row');
+    return rows[rows.length - 1];
+}
+    function calculateItemAmountFromInputs(row) {
+    const qtyInput = row.querySelector('[name="quantity"]');
+    const rateInput = row.querySelector('[name="unit_price"]');
+    const amountEl = row.querySelector('.item-amount');
+
+    const qty = parseFloat(qtyInput?.value || 0);
+    const rate = parseFloat(rateInput?.value || 0);
+
+    const total = qty * rate;
+    if (amountEl) {
+        amountEl.textContent = `₹${total.toFixed(2)}`;
+    }
+}
 
         // ----- Helper: calculate row amounts -----
         function calculateItemAmounts() {
-            document.querySelectorAll("tr.invoice-item").forEach(row => {
+            document.querySelectorAll("tr.item-row").forEach(row => {
                 const qtyField = row.querySelector("td:nth-child(3)");
                 const rateField = row.querySelector("td:nth-child(5)");
                 const amountField = row.querySelector("td:nth-child(7)");

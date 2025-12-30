@@ -409,14 +409,6 @@ function addItemRow(suggestion = null) {
 }
 
 
-
-
-
-
-
-
-
-
 // Remove item row
 function removeItemRow(row) {
     const rows = document.querySelectorAll('.item-row');
@@ -456,18 +448,6 @@ document.addEventListener('input', function(e) {
 
     deleteBtn.disabled = (!description && quantity === 0 && unitPrice === 0);
 });
-
-
-
-
-
-
-
-
-
-
-
-
 // Update row numbers
 function updateItemNumbers() {
     const rows = document.querySelectorAll('.item-row');
@@ -602,7 +582,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } else if (command.toLowerCase().includes("open dashboard")) {
       window.location.href = "/dashboard";
     } else {
-      alert("Command not recognized: " + command);
+      alert("Command recognized: " + command);
     }
   };
 
