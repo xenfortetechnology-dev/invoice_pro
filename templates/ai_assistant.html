@@ -467,65 +467,308 @@ function processAIResponse(userMessage) {
     addMessage('ai', response);
 }
 
+const demoData = {
+    clients: {
+        total: 52,
+        active: 41,
+        inactive: 11,
+        activeNames: [
+            "ABC Corp", "Tech Solutions", "Innovate Ltd", "Green Energy",
+            "FutureWorks", "Blue Ocean", "Bright Minds", "Starline Co", "NextGen"
+        ],
+        inactiveNames: ["XYZ Ltd", "OldTown Inc", "Legacy Systems"],
+        details: {
+            "ABC Corp": {
+                status: "Active",
+                lastInvoice: "2025-12-01",
+                outstandingAmount: "₹15,000",
+                lastPaymentDate: "2025-11-28"
+            },
+            "Tech Solutions": {
+                status: "Active",
+                lastInvoice: "2025-12-05",
+                outstandingAmount: "₹0",
+                lastPaymentDate: "2025-12-02"
+            },
+            "XYZ Ltd": {
+                status: "Inactive",
+                lastInvoice: "2025-09-15",
+                outstandingAmount: "₹45,000",
+                lastPaymentDate: "2025-09-10"
+            }
+        }
+        
+    },
+    invoices: {
+        total: 182,
+        paid: 146,
+        unpaid: 26,
+        overdue: 10,
+        byClient: {
+            "ABC Corp": 12,
+            "Tech Solutions": 8,
+            "XYZ Ltd": 5,
+            "Innovate Ltd": 10,
+            "Green Energy": 7,
+            "OldTown Inc": 4,
+            "FutureWorks": 9,
+            "Legacy Systems": 2,
+            "Blue Ocean": 6,
+            "Bright Minds": 9,
+            "Starline Co": 5,
+            "NextGen": 5
+        }
+    },
+    payments: {
+        delayedClients: ["XYZ Ltd", "OldTown Inc"],
+        earlyPayers: ["ABC Corp", "Bright Minds"],
+        averageDelayDays: 8.5,
+        successRate: 94.2
+    },
+    finance: {
+    incomeToday: 32000,
+    incomeWeek: 150000,      
+    incomeMonth: 425000,
+    incomeYear: 5100000,
+    revenueToday: 36000,
+    revenueWeek: 170000,      
+    revenueMonth: 468000,
+    revenueYear: 5600000,
+    profitMonth: 283000,
+    expensesMonth: 185000,
+    growth: "15%"
+}
+
+};
+
 function generateAIResponse(message) {
-    const lowerMessage = message.toLowerCase();
-    
-    // Simple pattern matching for demo purposes
-    if (lowerMessage.includes('revenue') || lowerMessage.includes('income')) {
-        return `📊 Based on your current data, your total revenue is ₹2,45,000 this month. That's a 12% increase from last month! Would you like me to show you a detailed breakdown or revenue trends?`;
+    const msg = message.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+
+    // Greeting
+    if (/^(hi|hello|hey|hai|good)/.test(msg)) {
+        return `👋 Hello! I'm your AI-powered business assistant. I can help you with:
+        <br>• Creating invoices through voice commands
+        <br>• Analyzing business performance and trends
+        <br>• Predicting client payment behavior
+        <br>• Generating insights and recommendations
+        <br>• Automating routine tasks
+        <br>How can I assist you today? 😊`;
     }
-    
-    if (lowerMessage.includes('invoice') && lowerMessage.includes('create')) {
-        return `📄 I can help you create an invoice! To get started, please tell me:
-        <br>• Which client is this invoice for?
-        <br>• What items or services should I include?
-        <br>• Any specific due date?
-        <br><br>You can also use voice commands by saying "Create invoice for [client name]"`;
-    }
-    
-    if (lowerMessage.includes('client') && (lowerMessage.includes('follow') || lowerMessage.includes('contact'))) {
-        return `👥 Here are clients who need follow-up:
-        <br>• <strong>ABC Corp</strong> - Invoice overdue by 5 days
-        <br>• <strong>XYZ Ltd</strong> - No activity in 30 days (high-value client)
-        <br>• <strong>Tech Solutions</strong> - Payment reminder needed
-        <br><br>Would you like me to draft follow-up emails or set reminders?`;
-    }
-    
-    if (lowerMessage.includes('payment') && lowerMessage.includes('trend')) {
-        return `💰 Your payment trends analysis:
-        <br>• <strong>Average payment delay:</strong> 8.5 days
-        <br>• <strong>Payment success rate:</strong> 94.2%
-        <br>• <strong>Best performing clients:</strong> Pay 3 days early on average
-        <br>• <strong>Risk clients:</strong> 2 clients with 30+ day delays
-        <br><br>Recommendation: Implement automated reminders to reduce delay by 40%.`;
-    }
-    
-    if (lowerMessage.includes('help') || lowerMessage.includes('what can you do')) {
-        return `🤖 I'm your AI business assistant! Here's what I can help you with:
-        <br><br><strong>📊 Analytics & Insights:</strong>
+
+  // Asking assistant's name or role (ONLY bot-related)
+if (
+    (msg.includes('your name') || msg.includes('who are you')) &&
+    !msg.includes('client') &&
+    !msg.includes('company')
+) {
+    return `🤖 I'm your AI-powered business assistant, built to manage clients, invoices, payments, income, and business insights.`;
+}
+
+
+    // Help or capabilities
+    if (msg.includes('help') || msg.includes('what can you do')) {
+        return `🤖 Here's what I can assist you with:
+        <br><br>📊 Analytics & Insights:
         <br>• Revenue forecasting and trend analysis
         <br>• Client payment behavior predictions
         <br>• Business performance metrics
-        <br><br><strong>📄 Invoice Management:</strong>
+        <br><br>📄 Invoice Management:
         <br>• Create invoices via voice or text
         <br>• Smart item suggestions based on client history
         <br>• Automated pricing optimization
-        <br><br><strong>👥 Client Management:</strong>
+        <br><br>👥 Client Management:
         <br>• Risk assessment and scoring
         <br>• Follow-up recommendations
         <br>• Communication insights
-        <br><br>Just ask me anything!`;
+        <br><br>Just ask me anything about your business!`;
     }
-    
-    // Default response
-    return `I understand you're asking about "${message}". I'm continuously learning to better assist you. Could you provide more specific details or try rephrasing your question? 
 
-You can also try these commands:
-• "Show revenue trends"
-• "Create invoice for [client]"
-• "Analyze payment patterns"
-• "Help with client follow-up"`;
+    // Total clients
+    if ((msg.includes('how many') || msg.includes('total') || msg.includes('number')) && (msg.includes('client') || msg.includes('company'))) {
+        return `👥 You have a total of ${demoData.clients.total} clients.`;
+    }
+
+    // Active clients count
+    if ((msg.includes('active') && (msg.includes('client') || msg.includes('company'))) && !(msg.includes('name'))) {
+        return `✅ Currently, you have ${demoData.clients.active} active clients.`;
+    }
+
+    if (
+    (msg.includes('client') || msg.includes('clients') || msg.includes('company') || msg.includes('companies')) &&
+    (msg.includes('details') || msg.includes('name') || msg.includes('names') || msg.includes('list'))
+) {
+    let response = `👥 <strong>Client Details:</strong><br><br>`;
+    response += `✅ <strong>Active Clients (${demoData.clients.active}):</strong><br><ul>`;
+    demoData.clients.activeNames.forEach(name => {
+        response += `<li>${name}</li>`;
+    });
+    response += `</ul><br>⚠️ <strong>Inactive Clients (${demoData.clients.inactive}):</strong><br><ul>`;
+    demoData.clients.inactiveNames.forEach(name => {
+        response += `<li>${name}</li>`;
+    });
+    response += `</ul>`;
+    return response;
 }
+
+
+    for (const companyName in demoData.clients.details) {
+        if (msg.includes(companyName.toLowerCase())) {
+            const details = demoData.clients.details[companyName];
+            return `🏢 Details for <strong>${companyName}</strong>:
+            <br>• Status: ${details.status}
+            <br>• Last Invoice Date: ${details.lastInvoice}
+            <br>• Outstanding Amount: ${details.outstandingAmount}
+            <br>• Last Payment Date: ${details.lastPaymentDate}`;
+        }
+    }
+
+    // Inactive clients count
+   if (
+    (msg.includes('inactive')) &&
+    (msg.includes('client') || msg.includes('company')) &&
+    (msg.includes('name') || msg.includes('names'))
+) {
+    return `⚠️ <strong>Inactive Client Names (${demoData.clients.inactive}):</strong>
+    <br><ul>
+    ${demoData.clients.inactiveNames.map(n => `<li>${n}</li>`).join('')}
+    </ul>`;
+}
+
+if (
+ (msg.includes('how many') || msg.includes('total') || msg.includes('number')) &&
+ (msg.includes('client') || msg.includes('company'))
+) {
+   return `👥 You have a total of ${demoData.clients.total} clients.`;
+}
+
+    // Active clients names
+    if (msg.includes('active') && msg.includes('name') && (msg.includes('client') || msg.includes('company'))) {
+        return `✅ Active clients are: ${demoData.clients.activeNames.join(', ')}`;
+    }
+
+    // Inactive clients names
+    if (msg.includes('inactive') && msg.includes('name') && (msg.includes('client') || msg.includes('company'))) {
+        return `⚠️ Inactive clients are: ${demoData.clients.inactiveNames.join(', ')}`;
+    }
+
+    // All clients names
+    if ((msg.includes('all') || msg.includes('list')) && msg.includes('name') && (msg.includes('client') || msg.includes('company'))) {
+        const allClients = demoData.clients.activeNames.concat(demoData.clients.inactiveNames);
+        return `👥 All your clients are: ${allClients.join(', ')}`;
+    }
+
+    // Invoices related queries
+    if (msg.includes('invoice')) {
+        if (msg.includes('how many') || msg.includes('total') || msg.includes('count')) {
+            return `📄 You have a total of ${demoData.invoices.total} invoices.`;
+        }
+        if (msg.includes('paid')) {
+            return `✅ ${demoData.invoices.paid} invoices have been paid.`;
+        }
+        if (msg.includes('unpaid') || msg.includes('pending')) {
+            return `⏳ There are ${demoData.invoices.unpaid} unpaid invoices.`;
+        }
+        if (msg.includes('overdue') || msg.includes('late')) {
+            return `⚠️ You have ${demoData.invoices.overdue} overdue invoices that need attention.`;
+        }
+
+        // Ask invoice count per client
+        for (const client of demoData.clients.activeNames.concat(demoData.clients.inactiveNames)) {
+            if (msg.includes(client.toLowerCase())) {
+                const count = demoData.invoices.byClient[client] || 0;
+                return `📄 ${client} has ${count} invoice(s) in the system.`;
+            }
+        }
+
+        return `📄 How can I assist with your invoices? You can ask about total invoices, paid/unpaid counts, overdue invoices, or invoice counts by client name.`;
+    }
+
+    if (msg.includes('followup') || (msg.includes('need') && msg.includes('followup')) || msg.includes('follow up')) {
+    // Using delayedClients array as clients needing follow-up
+    if (demoData.payments.delayedClients.length > 0) {
+        return `📋 Clients needing follow-up for delayed payments are: ${demoData.payments.delayedClients.join(', ')}.`;
+    } else {
+        return `🎉 No clients currently need follow-up for delayed payments.`;
+    }
+}
+    // Payment related queries
+if (
+  msg.includes('payment') ||
+  msg.includes('paying') ||
+  msg.includes('payer') ||
+  msg.includes('paid')
+) {
+  if (msg.includes('early')) {
+    return `🌟 Early paying clients are: ${demoData.payments.earlyPayers.join(', ')}.`;
+  }
+
+  if (msg.includes('delay') || msg.includes('late')) {
+    return `⏳ Clients with delayed payments: ${demoData.payments.delayedClients.join(', ')}.`;
+  }
+
+  if (msg.includes('success')) {
+    return `✅ Payment success rate is ${demoData.payments.successRate}%.`;
+  }
+}
+    // Income or Revenue queries
+if (msg.includes('income') || msg.includes('revenue')) {
+
+    const wantsTotal = !(msg.includes('today') || msg.includes('month') || msg.includes('year') || msg.includes('week'));
+
+    if (wantsTotal) {
+        const totalIncome = demoData.finance.incomeToday + demoData.finance.incomeWeek + demoData.finance.incomeMonth + demoData.finance.incomeYear;
+        return `💰 Your total income across available periods (today, week, month, year) is ₹${totalIncome.toLocaleString()}. 
+        <br>You can also ask for income or revenue by day, week, month, or year separately.`;
+    }
+
+    if (msg.includes('today')) {
+        return `💵 Today's income is ₹${demoData.finance.incomeToday.toLocaleString()}. Revenue today is ₹${demoData.finance.revenueToday.toLocaleString()}.`;
+    }
+    if (msg.includes('week')) {
+        return `📅 This week's income is ₹${demoData.finance.incomeWeek.toLocaleString()}. Revenue this week is ₹${demoData.finance.revenueWeek.toLocaleString()}.`;
+    }
+    if (msg.includes('month')) {
+        return `📈 This month's income is ₹${demoData.finance.incomeMonth.toLocaleString()}. Revenue for this month is ₹${demoData.finance.revenueMonth.toLocaleString()}. Profit is ₹${demoData.finance.profitMonth.toLocaleString()}. Expenses are ₹${demoData.finance.expensesMonth.toLocaleString()}. Growth is ${demoData.finance.growth}.`;
+    }
+    if (msg.includes('year')) {
+        return `📊 Year to date income is ₹${demoData.finance.incomeYear.toLocaleString()}. Revenue is ₹${demoData.finance.revenueYear.toLocaleString()}.`;
+    }
+
+    return `💰 You can ask for income or revenue details for today, week, this month, or this year.`;
+}
+
+
+
+    // Greetings for thanks or bye
+    if (msg.includes('thank')) {
+        return `🙏 You're welcome! If you need anything else, just ask.`;
+    }
+
+    if (msg.includes('bye') || msg.includes('exit') || msg.includes('quit')) {
+        return `👋 Goodbye! Have a productive day ahead.`;
+    }
+
+    // If user asks for client details but message is unclear
+    if (msg.includes('client') || msg.includes('company')) {
+        return `🤔 I understand you want client info. Please be specific.
+        <br>Example questions:
+        <br>• "List active clients"
+        <br>• "Show inactive client names"
+        <br>• "How many clients do I have?"
+        <br>• "Invoices for ABC Corp"
+        <br>• "Payment status of XYZ Ltd"`;
+    }
+
+    // If no match found
+    return `🤔 Sorry, I couldn't understand your request clearly.
+    <br>Please try asking differently or be more specific.
+    <br>Try examples like:
+    <br>• "Show monthly revenue"
+    <br>• "Create invoice for ABC Corp"
+    <br>• "Analyze payment delays"
+    <br>• "List active clients"`;
+}
+
 
 function initializeSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
