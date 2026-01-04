@@ -73,20 +73,7 @@ def generate_invoice_pdf(invoice):
     content.append(header_table)
     content.append(Spacer(1, 10))
 
-    # Client & Company info
-    """ company_dict = {
-    "name": "OMPS ENGINEERING INDUSTRIES",
-    "address": "No. 39, 9th Street, Kamaraj Nagar, Avadi, Chennai - 600071",
-    "gstin": "33AAFF01969B1Z1",
-    "pan": "AAFF01969B1",
-    "tin": "33436486057",
-    "phone": "044 - 4853 397, 9884544409, 9884533309",
-    "email": "ompsindustries@gmail.com"
-    }
-    company = SimpleNamespace(**company_dict) """
-    client = invoice.client
-    """ company = invoice.company or Company.query.first() """
-
+     
     info_data = [[
         Paragraph("<b>To</b><br/>" +
                   f"{client.name}<br/>{client.address}<br/>{client.city}, {client.state} - {client.pincode}<br/>Tamil Nadu, India<br/><b>GSTIN:</b> {client.gstin or ''}", normal),
@@ -594,30 +581,29 @@ def generate_detailed_monthly_report():
 def export_excel():
     output = io.BytesIO()
     workbook = xlsxwriter.Workbook(output, {'in_memory': True})
-    worksheet = workbook.add_worksheet("Invoices")
+    worksheet = workbook.add_worksheet("Client Summary")
 
-    # Header row
-    headers = ["Invoice No", "Client Name", "Invoice Date", "Subtotal", "CGST", "SGST", "Total", "Payment Status"]
+    headers = ["Date", "Name", "Mail ID", "Amount", "GST No", "PAN No"]
     worksheet.write_row("A1", headers)
 
-    # Fetch invoices from DB
-    invoices = Invoice.query.order_by(Invoice.invoice_date.desc()).all()
+    invoice = Invoice.query.order_by(Invoice.invoice_date.desc()).first()
+    client = invoice.client if invoice else None
 
-    # Populate data rows
-    row = 1
-    for inv in invoices:
-        worksheet.write(row, 0, inv.invoice_number)
-        worksheet.write(row, 1, inv.client.name if inv.client else "N/A")
-        worksheet.write(row, 2, inv.invoice_date.strftime('%Y-%m-%d') if inv.invoice_date else "")
-        worksheet.write(row, 3, inv.subtotal or 0)
-        worksheet.write(row, 4, inv.cgst or 0)
-        worksheet.write(row, 5, inv.sgst or 0)
-        worksheet.write(row, 6, inv.total_amount or 0)
-        worksheet.write(row, 7, inv.payment_status or "Unknown")
-        row += 1
+    worksheet.write_row("A2", [
+        invoice.invoice_date.strftime("%d-%m-%Y") if invoice else "",
+        client.name if client else "",
+        client.email if client else "",
+        invoice.total_amount if invoice else "",
+        client.gstin if client else "",
+        config.pan
+    ])
 
     workbook.close()
     output.seek(0)
 
-    filename = f"invoices_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-    return send_file(output, as_attachment=True, download_name=filename, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name="client_summary.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )

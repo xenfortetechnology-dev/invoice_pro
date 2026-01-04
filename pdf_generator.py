@@ -16,7 +16,7 @@ from models import Company
 import config
 
 def generate_invoice_pdf(invoice):
-    """Generate a professional invoice PDF with modern styling"""
+    #Generate a professional invoice PDF with modern styling"""
     try:
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(

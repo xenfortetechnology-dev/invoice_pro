@@ -483,7 +483,7 @@ def duplicate_invoice(id):
 
 
 
-from fpdf import FPDF
+"""from fpdf import FPDF
 
 def generate_invoice_pdf(invoice):
     pdf = FPDF()
@@ -500,7 +500,7 @@ def generate_invoice_pdf(invoice):
     pdf.output(pdf_file)
     return pdf_file
 
-
+"""
 @app.route('/invoice/<int:id>/send', methods=['POST'])
 @login_required
 def send_invoice(id):
@@ -539,12 +539,6 @@ def bulk_export():
         mimetype='text/csv',
         headers={"Content-Disposition": "attachment;filename=invoices.csv"}
     )
-
-
-
-
-
-
 
 
 @app.route('/clients')
@@ -686,19 +680,44 @@ def export_clients_pdf():
     width, height = letter
 
     y = height - 50
+
+    # Title
     p.setFont("Helvetica-Bold", 14)
     p.drawString(50, y, "Client List")
     y -= 30
 
     p.setFont("Helvetica", 10)
+
     for client in clients:
-        line = f"{client.id} - {client.name} - {client.email} - {client.phone} - {client.client_type}"
-        p.drawString(50, y, line)
+        date = client.created_at.strftime('%d-%m-%Y') if client.created_at else 'N/A'
+        name = client.name or 'N/A'
+        email = client.email or 'N/A'
+        amount = f"₹{client.total_business:,.2f}" if client.total_business else "₹0.00"
+        gst = client.gstin or 'N/A'
+        pan = client.pan or 'N/A'
+
+        p.drawString(50, y, f"Date      : {date}")
         y -= 15
-        if y < 50:
+        p.drawString(50, y, f"Name      : {name}")
+        y -= 15
+        p.drawString(50, y, f"Mail ID   : {email}")
+        y -= 15
+        p.drawString(50, y, f"Amount    : {amount}")
+        y -= 15
+        p.drawString(50, y, f"GST No    : {gst}")
+        y -= 15
+        p.drawString(50, y, f"PAN No    : {pan}")
+        y -= 20
+
+        # Separator line
+        p.line(50, y, width - 50, y)
+        y -= 25
+
+        # Page break
+        if y < 80:
             p.showPage()
-            y = height - 50
             p.setFont("Helvetica", 10)
+            y = height - 50
 
     p.save()
     output.seek(0)
@@ -709,6 +728,7 @@ def export_clients_pdf():
         download_name='clients.pdf',
         mimetype='application/pdf'
     )
+
 
 @app.route('/analytics')
 @login_required
