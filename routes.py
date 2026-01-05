@@ -451,11 +451,6 @@ def edit_invoice(id):
     return render_template('edit_invoice.html', invoice=invoice, clients=clients)
 
 
-
-    
-
-
-
 @app.route('/invoice/<int:id>/duplicate', methods=['POST'])
 @login_required
 def duplicate_invoice(id):
@@ -654,6 +649,11 @@ def export_clients_excel():
         'Risk Score': c.ai_risk_score,
         'Predicted LTV': c.predicted_ltv,
         'Verified': c.blockchain_verified,
+        'Date': c.created_at.strftime('%d-%m-%Y') if c.created_at else 'N/A',
+        'Name': c.name or 'N/A',
+        'Amount': c.total_business if c.total_business else 0,
+        'GST No': c.gstin or 'N/A',
+        'PAN No': c.pan or 'N/A'
     } for c in clients]
 
     df = pd.DataFrame(client_data)

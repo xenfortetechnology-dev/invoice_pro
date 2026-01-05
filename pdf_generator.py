@@ -301,7 +301,7 @@ def generate_invoice_pdf(invoice):
         raise
 
 def generate_challan_pdf(challan):
-    """Generate delivery challan PDF"""
+    #Generate delivery challan PDF
     try:
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(
