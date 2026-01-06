@@ -476,26 +476,6 @@ def duplicate_invoice(id):
         db.session.rollback()
         return jsonify({'message': f'Failed to duplicate invoice: {str(e)}'}), 400
 
-
-
-"""from fpdf import FPDF
-
-def generate_invoice_pdf(invoice):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(0, 10, f"Invoice #{invoice.invoice_number}", ln=True)
-
-    pdf.set_font("Arial", '', 12)
-    pdf.cell(0, 10, f"Client: {invoice.client.name}", ln=True)
-    pdf.cell(0, 10, f"Amount: ₹{invoice.total_amount}", ln=True)
-    pdf.multi_cell(0, 10, f"Notes:\n{invoice.notes}\n\nTerms & Conditions:\n{invoice.terms_conditions}")
-
-    pdf_file = f"Invoice_{invoice.invoice_number}.pdf"
-    pdf.output(pdf_file)
-    return pdf_file
-
-"""
 @app.route('/invoice/<int:id>/send', methods=['POST'])
 @login_required
 def send_invoice(id):
@@ -853,7 +833,6 @@ def export_excel():
     )
 
 
-
 @app.route("/api/export/pdf")
 def export_pdf():
     from io import BytesIO
@@ -1035,4 +1014,92 @@ def inject_globals():
         'current_user_id': session.get('user_id'),
         'is_admin': session.get('is_admin', False)
     }
+      
+
+@app.route('/analytics/export/pdf')
+@login_required
+def export_analytics_pdf():
+
+    output = io.BytesIO()
+    p = canvas.Canvas(output, pagesize=letter)
+    width, height = letter
+
+    y = height - 50
+
+    # Title
+    p.setFont("Helvetica-Bold", 16)
+    p.drawCentredString(width / 2, y, "Analytics Report")
+    y -= 40
+
+    p.setFont("Helvetica", 12)
+
+    # Example analytics values (replace with real analytics_engine data)
+    total_revenue = db.session.query(func.sum(Invoice.total_amount)).scalar() or 0
+    total_clients = Client.query.count()
+    total_invoices = Invoice.query.count()
+
+    p.drawString(50, y, f"Date        : {datetime.now().strftime('%d-%m-%Y')}")
+    y -= 20
+    p.drawString(50, y, f"Total Revenue : ₹{total_revenue:,.2f}")
+    y -= 20
+    p.drawString(50, y, f"Total Clients : {total_clients}")
+    y -= 20
+    p.drawString(50, y, f"Total Invoices: {total_invoices}")
+    y -= 30
+
+    # Section line
+    p.line(50, y, width - 50, y)
+    y -= 30
+
+    # Footer
+    p.setFont("Helvetica", 9)
+    p.drawCentredString(
+        width / 2,
+        30,
+        "System Generated Analytics Report"
+    )
+
+    p.save()
+    output.seek(0)
+
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name="analytics_report.pdf",
+        mimetype="application/pdf"
+    )
+  
+
+@app.route('/analytics/export/excel')
+@login_required
+def export_analytics_excel():
+    data = {
+        'Metric': [
+            'Date',
+            'Total Revenue',
+            'Total Clients',
+            'Total Invoices'
+        ],
+        'Value': [
+            datetime.now().strftime('%d-%m-%Y'),
+            db.session.query(func.sum(Invoice.total_amount)).scalar() or 0,
+            Client.query.count(),
+            Invoice.query.count()
+        ]
+    }
+
+    df = pd.DataFrame(data)
+
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='Analytics')
+
+    output.seek(0)
+
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name="analytics_report.xlsx",
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
 
