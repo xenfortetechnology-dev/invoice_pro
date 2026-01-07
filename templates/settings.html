@@ -219,15 +219,38 @@
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="themePreference" class="form-label">Theme Preference</label>
-                                        <select class="form-select glass-input" id="themePreference">
-                                            <option value="auto" {% if settings_data.user and settings_data.user.theme_preference == 'auto' %}selected{% endif %}>Auto (System)</option>
-                                            <option value="light" {% if settings_data.user and settings_data.user.theme_preference == 'light' %}selected{% endif %}>Light</option>
-                                            <option value="dark" {% if settings_data.user and settings_data.user.theme_preference == 'dark' %}selected{% endif %}>Dark</option>
-                                        </select>
-                                    </div>
-                                </div>
+    <div class="mb-3">
+        <label for="themePreference" class="form-label">Theme Preference</label>
+        <select class="form-select glass-input" id="themePreference">
+            
+            <option value="light"
+                {% if not settings_data.user or not settings_data.user.theme_preference or settings_data.user.theme_preference == 'light' %}
+                    selected
+                {% endif %}
+            >
+                Light
+            </option>
+
+            <option value="dark"
+                {% if settings_data.user and settings_data.user.theme_preference == 'dark' %}
+                    selected
+                {% endif %}
+            >
+                Dark
+            </option>
+
+            <option value="auto"
+                {% if settings_data.user and settings_data.user.theme_preference == 'auto' %}
+                    selected
+                {% endif %}
+            >
+                Auto (System)
+            </option>
+
+        </select>
+    </div>
+</div>
+
                             </div>
                             
                             <div class="mb-4">
@@ -902,13 +925,20 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializeSettings() {
-    // Initialize theme based on user preference
-    const theme = document.getElementById('themePreference').value;
+    const themeDropdown = document.getElementById('themePreference');
+    let theme = themeDropdown.value;
+
+    // ✅ FORCE LIGHT IF EMPTY OR AUTO
+    if (!theme || theme === "auto") {
+        theme = "light";
+        themeDropdown.value = "light";
+    }
+
     applyTheme(theme);
-    
+
     // Setup form validation
     setupFormValidation();
-    
+
     // Load saved settings
     loadUserPreferences();
 }
