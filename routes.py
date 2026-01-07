@@ -653,62 +653,120 @@ def export_clients_excel():
 @app.route('/api/export/clients/pdf')
 @login_required
 def export_clients_pdf():
-    clients = Client.query.order_by(Client.name).all()
-
-    output = io.BytesIO()
-    p = canvas.Canvas(output, pagesize=letter)
+    clients = Client.query.all()
+    buffer = io.BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
 
-    y = height - 50
+    col_x = [50, width / 2 + 10]
+    col = 0
+    y = height - 70
 
+    # =====================
+    # PAGE BORDER SETTINGS (OUTSIDE LOOK)
+    # =====================
+    PAGE_MARGIN = 10   # 👈 moved border closer to page edge
+
+    def draw_page_border():
+        p.setStrokeColorRGB(0, 0, 0)   # black border
+        p.setLineWidth(2)
+        p.rect(
+            PAGE_MARGIN,
+            PAGE_MARGIN,
+            width - PAGE_MARGIN * 2,
+            height - PAGE_MARGIN * 2
+        )
+
+    # Draw border on first page
+    draw_page_border()
+
+    # =====================
     # Title
-    p.setFont("Helvetica-Bold", 14)
-    p.drawString(50, y, "Client List")
-    y -= 30
+    # =====================
+    p.setFont("Helvetica-Bold", 18)
+    p.drawCentredString(width / 2, height - 40, "Client Directory Report")
 
-    p.setFont("Helvetica", 10)
+    # Light header line
+    p.setStrokeColorRGB(0.7, 0.7, 0.7)
+    p.line(40, height - 55, width - 40, height - 55)
 
-    for client in clients:
-        date = client.created_at.strftime('%d-%m-%Y') if client.created_at else 'N/A'
-        name = client.name or 'N/A'
-        email = client.email or 'N/A'
-        amount = f"₹{client.total_business:,.2f}" if client.total_business else "₹0.00"
-        gst = client.gstin or 'N/A'
-        pan = client.pan or 'N/A'
+    # =====================
+    # Client Blocks
+    # =====================
+    for c in clients:
 
-        p.drawString(50, y, f"Date      : {date}")
-        y -= 15
-        p.drawString(50, y, f"Name      : {name}")
-        y -= 15
-        p.drawString(50, y, f"Mail ID   : {email}")
-        y -= 15
-        p.drawString(50, y, f"Amount    : {amount}")
-        y -= 15
-        p.drawString(50, y, f"GST No    : {gst}")
-        y -= 15
-        p.drawString(50, y, f"PAN No    : {pan}")
-        y -= 20
+        block_height = 150
 
-        # Separator line
-        p.line(50, y, width - 50, y)
-        y -= 25
+        # Page & column handling
+        if y - block_height < 80:
+            if col == 0:
+                col = 1
+                y = height - 70
+            else:
+                p.showPage()
+                draw_page_border()   # redraw border on new page
+                col = 0
+                y = height - 70
 
-        # Page break
-        if y < 80:
-            p.showPage()
-            p.setFont("Helvetica", 10)
-            y = height - 50
+        x = col_x[col]
+        box_width = width / 2 - 70
 
-    p.save()
-    output.seek(0)
+        # Light background color
+        p.setFillColorRGB(0.95, 0.97, 1)
+        p.roundRect(x, y - block_height, box_width, block_height, 8, fill=1)
 
-    return send_file(
-        output,
-        as_attachment=True,
-        download_name='clients.pdf',
-        mimetype='application/pdf'
+        # Block border
+        p.setStrokeColorRGB(0.75, 0.8, 0.9)
+        p.roundRect(x, y - block_height, box_width, block_height, 8, fill=0)
+
+        p.setFillColorRGB(0, 0, 0)
+        text_y = y - 30
+
+        # Client Name
+        p.setFont("Helvetica-Bold", 14)
+        p.drawString(x + 15, text_y, c.name or "N/A")
+        text_y -= 24
+
+        # Details
+        p.setFont("Helvetica", 11)
+        p.drawString(x + 15, text_y,
+            f"Date      : {c.created_at.strftime('%d-%m-%Y') if c.created_at else 'N/A'}")
+        text_y -= 18
+
+        p.drawString(x + 15, text_y, f"Mail ID   : {c.email or 'N/A'}")
+        text_y -= 18
+
+        p.drawString(x + 15, text_y,
+            f"Amount    : ₹{c.total_business:,.2f}" if c.total_business else "Amount    : ₹0.00")
+        text_y -= 18
+
+        p.drawString(x + 15, text_y, f"GST No    : {c.gstin or 'N/A'}")
+        text_y -= 18
+
+        p.drawString(x + 15, text_y, f"PAN No    : {c.pan or 'N/A'}")
+
+        y -= block_height + 20
+
+    # =====================
+    # Footer
+    # =====================
+    p.setFont("Helvetica", 9)
+    p.setFillColorRGB(0.4, 0.4, 0.4)
+    p.drawCentredString(
+        width / 2,
+        25,
+        f"Generated On : {datetime.now().strftime('%d-%m-%Y %H:%M')} | System Generated Report"
     )
 
+    p.save()
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name="clients_styled.pdf",
+        mimetype="application/pdf"
+    )
 
 @app.route('/analytics')
 @login_required
