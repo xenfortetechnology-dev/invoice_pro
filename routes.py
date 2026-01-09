@@ -382,6 +382,7 @@ def invoice_detail(id):
     return render_template(
         template_name,
         invoice=invoice,
+        company=Company,
         blockchain_verification=blockchain_verification,
         ai_insights=ai_insights
     )

@@ -1,1 +1,153 @@
-<h1>EXCEL FORMAT WORKING</h1>
+
+{% block content %}
+
+<div style="width:800px;margin:auto;font-family:Arial;font-size:12px;color:#000;">
+
+<!-- HEADER -->
+<table width="100%" border="1" cellspacing="0" cellpadding="6">
+  <tr>
+    <td width="70%">
+      <strong style="font-size:18px;">INVOICE</strong><br><br>
+
+      <strong>Invoice No :</strong> {{ invoice.invoice_number }}<br>
+      <strong>Date :</strong> {{ invoice.invoice_date.strftime('%d-%m-%Y') }}
+    </td>
+
+    <td width="30%" align="center">
+      <img src="{{ url_for('static', filename='logo.png') }}" width="120"><br>
+      <strong>{{ company.name }}</strong><br>
+      {{ company.address }}<br>
+      {{ company.city }} - {{ company.pincode }}
+    </td>
+  </tr>
+</table>
+
+<br>
+
+<!-- CUSTOMER / GST DETAILS -->
+<table width="100%" border="1" cellspacing="0" cellpadding="6">
+  <tr>
+    <td width="60%">
+      <strong>To :</strong><br>
+      {{ invoice.client.name }}<br>
+      {{ invoice.client.address }}<br>
+      {{ invoice.client.city }}<br>
+      Tamil Nadu, India
+    </td>
+
+    <td width="40%">
+      <strong>Our Details</strong><br>
+      GSTIN : {{ company.gstin }}<br>
+      PAN : {{ company.pan }}<br>
+      CIN : {{ company.cin }}
+    </td>
+  </tr>
+</table>
+
+<br>
+
+<!-- ITEM TABLE -->
+<table width="100%" border="1" cellspacing="0" cellpadding="5">
+  <tr align="center">
+    <th width="5%">Sl.No</th>
+    <th width="10%">HSN Code</th>
+    <th width="45%">Product Name / Description</th>
+    <th width="10%">Qty</th>
+    <th width="15%">Unit Price</th>
+    <th width="15%">Total</th>
+  </tr>
+
+  {% for item in invoice.line_items %}
+  <tr>
+    <td align="center">{{ loop.index }}</td>
+    <td align="center">{{ item.hsn_code }}</td>
+    <td>{{ item.description }}</td>
+    <td align="right">{{ item.quantity }}</td>
+    <td align="right">{{ "%.2f"|format(item.unit_price) }}</td>
+    <td align="right">{{ "%.2f"|format(item.total_amount) }}</td>
+  </tr>
+  {% endfor %}
+
+  <!-- EMPTY ROWS FOR FORMAT MATCH -->
+  {% for i in range(12 - invoice.line_items|length) %}
+  <tr>
+    <td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td>
+  </tr>
+  {% endfor %}
+</table>
+
+<br>
+
+<!-- TAX & TOTAL -->
+<table width="100%" border="1" cellspacing="0" cellpadding="6">
+  <tr>
+    <td width="60%">
+      <strong>Party GST No :</strong> {{ invoice.client.gstin }}<br>
+      <strong>PO No :</strong> {{ invoice.po_number or '' }}<br>
+      <strong>Vehicle No :</strong> {{ invoice.vehicle_no or '' }}
+    </td>
+
+    <td width="40%">
+      <table width="100%" border="0">
+   <tr>
+  <td colspan="6" align="right"><strong>Sub Total</strong></td>
+  <td align="right">{{ "%.2f"|format(invoice.subtotal) }}</td>
+</tr>
+
+<tr>
+  <td colspan="6" align="right">CGST</td>
+  <td align="right">{{ "%.2f"|format(invoice.cgst) }}</td>
+</tr>
+
+<tr>
+  <td colspan="6" align="right">SGST</td>
+  <td align="right">{{ "%.2f"|format(invoice.sgst) }}</td>
+</tr>
+
+<tr>
+  <td colspan="6" align="right">IGST</td>
+  <td align="right">{{ "%.2f"|format(invoice.igst) }}</td>
+</tr>
+
+<tr>
+  <td colspan="6" align="right"><strong>Grand Total</strong></td>
+  <td align="right"><strong>{{ "%.2f"|format(invoice.total_amount) }}</strong></td>
+</tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+
+<br>
+
+<!-- BANK DETAILS -->
+<table width="100%" border="1" cellspacing="0" cellpadding="6">
+  <tr>
+    <td width="60%">
+      <strong>OUR BANK DETAILS</strong><br>
+      Bank Name : {{ company.bank_name }}<br>
+      A/C No : {{ company.bank_account }}<br>
+      A/C Name : {{ company.name }}<br>
+      IFSC Code : {{ company.ifsc }}<br>
+      Branch : {{ company.branch }}
+    </td>
+
+    <td width="40%" align="center">
+      <br><br>
+      <strong>For {{ company.name }}</strong><br><br><br>
+      Authorized Signatory
+    </td>
+  </tr>
+</table>
+
+<br>
+
+<p style="text-align:center;font-size:11px;">
+Ph : {{ company.phone }} &nbsp; | &nbsp;
+Email : {{ company.email }}
+</p>
+
+</div>
+
+{% endblock %}
