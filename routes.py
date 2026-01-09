@@ -21,12 +21,11 @@ from reportlab.lib.pagesizes import letter
 import io
 import csv
 from flask import Response, request
-<<<<<<< Updated upstream
+
 from voice_service import VoiceCommandProcessor, VoiceInvoiceBuilder
-=======
+
 from pdf_generator import generate_quotation_pdf
 from flask import send_file
->>>>>>> Stashed changes
 
 # Initialize analytics engine
 analytics_engine = AnalyticsEngine(db.session)
