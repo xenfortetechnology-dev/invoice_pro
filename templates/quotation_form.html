@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %}Create Quotation{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+
+<form method="POST" action="{{ url_for('create_quotation') }}">
+
+<!-- ================= OVERVIEW ================= -->
+<div class="card shadow mb-3">
+<div class="card-header fw-bold">Quotation Overview</div>
+<div class="card-body row g-3">
+
+<input type="hidden" name="quotation_number" value="{{ quotation_no }}">
+
+<div class="col-md-3">
+<label>Quotation No</label>
+<input class="form-control" value="{{ quotation_no }}" readonly>
+</div>
+
+<div class="col-md-3">
+<label>Quotation Date</label>
+<input type="date" name="quotation_date" id="quotation_date" class="form-control" required>
+</div>
+
+<div class="col-md-3">
+<label>Validity (Days)</label>
+<input 
+    type="number" 
+    name="validity_days" 
+    id="validity_days" 
+    class="form-control" 
+    placeholder="Enter days (eg: 15)" 
+    min="1"
+    value="15"
+    required>
+</div>
+
+<div class="col-md-3">
+<label>Expiry Date</label>
+<input id="expiry_preview" class="form-control" readonly>
+</div>
+
+<div class="col-md-4">
+<label>Status</label>
+<select name="status" class="form-select">
+<option>Draft</option>
+<option>Sent</option>
+<option>Viewed</option>
+<option>Accepted</option>
+<option>Rejected</option>
+<option>Expired</option>
+</select>
+</div>
+
+<div class="col-md-4">
+<label>Sales Person</label>
+<input name="sales_person" class="form-control">
+</div>
+
+<div class="col-md-4">
+<label>Reference / Lead ID</label>
+<input name="reference_id" class="form-control">
+</div>
+
+</div>
+</div>
+
+<!-- ================= PRICING ================= -->
+<div class="card shadow mb-3">
+<div class="card-header fw-bold">Pricing Summary</div>
+<div class="card-body row g-3">
+
+{% for field in ['subtotal','discount','taxable','cgst','sgst','igst','shipping','rounding','grand_total'] %}
+<input type="hidden" name="{{ field }}" id="{{ field }}">
+{% endfor %}
+
+<div class="col-md-3">
+<label>Subtotal</label>
+<input class="form-control calc" id="ui_subtotal" value="0">
+</div>
+
+<div class="col-md-3">
+<label>Discount</label>
+<input class="form-control calc" id="ui_discount" value="0">
+</div>
+
+<div class="col-md-3">
+<label>Tax %</label>
+<input class="form-control calc" id="ui_tax" value="18">
+</div>
+
+<div class="col-md-3">
+<label>Shipping</label>
+<input class="form-control calc" id="ui_shipping" value="0">
+</div>
+
+<div class="col-md-3">
+<label>Rounding</label>
+<input class="form-control calc" id="ui_rounding" value="0">
+</div>
+
+<div class="col-md-3">
+<label>Grand Total</label>
+<input class="form-control fw-bold" id="ui_total" readonly>
+</div>
+
+</div>
+</div>
+
+<!-- ================= DELIVERY & TERMS ================= -->
+<div class="card shadow mb-3">
+<div class="card-header fw-bold">Delivery & Project Terms</div>
+<div class="card-body row g-3">
+
+<!-- Delivery Timeline -->
+<div class="col-md-4">
+<label>Delivery Timeline</label>
+<select name="delivery_timeline" class="form-select" required>
+    <option value="7 Working Days">7 Working Days</option>
+    <option value="15 Working Days" selected>15 Working Days</option>
+    <option value="30 Working Days">30 Working Days</option>
+    <option value="45 Working Days">45 Working Days</option>
+</select>
+</div>
+
+<!-- Project Scope -->
+<div class="col-md-4">
+<label>Project Scope</label>
+<select name="project_scope" class="form-select">
+    <option>Website Development</option>
+    <option>Mobile App Development</option>
+    <option>ERP System</option>
+    <option>CRM Implementation</option>
+    <option>Maintenance Support</option>
+</select>
+</div>
+
+<!-- Milestones -->
+<div class="col-md-4">
+<label>Milestones</label>
+<select name="milestones" class="form-select">
+    <option>Requirement → Design → Development → Testing → Delivery</option>
+    <option>Phase Wise Delivery</option>
+    <option>Single Final Delivery</option>
+</select>
+</div>
+
+<!-- Warranty -->
+<div class="col-md-4">
+<label>Support / Warranty</label>
+<select name="warranty" class="form-select">
+    <option>30 Days Free Support</option>
+    <option>3 Months Support</option>
+    <option>6 Months Support</option>
+    <option>1 Year Support</option>
+</select>
+</div>
+
+<!-- Revision Policy -->
+<div class="col-md-4">
+<label>Revision Policy</label>
+<select name="revision_policy" class="form-select">
+    <option>2 Free Revisions</option>
+    <option>3 Free Revisions</option>
+    <option>Unlimited Revisions (30 Days)</option>
+</select>
+</div>
+
+<!-- Dependencies -->
+<div class="col-md-4">
+<label>Dependencies</label>
+<select name="dependencies" class="form-select">
+    <option>Client Content</option>
+    <option>API Access</option>
+    <option>Server Credentials</option>
+    <option>Design Approval</option>
+</select>
+</div>
+
+  
+
+</div>
+</div>
+<!-- Terms Template -->
+<div class="col-md-12">
+<label>Terms & Conditions</label>
+
+<select class="form-select mb-2" onchange="loadTerms(this.value)">
+    <option value="">Select Terms Template</option>
+    <option value="standard">Standard Terms</option>
+    <option value="corporate">Corporate Terms</option>
+    <option value="strict">Strict Payment Terms</option>
+</select>
+
+<textarea 
+    name="terms" 
+    id="termsBox" 
+    class="form-control" 
+    rows="8"
+    placeholder="Terms will auto load here... You can edit if needed."
+></textarea>
+</div>
+
+
+<!-- ================= ACTIONS ================= -->
+<div class="d-flex gap-2">
+<button class="btn btn-success">Save Quotation</button>
+<a href="{{ url_for('quotation_list') }}" class="btn btn-secondary">View Quotations</a>
+</div>
+
+</form>
+</div>
+
+<script src="/static/js/quotation.js"></script>
+<script>
+quotation_date.addEventListener("change", calculateExpiry);
+validity_days.addEventListener("change", calculateExpiry);
+document.querySelectorAll(".calc").forEach(i => i.addEventListener("input", calculate));
+calculate();
+</script>
+
+{% endblock %}

@@ -10,7 +10,8 @@ from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.pdfgen import canvas
 import logging
-
+ 
+from reportlab.pdfgen import canvas
 from utils import number_to_words
 from models import Company
 import config
@@ -373,3 +374,116 @@ def export_excel(invoices, filename="invoices_export.xlsx"):
         logging.error(f"Excel export failed: {e}")
         raise
 
+
+def generate_quotation_pdf(q):
+    buffer = io.BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=30,
+        leftMargin=30,
+        topMargin=40,
+        bottomMargin=30
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "title",
+        fontSize=20,
+        alignment=TA_CENTER,
+        spaceAfter=10,
+        textColor=colors.HexColor("#2c3e50")
+    )
+
+    label_style = ParagraphStyle(
+        "label",
+        fontSize=10,
+        textColor=colors.grey
+    )
+
+    value_style = ParagraphStyle(
+        "value",
+        fontSize=11
+    )
+
+    elements = []
+
+    # ================= TITLE =================
+    elements.append(Paragraph("QUOTATION", title_style))
+    elements.append(Spacer(1, 10))
+
+    # ================= QUOTATION INFO =================
+    info_data = [
+        ["Quotation No", q.quotation_number, "Status", q.status],
+        ["Quotation Date", str(q.quotation_date), "Sales Person", q.sales_person],
+        ["Validity (Days)", str(q.validity_days), "Grand Total", f"₹ {q.grand_total:,.2f}"],
+    ]
+
+    info_table = Table(info_data, colWidths=[90, 180, 90, 150])
+    info_table.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
+        ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
+        ("FONT", (0,0), (-1,-1), "Helvetica"),
+        ("ALIGN", (-1,0), (-1,-1), "RIGHT"),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 8),
+        ("TOPPADDING", (0,0), (-1,-1), 8),
+    ]))
+
+    elements.append(info_table)
+    elements.append(Spacer(1, 20))
+
+    # ================= PRICING SUMMARY =================
+    pricing_data = [
+        ["Subtotal", f"₹ {q.subtotal:,.2f}"],
+        ["Discount", f"₹ {q.discount:,.2f}"],
+        ["Taxable Value", f"₹ {q.taxable_value:,.2f}"],
+        ["CGST", f"₹ {q.cgst:,.2f}"],
+        ["SGST", f"₹ {q.sgst:,.2f}"],
+        ["Shipping", f"₹ {q.shipping:,.2f}"],
+        ["Rounding", f"₹ {q.rounding:,.2f}"],
+        ["Grand Total", f"₹ {q.grand_total:,.2f}"],
+    ]
+
+    pricing_table = Table(pricing_data, colWidths=[200, 150])
+    pricing_table.setStyle(TableStyle([
+        ("BACKGROUND", (0,-1), (-1,-1), colors.lightgrey),
+        ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
+        ("ALIGN", (1,0), (1,-1), "RIGHT"),
+        ("FONT", (0,-1), (-1,-1), "Helvetica-Bold"),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+        ("TOPPADDING", (0,0), (-1,-1), 6),
+    ]))
+
+    elements.append(Paragraph("Pricing Summary", styles["Heading3"]))
+    elements.append(pricing_table)
+    elements.append(Spacer(1, 20))
+
+    # ================= DELIVERY TERMS =================
+    terms_text = f"""
+    <b>Delivery Timeline:</b> {q.delivery_timeline}<br/>
+    <b>Project Scope:</b> {q.project_scope}<br/>
+    <b>Milestones:</b> {q.milestones}<br/>
+    <b>Warranty:</b> {q.warranty}<br/>
+    <b>Revision Policy:</b> {q.revision_policy}<br/>
+    <b>Dependencies:</b> {q.dependencies}<br/>
+    """
+
+    elements.append(Paragraph("Delivery & Project Terms", styles["Heading3"]))
+    elements.append(Paragraph(terms_text, styles["Normal"]))
+    elements.append(Spacer(1, 15))
+
+    # ================= TERMS & CONDITIONS =================
+    elements.append(Paragraph("Terms & Conditions", styles["Heading3"]))
+    elements.append(Paragraph(q.terms or "-", styles["Normal"]))
+
+    # ================= PAGE BORDER =================
+    def draw_border(canvas, doc):
+        canvas.setStrokeColor(colors.grey)
+        canvas.setLineWidth(1)
+        canvas.rect(20, 20, A4[0]-40, A4[1]-40)
+
+    doc.build(elements, onFirstPage=draw_border, onLaterPages=draw_border)
+
+    buffer.seek(0)
+    return buffer

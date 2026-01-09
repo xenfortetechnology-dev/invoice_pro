@@ -21,7 +21,11 @@ from reportlab.lib.pagesizes import letter
 import io
 import csv
 from flask import Response, request
+
 from voice_service import VoiceCommandProcessor, VoiceInvoiceBuilder
+
+from pdf_generator import generate_quotation_pdf
+from flask import send_file
 
 # Initialize analytics engine
 analytics_engine = AnalyticsEngine(db.session)
@@ -1190,6 +1194,7 @@ def export_analytics_pdf():
     )
 
 @app.route('/analytics/export/excel')
+
 @login_required
 def export_analytics_excel():
 
@@ -1255,6 +1260,7 @@ def export_analytics_excel():
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
+
 voice_processor = VoiceCommandProcessor()
 
 @app.route("/api/voice-command", methods=["POST"])
@@ -1289,3 +1295,183 @@ def handle_voice_command():
             "message": "Internal server error in voice command",
             "error": str(e)
         }), 500
+
+    
+
+ 
+
+from flask import render_template, request, redirect, url_for
+from datetime import datetime, timedelta
+from app import app, db
+from models import Quotation
+
+# -------------------------
+# Auto Quotation Number
+# -------------------------
+def generate_quotation_number():
+    last = Quotation.query.order_by(Quotation.id.desc()).first()
+    next_id = 1 if not last else last.id + 1
+    return f"QT-2026-{str(next_id).zfill(4)}"
+
+
+# -------------------------
+# Create Form
+# -------------------------
+@app.route("/quotations")
+def quotation_form():
+    return render_template(
+        "quotation_form.html",
+        quotation_no=generate_quotation_number()
+    )
+
+def safe_float(value):
+    try:
+        return float(value)
+    except:
+        return 0.0
+
+# -------------------------
+# Save Quotation
+# -------------------------
+@app.route("/quotations/create", methods=["POST"])
+def create_quotation():
+    f = request.form
+
+    quotation_date = datetime.strptime(f["quotation_date"], "%Y-%m-%d")
+    validity_days = int(f["validity_days"])
+    expiry_date = quotation_date + timedelta(days=validity_days)
+
+    quotation = Quotation(
+    quotation_number=f.get("quotation_number"),
+    quotation_date=quotation_date,
+    validity_days=validity_days,
+    expiry_date=expiry_date,
+    status=f.get("status"),
+
+    sales_person = f.get("sales_person"),
+    reference_id=f.get("reference_id"),
+
+    subtotal=safe_float(f.get("subtotal")),
+    discount=safe_float(f.get("discount")),
+    taxable_value=safe_float(f.get("taxable")),
+    cgst=safe_float(f.get("cgst")),
+    sgst=safe_float(f.get("sgst")),
+    igst=safe_float(f.get("igst")),
+    shipping=safe_float(f.get("shipping")),
+    rounding=safe_float(f.get("rounding")),
+    grand_total=safe_float(f.get("grand_total")),
+
+    delivery_timeline=f.get("delivery_timeline"),
+    project_scope=f.get("project_scope"),
+    milestones=f.get("milestones"),
+    warranty=f.get("warranty"),
+    revision_policy=f.get("revision_policy"),
+    dependencies=f.get("dependencies"),
+    terms=f.get("terms")
+)
+
+    db.session.add(quotation)
+    db.session.commit()
+
+    return redirect(url_for("quotation_preview", qid=quotation.id))
+
+
+# -------------------------
+# Preview
+# -------------------------
+@app.route("/quotations/preview/<int:qid>")
+def quotation_preview(qid):
+    q = Quotation.query.get_or_404(qid)
+    return render_template("quotation_preview.html", q=q)
+
+
+# -------------------------
+# List
+# -------------------------
+@app.route("/quotations/list")
+def quotation_list():
+    quotations = Quotation.query.order_by(Quotation.id.desc()).all()
+    return render_template("quotation_list.html", quotations=quotations)
+
+
+# -------------------------
+# Duplicate
+# -------------------------
+@app.route("/quotations/duplicate/<int:qid>")
+def duplicate_quotation(qid):
+    q = Quotation.query.get_or_404(qid)
+
+    new = Quotation(
+        quotation_number=generate_quotation_number(),
+        quotation_date=q.quotation_date,
+        validity_days=q.validity_days,
+        expiry_date=q.expiry_date,
+        status="Draft",
+        sales_person=q.sales_person,
+        reference_id=q.reference_id,
+
+        subtotal=q.subtotal,
+        discount=q.discount,
+        taxable_value=q.taxable_value,
+        cgst=q.cgst,
+        sgst=q.sgst,
+        igst=q.igst,
+        shipping=q.shipping,
+        rounding=q.rounding,
+        grand_total=q.grand_total,
+
+        delivery_timeline=q.delivery_timeline,
+        project_scope=q.project_scope,
+        milestones=q.milestones,
+        warranty=q.warranty,
+        revision_policy=q.revision_policy,
+        dependencies=q.dependencies,
+        terms=q.terms
+    )
+
+    db.session.add(new)
+    db.session.commit()
+    return redirect(url_for("quotation_preview", qid=new.id))
+
+
+# -------------------------
+# Cancel / Reject
+# -------------------------
+@app.route("/quotations/cancel/<int:qid>")
+def cancel_quotation(qid):
+    q = Quotation.query.get_or_404(qid)
+    q.status = "Cancelled"
+    db.session.commit()
+    return redirect(url_for("quotation_preview", qid=q.id))
+
+
+@app.route("/quotations/<int:qid>/delete")
+def delete_quotation(qid):
+    q = Quotation.query.get_or_404(qid)
+    db.session.delete(q)
+    db.session.commit()
+    flash("Quotation deleted successfully!", "success")
+    return redirect(url_for("quotation_list"))
+
+@app.route("/quotations/<int:qid>/pdf")
+def quotation_pdf(qid):
+    quotation = Quotation.query.get_or_404(qid)
+    pdf_file = generate_quotation_pdf(quotation)
+
+    return send_file(
+        pdf_file,
+        download_name=f"{quotation.quotation_number}.pdf",
+        as_attachment=True
+    )
+
+
+@app.route("/quotations/<int:qid>/convert")
+def convert_to_invoice(qid):
+    quotation = Quotation.query.get_or_404(qid)
+
+    quotation.status = "Converted to Invoice"
+    db.session.commit()
+
+    flash("Quotation converted to Invoice successfully!", "success")
+    return redirect(url_for("quotation_list"))
+

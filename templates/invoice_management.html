@@ -401,16 +401,7 @@ document.addEventListener('DOMContentLoaded', function() {
         bulkActions.style.display = checkedCount > 0 ? 'inline-flex' : 'none';
     }
  
-    
 
-
-
-
-
-
-
-
-    
     // Blockchain verification buttons
     {% if blockchain_enabled %}
     const blockchainVerifyBtns = document.querySelectorAll('.blockchain-verify-btn');
@@ -493,13 +484,6 @@ function sendInvoice(invoiceId) {
         })
         .catch(err => alert("Unexpected error: " + err));
 }
-
-
-
-
-
-
-
 
 function verifyInvoiceOnBlockchain(invoiceId) {
     console.log('Verify invoice on blockchain:', invoiceId);
