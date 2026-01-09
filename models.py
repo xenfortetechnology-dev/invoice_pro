@@ -85,6 +85,7 @@ class Invoice(db.Model):
     # Additional fields
     notes = db.Column(db.Text)
     terms_conditions = db.Column(db.Text)
+    invoice_format = db.Column(db.String(50), default="default")
     invoice_type = db.Column(db.String(20), default='Invoice')
     
     # Revolutionary AI Features

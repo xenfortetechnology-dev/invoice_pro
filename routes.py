@@ -213,6 +213,7 @@ def create_invoice():
             due_date_str = request.form.get('due_date')
             notes = request.form.get('notes', '')
             terms_conditions = request.form.get('terms_conditions', '')
+            invoice_format = request.form.get("invoice_format", "default")
 
             # Parse dates
             invoice_date = datetime.strptime(invoice_date_str, '%Y-%m-%d').date() if invoice_date_str else datetime.now().date()
@@ -229,6 +230,7 @@ def create_invoice():
                 due_date=due_date,
                 notes=notes,
                 terms_conditions=terms_conditions,
+                invoice_format=invoice_format,
                 ai_generated=request.form.get('ai_generated') == 'true',
                 voice_command_created=request.form.get('voice_created') == 'true'
             )
@@ -364,11 +366,26 @@ def invoice_detail(id):
             }
         except Exception as e:
             logging.error(f"AI insights failed: {e}")
-    
-    return render_template('invoice_detail.html',
-                         invoice=invoice,
-                         blockchain_verification=blockchain_verification,
-                         ai_insights=ai_insights)
+
+    # 🔹 FORMAT SWITCH LOGIC (THIS IS THE ONLY ADDITION)
+    template_map = {
+    "default": "invoice_detail.html",
+    "excel_customer_A": "invoice_excel_customer_A.html"
+    }
+
+
+    template_name = template_map.get(
+        invoice.invoice_format,
+        "invoice_detail.html"
+    )
+
+    return render_template(
+        template_name,
+        invoice=invoice,
+        blockchain_verification=blockchain_verification,
+        ai_insights=ai_insights
+    )
+
 
 @app.route('/invoice/<int:id>/pdf')
 @login_required
