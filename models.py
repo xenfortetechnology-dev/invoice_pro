@@ -312,3 +312,38 @@ class DocumentTemplate(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+from datetime import datetime
+from app import db
+
+class Quotation(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+
+    quotation_number = db.Column(db.String(50), unique=True, nullable=False)
+    quotation_date = db.Column(db.Date, nullable=False)
+    validity_days = db.Column(db.Integer)
+    expiry_date = db.Column(db.Date)
+
+    status = db.Column(db.String(30), default="Draft")
+    sales_person = db.Column(db.String(100))
+    reference_id = db.Column(db.String(100))
+
+    subtotal = db.Column(db.Float)
+    discount = db.Column(db.Float)
+    taxable_value = db.Column(db.Float)
+    cgst = db.Column(db.Float)
+    sgst = db.Column(db.Float)
+    igst = db.Column(db.Float)
+    shipping = db.Column(db.Float)
+    rounding = db.Column(db.Float)
+    grand_total = db.Column(db.Float)
+
+    delivery_timeline = db.Column(db.String(100))
+    project_scope = db.Column(db.Text)
+    milestones = db.Column(db.Text)
+    warranty = db.Column(db.String(100))
+    revision_policy = db.Column(db.String(200))
+    dependencies = db.Column(db.String(200))
+    terms = db.Column(db.Text)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)

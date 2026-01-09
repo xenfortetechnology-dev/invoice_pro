@@ -64,6 +64,15 @@
                     <i data-feather="file-text" class="me-2"></i> Invoices
                 </a>
             </li>
+        <li>
+  <a class="nav-link {% if request.endpoint == 'quotation_form' %}active{% endif %}" 
+     href="{{ url_for('quotation_form') }}">
+     
+    <i data-feather="file-text" class="me-2"></i> Quotation
+  </a>
+</li>
+
+
             <li>
                 <a class="nav-link {% if request.endpoint == 'client_management' %}active{% endif %}" href="{{ url_for('client_management') }}">
                     <i data-feather="users" class="me-2"></i> Clients
