@@ -21,6 +21,7 @@ from reportlab.lib.pagesizes import letter
 import io
 import csv
 from flask import Response, request
+from voice_service import VoiceCommandProcessor, VoiceInvoiceBuilder
 
 # Initialize analytics engine
 analytics_engine = AnalyticsEngine(db.session)
@@ -1161,3 +1162,37 @@ def export_analytics_excel():
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
 
+voice_processor = VoiceCommandProcessor()
+
+@app.route("/api/voice-command", methods=["POST"])
+def handle_voice_command():
+    try:
+        data = request.get_json(force=True)
+
+        voice_text = data.get("text", "").strip()
+        user_id = data.get("user_id", 1)  # default for now
+
+        if not voice_text:
+            return jsonify({
+                "success": False,
+                "message": "No voice text received"
+            }), 400
+
+        result = voice_processor.process_voice_command(
+            user_id=user_id,
+            voice_text=voice_text,
+            context={}
+        )
+
+        return jsonify(result)
+
+    except Exception as e:
+        # 🔴 THIS IS THE MOST IMPORTANT PART
+        import traceback
+        traceback.print_exc()
+
+        return jsonify({
+            "success": False,
+            "message": "Internal server error in voice command",
+            "error": str(e)
+        }), 500
