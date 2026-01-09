@@ -23,30 +23,33 @@
                     <div class="card-body">
                         <div class="mb-3">
                             <label for="client_id" class="form-label">Select Client *</label>
-                            <select class="form-select" id="client_id" name="client_id" required>
+                                <select class="form-select" id="client_id" name="client_id" required>
                                 <option value="">Choose a client...</option>
-                                {% for client in clients %}
-                                <option value="{{ client.id }}" 
-                                        data-name="{{ client.name }}"
-                                        data-address="{{ client.address or '' }}"
-                                        data-city="{{ client.city or '' }}"
-                                        data-state="{{ client.state or '' }}"
-                                        data-phone="{{ client.phone or '' }}">
-                                    {{ client.name }} - {{ client.phone or 'No Phone' }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
 
-                        <div id="clientDetails" class="d-none">
-                            <div class="row">
-                                <div class="col-md-12">
-                                    <p><strong>Address:</strong> <span id="clientAddress"></span></p>
-                                    <p><strong>City:</strong> <span id="clientCity"></span>, <span id="clientState"></span></p>
-                                    <p><strong>Phone:</strong> <span id="clientPhone"></span></p>
+                                {% for client in clients %}
+                                 <option value="{{ client.id }}"
+                                 data-address="{{ client.address or '' }}"
+                                 data-city="{{ client.city or '' }}"
+                                 data-phone="{{ client.phone or '' }}">
+                                 {{ client.name }} - {{ client.phone or 'No Phone' }}
+                                </option>
+
+                                {% endfor %}
+                                </select>
+
                                 </div>
-                            </div>
-                        </div>
+<div id="clientDetails" class="d-none mt-3">
+    <div class="row">
+        <div class="col-md-12">
+            <p><strong>Address:</strong> <span id="clientAddress"></span></p>
+            <p><strong>City:</strong> <span id="clientCity"></span></p>
+            <p><strong>Phone:</strong> <span id="clientPhone"></span></p>
+        </div>
+    </div>
+</div>
+
+
+
                     </div>
                 </div>
             </div>
@@ -213,29 +216,44 @@
     </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/challan.js') }}"></script>
+
 <script>
-// Client selection handler
-document.getElementById('client_id').addEventListener('change', function() {
-    const selectedOption = this.options[this.selectedIndex];
-    const clientDetails = document.getElementById('clientDetails');
-    
-    if (selectedOption.value) {
-        document.getElementById('clientAddress').textContent = selectedOption.dataset.address || 'N/A';
-        document.getElementById('clientCity').textContent = selectedOption.dataset.city || 'N/A';
-        document.getElementById('clientState').textContent = selectedOption.dataset.state || 'N/A';
-        document.getElementById('clientPhone').textContent = selectedOption.dataset.phone || 'N/A';
-        clientDetails.classList.remove('d-none');
-        
-        // Load client invoices for import
-        loadClientInvoices(selectedOption.value);
-    } else {
-        clientDetails.classList.add('d-none');
-    }
+ 
+document.addEventListener("DOMContentLoaded", function () {
+
+    const clientSelect = document.getElementById("client_id");
+    const detailsBox = document.getElementById("clientDetails");
+
+    clientSelect.addEventListener("change", function () {
+
+        const selected = this.options[this.selectedIndex];
+
+        if (!selected.value) {
+            detailsBox.classList.add("d-none");
+            return;
+        }
+
+        document.getElementById("clientAddress").innerText =
+            selected.dataset.address || "N/A";
+
+        document.getElementById("clientCity").innerText =
+            selected.dataset.city || "N/A";
+
+        document.getElementById("clientPhone").innerText =
+            selected.dataset.phone || "N/A";
+
+        // ✅ SHOW DETAILS BOX
+        detailsBox.classList.remove("d-none");
+    });
+
 });
+ 
+
+
 
 //let challanItemCounter = 0;
 //let challanItems = [];
+let challanItemCounter = 1;
 
 function addChallanItem() {
     challanItemCounter++;

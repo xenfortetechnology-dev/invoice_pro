@@ -662,10 +662,7 @@ def export_clients_pdf():
     col_x = [50, width / 2 + 10]
     col = 0
     y = height - 70
-
-    # =====================
-    # PAGE BORDER SETTINGS (OUTSIDE LOOK)
-    # =====================
+ 
     PAGE_MARGIN = 10   # 👈 moved border closer to page edge
 
     def draw_page_border():
@@ -681,19 +678,14 @@ def export_clients_pdf():
     # Draw border on first page
     draw_page_border()
 
-    # =====================
-    # Title
-    # =====================
+    
     p.setFont("Helvetica-Bold", 18)
     p.drawCentredString(width / 2, height - 40, "Client Directory Report")
 
     # Light header line
     p.setStrokeColorRGB(0.7, 0.7, 0.7)
     p.line(40, height - 55, width - 40, height - 55)
-
-    # =====================
-    # Client Blocks
-    # =====================
+ 
     for c in clients:
 
         block_height = 150
@@ -748,9 +740,7 @@ def export_clients_pdf():
 
         y -= block_height + 20
 
-    # =====================
-    # Footer
-    # =====================
+    
     p.setFont("Helvetica", 9)
     p.setFillColorRGB(0.4, 0.4, 0.4)
     p.drawCentredString(
@@ -847,7 +837,13 @@ def settings():
 @app.route("/create-challan")
 @login_required
 def create_challan():
-    return render_template("create_challan.html")
+    clients = Client.query.order_by(Client.name).all()
+
+    for c in clients:
+        print("CLIENT:", c.name, "| Address:", c.address, "| City:", c.city, "| Phone:", c.phone)
+
+    return render_template("create_challan.html", clients=clients)
+
 
 @app.route("/delivery-challan")
 @login_required
@@ -1083,39 +1079,86 @@ def export_analytics_pdf():
     p = canvas.Canvas(output, pagesize=letter)
     width, height = letter
 
-    y = height - 50
+   
+    PAGE_MARGIN = 10
 
-    # Title
-    p.setFont("Helvetica-Bold", 16)
-    p.drawCentredString(width / 2, y, "Analytics Report")
-    y -= 40
+    def draw_page_border():
+        p.setStrokeColorRGB(0, 0, 0)
+        p.setLineWidth(2)
+        p.rect(
+            PAGE_MARGIN,
+            PAGE_MARGIN,
+            width - PAGE_MARGIN * 2,
+            height - PAGE_MARGIN * 2
+        )
 
-    p.setFont("Helvetica", 12)
+    draw_page_border()
 
-    # Example analytics values (replace with real analytics_engine data)
+
     total_revenue = db.session.query(func.sum(Invoice.total_amount)).scalar() or 0
     total_clients = Client.query.count()
     total_invoices = Invoice.query.count()
+    generated_on = datetime.now().strftime('%d-%m-%Y %H:%M')
 
-    p.drawString(50, y, f"Date        : {datetime.now().strftime('%d-%m-%Y')}")
-    y -= 20
-    p.drawString(50, y, f"Total Revenue : ₹{total_revenue:,.2f}")
-    y -= 20
-    p.drawString(50, y, f"Total Clients : {total_clients}")
-    y -= 20
-    p.drawString(50, y, f"Total Invoices: {total_invoices}")
+    y = height - 80
+
+    
+    p.setFont("Helvetica-Bold", 20)
+    p.drawCentredString(width / 2, y, "ANALYTICS REPORT")
     y -= 30
 
-    # Section line
+    p.setFont("Helvetica", 11)
+    p.drawCentredString(width / 2, y, f"Generated On : {generated_on}")
+    y -= 30
+
+    # Divider
+    p.setLineWidth(1)
     p.line(50, y, width - 50, y)
-    y -= 30
+    y -= 40
 
-    # Footer
-    p.setFont("Helvetica", 9)
+   
+    metrics = [
+        ("Total Revenue", f"₹{total_revenue:,.2f}"),
+        ("Total Clients", str(total_clients)),
+        ("Total Invoices", str(total_invoices)),
+    ]
+
+    card_width = width - 140
+    card_height = 50
+    x = 70
+
+    for label, value in metrics:
+
+        if y - card_height < 80:
+            p.showPage()
+            draw_page_border()
+            y = height - 120
+
+        # Card background
+        p.setFillColorRGB(0.95, 0.97, 1)
+        p.roundRect(x, y - card_height, card_width, card_height, 10, fill=1)
+
+        # Card border
+        p.setStrokeColorRGB(0, 0, 0)
+        p.roundRect(x, y - card_height, card_width, card_height, 10, fill=0)
+
+        p.setFillColorRGB(0, 0, 0)
+
+        # Text
+        p.setFont("Helvetica-Bold", 14)
+        p.drawString(x + 25, y - 30, label)
+
+        p.setFont("Helvetica", 13)
+        p.drawRightString(x + card_width - 25, y - 30, value)
+
+        y -= card_height + 30
+
+   
+    p.setFont("Helvetica", 10)
     p.drawCentredString(
         width / 2,
         30,
-        "System Generated Analytics Report"
+        "System Generated Business Analytics Report"
     )
 
     p.save()
@@ -1127,31 +1170,63 @@ def export_analytics_pdf():
         download_name="analytics_report.pdf",
         mimetype="application/pdf"
     )
-  
 
 @app.route('/analytics/export/excel')
 @login_required
 def export_analytics_excel():
-    data = {
-        'Metric': [
-            'Date',
-            'Total Revenue',
-            'Total Clients',
-            'Total Invoices'
-        ],
-        'Value': [
-            datetime.now().strftime('%d-%m-%Y'),
-            db.session.query(func.sum(Invoice.total_amount)).scalar() or 0,
-            Client.query.count(),
-            Invoice.query.count()
-        ]
-    }
 
-    df = pd.DataFrame(data)
+    total_revenue = db.session.query(func.sum(Invoice.total_amount)).scalar() or 0
+    total_clients = Client.query.count()
+    total_invoices = Invoice.query.count()
+    generated_on = datetime.now().strftime('%d-%m-%Y %H:%M')
+
+    data = [
+        ["Generated On", generated_on],
+        ["Total Revenue", total_revenue],
+        ["Total Clients", total_clients],
+        ["Total Invoices", total_invoices],
+    ]
+
+    df = pd.DataFrame(data, columns=["Metric", "Value"])
 
     output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name='Analytics')
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="Analytics")
+
+        workbook = writer.book
+        worksheet = writer.sheets["Analytics"]
+
+        # Formatting
+        header_format = workbook.add_format({
+            "bold": True,
+            "font_size": 12,
+            "align": "center",
+            "border": 1
+        })
+
+        cell_format = workbook.add_format({
+            "font_size": 11,
+            "border": 1
+        })
+
+        currency_format = workbook.add_format({
+            "num_format": "₹#,##0.00",
+            "border": 1
+        })
+
+        # Apply formatting
+        worksheet.set_column("A:A", 25)
+        worksheet.set_column("B:B", 25)
+
+        worksheet.write_row("A1", ["Metric", "Value"], header_format)
+
+        for row in range(1, len(data) + 1):
+            worksheet.write(row, 0, df.iloc[row - 1, 0], cell_format)
+
+            if df.iloc[row - 1, 0] == "Total Revenue":
+                worksheet.write(row, 1, df.iloc[row - 1, 1], currency_format)
+            else:
+                worksheet.write(row, 1, df.iloc[row - 1, 1], cell_format)
 
     output.seek(0)
 
@@ -1159,7 +1234,7 @@ def export_analytics_excel():
         output,
         as_attachment=True,
         download_name="analytics_report.xlsx",
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
 voice_processor = VoiceCommandProcessor()

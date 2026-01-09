@@ -39,9 +39,7 @@
             </a>
         </li>
         <li>
-    <a class="dropdown-item" href="javascript:void(0)" onclick="exportClientsToQuotation()">
-        <i data-feather="file-plus" class="me-2"></i> Quotation
-    </a>
+     
 </li>
     </ul>
 </div>
@@ -509,9 +507,7 @@ function exportClientsToExcel() {
 function exportClientsToPDF() {
     window.location.href = '/api/export/clients/pdf?' + new URLSearchParams(window.location.search);
 }
-function exportClientsToQuotation() {
-    window.location.href = '/api/export/clients/quotation?' + new URLSearchParams(window.location.search);
-}
+ 
 
 document.addEventListener('DOMContentLoaded', function() {
     const tableBody = document.getElementById('clientsTableBody'); // table body
