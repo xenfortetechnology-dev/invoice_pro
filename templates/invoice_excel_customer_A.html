@@ -1,8 +1,9 @@
 
 {% block content %}
-<h3>DEBUG</h3>
-<p>Invoice ID: {{ invoice.id }}</p>
-<p>Line Items Count: {{ invoice.line_items|length }}</p>
+<pre>
+  BANK DEBUG:
+  {{ bank }}
+</pre>
 
 <div style="width:800px;margin:auto;font-family:Arial;font-size:12px;color:#000;">
 
@@ -49,7 +50,7 @@
 
 <br>
 
-<!-- ITEM TABLE -->
+
 <!-- ITEM TABLE -->
 <table width="100%" border="1" cellspacing="0" cellpadding="5">
   <tr align="center">
@@ -127,16 +128,16 @@
 
 <br>
 
-<!-- BANK DETAILS -->
+<!-- BANK DETAILS-->
 <table width="100%" border="1" cellspacing="0" cellpadding="6">
   <tr>
-    <td width="60%">
+   <td>
       <strong>OUR BANK DETAILS</strong><br>
-      Bank Name : {{ company.bank_name }}<br>
-      A/C No : {{ company.bank_account }}<br>
-      A/C Name : {{ company.name }}<br>
-      IFSC Code : {{ company.ifsc }}<br>
-      Branch : {{ company.branch }}
+      Bank Name : {{ bank.bank_name }}<br>
+      A/C No. : {{ bank.account_number }}<br>
+      A/C Name : {{ bank.account_name }}<br>
+      IFSC Code : {{ bank.ifsc_code }}<br>
+      Branch : {{ bank.branch }}
     </td>
 
     <td width="40%" align="center">
@@ -145,9 +146,8 @@
       Authorized Signatory
     </td>
   </tr>
-</table>
+</table> 
 
-<br>
 
 <p style="text-align:center;font-size:11px;">
 Ph : {{ company.phone }} &nbsp; | &nbsp;
