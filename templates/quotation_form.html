@@ -200,11 +200,16 @@
     placeholder="Terms will auto load here... You can edit if needed."
 ></textarea>
 </div>
-
-
+ 
 <!-- ================= ACTIONS ================= -->
 <div class="d-flex gap-2">
 <button class="btn btn-success">Save Quotation</button>
+   <button type="submit" 
+            name="save_draft" 
+            value="1"
+            class="btn btn-warning">
+        📝 Save as Draft
+    </button>
 <a href="{{ url_for('quotation_list') }}" class="btn btn-secondary">View Quotations</a>
 </div>
 

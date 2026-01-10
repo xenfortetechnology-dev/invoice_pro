@@ -23,6 +23,30 @@
        onclick="return confirm('Are you sure you want to delete this quotation?')">
        Delete
     </a>
+    <td class="d-flex flex-wrap gap-1">
+
+    <!-- Preview -->
+    <a href="/quotations/preview/{{ q.id }}" 
+       class="btn btn-sm btn-info">
+       Preview
+    </a>
+
+ 
+    <!-- Email -->
+    <a href="/quotations/{{ q.id }}/send-email" 
+       class="btn btn-sm btn-warning">
+       Email
+    </a>
+
+    <!-- WhatsApp -->
+    <a href="/quotations/{{ q.id }}/send-whatsapp" 
+       class="btn btn-sm btn-success">
+       WhatsApp
+    </a>
+
+   
+</td>
+
 </td>
 </tr>
 {% endfor %}

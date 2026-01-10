@@ -1474,3 +1474,27 @@ def convert_to_invoice(qid):
     flash("Quotation converted to Invoice successfully!", "success")
     return redirect(url_for("quotation_list"))
 
+
+ 
+
+
+@app.route("/quotations/<int:qid>/send-email")
+def send_email(qid):
+    q = Quotation.query.get_or_404(qid)
+
+    # TEMP DEMO (replace with real email later)
+    print("Sending email for quotation:", q.quotation_number)
+
+    flash("Email sent successfully (demo).")
+    return redirect(url_for("quotation_list"))
+
+
+@app.route("/quotations/<int:qid>/send-whatsapp")
+def send_whatsapp(qid):
+    q = Quotation.query.get_or_404(qid)
+
+    # TEMP DEMO
+    print("Sending WhatsApp for quotation:", q.quotation_number)
+
+    flash("WhatsApp sent successfully (demo).")
+    return redirect(url_for("quotation_list"))

@@ -69,5 +69,20 @@
 </div>
 
 </div>
+<hr>
+
+<div class="d-flex flex-wrap gap-2 mt-3">
+    <!-- Preview -->
+    <a href="/quotations/preview/{{ q.id }}" class="btn btn-info">
+        👁 Preview
+    </a>
+
+    <!-- Download PDF -->
+    <a href="/quotations/{{ q.id }}/pdf" class="btn btn-primary">
+        📄 Download PDF
+    </a>
+
+
+</div>
 
 {% endblock %}
