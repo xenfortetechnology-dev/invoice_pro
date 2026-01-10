@@ -1,9 +1,5 @@
 
 {% block content %}
-<pre>
-  BANK DEBUG:
-  {{ bank }}
-</pre>
 
 <div style="width:800px;margin:auto;font-family:Arial;font-size:12px;color:#000;">
 
@@ -142,6 +138,9 @@
 
     <td width="40%" align="center">
       <br><br>
+      <img src="{{ url_for('static', filename='signature.png') }}"
+       alt="Authorized Signature"
+       style="height:45px;"><br><br>
       <strong>For {{ company.name }}</strong><br><br><br>
       Authorized Signatory
     </td>
