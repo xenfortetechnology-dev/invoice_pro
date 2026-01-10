@@ -63,6 +63,7 @@ class Client(db.Model):
     challans = db.relationship('DeliveryChallan', backref='client', lazy=True)
 
 class Invoice(db.Model):
+    __tablename__ = "invoice"
     id = db.Column(db.Integer, primary_key=True)
     invoice_number = db.Column(db.String(50), unique=True, nullable=False)
     client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
@@ -110,6 +111,7 @@ class Invoice(db.Model):
     ai_interactions = db.relationship('AIInteraction', backref='invoice', lazy=True)
 
 class InvoiceLineItem(db.Model):
+    __tablename__ = "invoice_line_item"
     id = db.Column(db.Integer, primary_key=True)
     invoice_id = db.Column(db.Integer, db.ForeignKey('invoice.id'), nullable=False)
     sr_no = db.Column(db.Integer, nullable=False)
@@ -312,6 +314,21 @@ class DocumentTemplate(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class BankDetails(db.Model):
+    __tablename__ = "bank_details"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    bank_name = db.Column(db.String(100))
+    account_number = db.Column(db.String(50))
+    account_name = db.Column(db.String(100))
+    ifsc_code = db.Column(db.String(20))
+    branch = db.Column(db.String(100))
+   
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 
 from datetime import datetime
 from app import db

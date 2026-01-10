@@ -26,6 +26,7 @@ from voice_service import VoiceCommandProcessor, VoiceInvoiceBuilder
 
 from pdf_generator import generate_quotation_pdf
 from flask import send_file
+from models import BankDetails
 
 # Initialize analytics engine
 analytics_engine = AnalyticsEngine(db.session)
@@ -240,9 +241,11 @@ def create_invoice():
             )
 
             db.session.add(invoice)
-            db.session.flush()
+            db.session.commit()
 
             # Process line items
+            print("RAW line_items:", request.form.get("line_items"))
+
             line_items_data = json.loads(request.form.get('line_items', '[]'))
             subtotal = 0
             total_tax = 0
@@ -273,6 +276,7 @@ def create_invoice():
                 db.session.add(line_item)
                 subtotal += line_total
                 total_tax += tax_amount
+            db.session.commit()
 
             # Calculate taxes based on client location
             client = Client.query.get(client_id)
@@ -350,7 +354,7 @@ def create_invoice():
 def invoice_detail(id):
     """Detailed invoice view with blockchain verification"""
     invoice = Invoice.query.get_or_404(id)
-    
+ 
     # Blockchain verification
     blockchain_verification = {}
     if app.config.get("BLOCKCHAIN_ENABLED") and blockchain_service and invoice.blockchain_hash:
@@ -382,13 +386,19 @@ def invoice_detail(id):
         invoice.invoice_format,
         "invoice_detail.html"
     )
+   
+    company = Company.query.first()
+    bank = BankDetails.query.first()
+
 
     return render_template(
         template_name,
         invoice=invoice,
+        company=company,
+        bank=bank,
         blockchain_verification=blockchain_verification,
         ai_insights=ai_insights
-    )
+)
 
 
 @app.route('/invoice/<int:id>/pdf')
