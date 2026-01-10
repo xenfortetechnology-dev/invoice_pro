@@ -1,5 +1,8 @@
 
 {% block content %}
+<h3>DEBUG</h3>
+<p>Invoice ID: {{ invoice.id }}</p>
+<p>Line Items Count: {{ invoice.line_items|length }}</p>
 
 <div style="width:800px;margin:auto;font-family:Arial;font-size:12px;color:#000;">
 
@@ -47,6 +50,7 @@
 <br>
 
 <!-- ITEM TABLE -->
+<!-- ITEM TABLE -->
 <table width="100%" border="1" cellspacing="0" cellpadding="5">
   <tr align="center">
     <th width="5%">Sl.No</th>
@@ -75,6 +79,8 @@
   </tr>
   {% endfor %}
 </table>
+
+
 
 <br>
 
