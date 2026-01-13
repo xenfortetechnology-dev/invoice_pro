@@ -48,6 +48,72 @@ html, body {
     padding: 0;
 }
 
+/* ================= SIDEBAR HOVER EFFECTS ================= */
+
+.nav-link {
+    position: relative;
+    transition: all 0.3s ease;
+    border-radius: 10px;
+}
+
+/* Hover Glow */
+.nav-link:hover {
+    background: rgba(255, 255, 255, 0.12);
+    transform: translateX(6px);
+    box-shadow: 0 0 12px rgba(0, 140, 255, 0.35);
+}
+
+/* Icon Shine */
+.nav-link i {
+    transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+.nav-link:hover i {
+    transform: scale(1.15);
+    filter: drop-shadow(0 0 6px rgba(0, 150, 255, 0.8));
+}
+
+/* Active Page Highlight */
+.nav-link.active {
+    background: linear-gradient(90deg, rgba(0,150,255,0.25), transparent);
+    box-shadow: inset 3px 0 0 rgba(0, 150, 255, 0.9);
+}
+
+/* Click Ripple Effect */
+.nav-link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle, rgba(255,255,255,0.35) 10%, transparent 60%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+}
+
+.nav-link:active::after {
+    opacity: 1;
+}
+ 
+
+.glass-btn {
+    transition: all 0.3s ease;
+}
+
+.glass-btn:hover {
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 0 15px rgba(0,150,255,0.4);
+}
+
+@keyframes glowPulse {
+    0% { filter: drop-shadow(0 0 3px rgba(0,150,255,0.4)); }
+    50% { filter: drop-shadow(0 0 10px rgba(0,150,255,0.9)); }
+    100% { filter: drop-shadow(0 0 3px rgba(0,150,255,0.4)); }
+}
+
+.nav-link:hover i {
+    animation: glowPulse 1s infinite alternate;
+}
+
 
     </style>
     
