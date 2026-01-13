@@ -1,190 +1,631 @@
 {% extends "base.html" %}
-
 {% block title %}Login - Revolutionary Invoice System{% endblock %}
 
 {% block content %}
-<div class="container-fluid vh-100">
-    <div class="row h-100">
-        <!-- Left Side - Branding -->
-        <div class="col-lg-6 d-none d-lg-flex align-items-center justify-content-center bg-gradient-primary">
-            <div class="text-center text-white">
-                <div class="mb-4">
-                    <i data-feather="zap" size="120" class="text-white"></i>
-                </div>
-                <h1 class="display-4 fw-bold mb-3">Revolutionary Invoice</h1>
+<div class="container-fluid vh-100 login-bg px-0">
+    <div class="row h-100 g-0">
+
+
+        <!-- ================= LEFT BRANDING ================= -->
+        <div class="col-lg-6 d-none d-lg-flex align-items-center justify-content-center branding-panel">
+            <div class="text-center text-white branding-box">
+
+                <i data-feather="zap" size="120" class="mb-4 floating glow"></i>
+
+                <!-- MULTI SHINE TEXT -->
+                <h1 class="display-4 fw-bold ultra-shine-text">
+                    Revolutionary Invoice
+                </h1>
+
                 <p class="lead mb-4">AI-Powered • Blockchain Secured • Voice Enabled</p>
-                <div class="row text-center">
-                    <div class="col-md-4">
-                        <i data-feather="cpu" size="48" class="mb-2"></i>
-                        <h5>AI Assistant</h5>
-                        <p class="small">Smart suggestions and predictions</p>
+
+                <!-- FEATURE ICONS -->
+                <div class="row text-center mt-4 feature-icons">
+                    <div class="col-4">
+                        <i data-feather="cpu" size="42" class="ai-icon"></i>
+                        <p>AI Assistant</p>
                     </div>
-                    <div class="col-md-4">
-                        <i data-feather="shield" size="48" class="mb-2"></i>
-                        <h5>Blockchain</h5>
-                        <p class="small">Tamper-proof verification</p>
+                    <div class="col-4">
+                        <i data-feather="shield" size="42" class="blockchain-icon"></i>
+                        <p>Blockchain</p>
                     </div>
-                    <div class="col-md-4">
-                        <i data-feather="mic" size="48" class="mb-2"></i>
-                        <h5>Voice Control</h5>
-                        <p class="small">Create invoices by speaking</p>
+                    <div class="col-4">
+                        <i data-feather="mic" size="42" class="voice-icon"></i>
+                        <p>Voice</p>
                     </div>
                 </div>
+
             </div>
         </div>
-        
-        <!-- Right Side - Login Form -->
+
+        <!-- ================= LOGIN CARD ================= -->
         <div class="col-lg-6 d-flex align-items-center justify-content-center">
-            <div class="glass-card p-5" style="width: 100%; max-width: 400px;">
+            <div class="login-card sparkle particle-zone">
+
                 <div class="text-center mb-4">
-                    <div class="logo-container mb-3">
-                        <i data-feather="zap" size="48" class="text-primary"></i>
-                    </div>
-                    <h2 class="fw-bold text-primary">Welcome Back</h2>
-                    <p class="text-muted">Sign in to your revolutionary invoice system</p>
+                    <i data-feather="zap" size="48" class="text-primary mb-2 floating"></i>
+                    <h2 class="fw-bold glossy-text">Welcome Back</h2>
+                    <p class="text-muted">Login to your account</p>
                 </div>
-                
-                <form method="POST" id="loginForm">
-                    <div class="mb-3">
-                        <label for="username" class="form-label">Username</label>
-                        <div class="input-group">
-                            <span class="input-group-text glass-input-addon">
-                                <i data-feather="user" size="18"></i>
-                            </span>
-                            <input type="text" class="form-control glass-input" id="username" name="username" 
-                                   required autocomplete="username" placeholder="Enter your username">
-                        </div>
+
+                <form method="POST">
+                <div class="input-wrapper glow-field">
+                <input type="text" id="username" name="username" required>
+                <label>Username</label>
+                </div>
+
+                    <div class="input-wrapper glow-field">
+                    <input type="password" id="password" name="password" required>
+                    <label>Password</label>
+                    <i data-feather="eye" id="togglePassword" class="eye-icon"></i>
                     </div>
-                    
-                    <div class="mb-3">
-                        <label for="password" class="form-label">Password</label>
-                        <div class="input-group">
-                            <span class="input-group-text glass-input-addon">
-                                <i data-feather="lock" size="18"></i>
-                            </span>
-                            <input type="password" class="form-control glass-input" id="password" name="password" 
-                                   required autocomplete="current-password" placeholder="Enter your password">
-                            <button class="btn btn-outline-secondary" type="button" id="togglePassword">
-                                <i data-feather="eye" size="18"></i>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="rememberMe">
-                        <label class="form-check-label" for="rememberMe">
-                            Remember me for 30 days
-                        </label>
-                    </div>
-                    
-                    <button type="submit" class="btn btn-primary w-100 glass-btn-primary mb-3">
-                        <i data-feather="log-in" size="18" class="me-2"></i>
+
+                   <div class="remember-row">
+    <label>
+        <input type="checkbox" id="rememberMe">
+        Remember me for 30 days
+    </label>
+</div>
+
+
+
+                    <!-- Button -->
+                    <button class="login-btn ripple hover-ripple wave-effect">
                         Sign In
                     </button>
-                    
-                    <!-- Demo Credentials -->
-                    <div class="text-center">
-                        <small class="text-muted">
-                            Demo: admin / RevolutionaryAI2025!
-                        </small>
-                    </div>
+
                 </form>
-                
-                <!-- AI Features Showcase -->
-                <div class="mt-4 pt-4 border-top">
-                    <h6 class="text-center mb-3">🚀 Revolutionary Features</h6>
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <div class="feature-card glass-card-sm p-2 text-center">
-                                <i data-feather="cpu" size="24" class="text-primary mb-1"></i>
-                                <small class="d-block">AI Predictions</small>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="feature-card glass-card-sm p-2 text-center">
-                                <i data-feather="camera" size="24" class="text-success mb-1"></i>
-                                <small class="d-block">OCR Scanning</small>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="feature-card glass-card-sm p-2 text-center">
-                                <i data-feather="smartphone" size="24" class="text-info mb-1"></i>
-                                <small class="d-block">QR Payments</small>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="feature-card glass-card-sm p-2 text-center">
-                                <i data-feather="globe" size="24" class="text-warning mb-1"></i>
-                                <small class="d-block">Multi-Language</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+
             </div>
         </div>
+
     </div>
 </div>
 
+<!-- ================= STYLES ================= -->
 <style>
-.bg-gradient-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+/* ================= BACKGROUND ================= */
+ 
+
+/* LEFT PANEL */
+.branding-panel {
+    background:
+        radial-gradient(circle at top left, rgba(255,255,255,0.12), transparent 40%),
+        linear-gradient(135deg, #4f46e5, #7c3aed);
 }
 
-.feature-card {
-    transition: transform 0.2s ease;
+/* RIGHT PANEL */
+.col-lg-6:not(.branding-panel) {
+    background: linear-gradient(135deg, #020617, #1e1b4b);
 }
 
-.feature-card:hover {
+
+
+.branding-box {
+    position: relative;
+}
+
+/* ================= CARD ================= */
+.login-card {
+    width: 100%;
+    max-width: 430px;
+    padding: 48px;
+    border-radius: 22px;
+    background: rgba(255,255,255,0.96);
+    box-shadow: 0 25px 70px rgba(0,0,0,0.18);
+    animation: fadeUp 1s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+@keyframes fadeUp {
+    from {opacity:0; transform: translateY(60px);}
+    to {opacity:1; transform: translateY(0);}
+}
+
+/* ================= FLOATING ICON ================= */
+.floating {
+    animation: float 4s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
+}
+
+.glow {
+    filter: drop-shadow(0 0 15px rgba(255,255,255,0.6));
+}
+
+/* ================= ULTRA SHINE TEXT ================= */
+.ultra-shine-text {
+    background: linear-gradient(
+        120deg,
+        #ffffff 10%,
+        #93c5fd 30%,
+        #6366f1 50%,
+        #93c5fd 70%,
+        #ffffff 90%
+    );
+    background-size: 300% auto;
+    color: transparent;
+    background-clip: text;
+    -webkit-background-clip: text;
+    animation: shine 4s linear infinite;
+}
+
+@keyframes shine {
+    to { background-position: -300% center; }
+}
+
+/* Glossy + Highlight */
+.glossy-text {
+    background: linear-gradient(120deg, #111827, #6366f1, #111827);
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+}
+
+/* ================= SPARKLE + GLITTER ================= */
+.sparkle::before {
+    content: "";
+    position: absolute;
+    inset: -60%;
+    background:
+        radial-gradient(circle at 20% 30%, rgba(255,255,255,0.4), transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(255,255,255,0.3), transparent 40%);
+    opacity: 0;
+    transition: 0.6s;
+}
+
+.sparkle:hover::before {
+    opacity: 1;
+}
+
+
+/* ================= INPUTS ================= */
+.input-wrapper {
+    position: relative;
+    margin-bottom: 22px;
+}
+
+.input-wrapper input {
+    width: 100%;
+    padding: 14px 46px;
+    border-radius: 14px;
+    border: 1px solid #ddd;
+    transition: 0.4s ease;
+}
+
+.input-wrapper input:hover {
     transform: translateY(-2px);
 }
 
-.logo-container {
-    animation: pulse 2s infinite;
+.input-wrapper input:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 4px rgba(99,102,241,0.25);
 }
 
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
+/* Wave hover */
+.wave-hover::after {
+    content:"";
+    position:absolute;
+    inset:0;
+    border-radius:14px;
+    background: linear-gradient(120deg, transparent, rgba(99,102,241,0.3), transparent);
+    opacity:0;
+    transition:0.4s;
 }
+
+.wave-hover:hover::after {
+    opacity:1;
+}
+
+/* Icons */
+.input-icon, .eye-icon {
+    position:absolute;
+    top:50%;
+    transform:translateY(-50%);
+    width:18px;
+    color:#777;
+}
+
+.input-icon { left:14px; }
+.eye-icon { right:14px; cursor:pointer; }
+
+/* ================= BUTTON EFFECTS ================= */
+.login-btn {
+    width:100%;
+    padding:15px;
+    border-radius:16px;
+    border:none;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    color:white;
+    font-weight:600;
+    font-size:16px;
+    position:relative;
+    overflow:hidden;
+    transition:0.4s;
+}
+
+.login-btn:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 15px 40px rgba(99,102,241,0.6);
+}
+
+/* Ripple */
+.ripple::after {
+    content:"";
+    position:absolute;
+    inset:0;
+    background: radial-gradient(circle, rgba(255,255,255,0.6) 10%, transparent 60%);
+    transform:scale(0);
+}
+
+.ripple:active::after {
+    animation:ripple 0.6s ease-out;
+}
+
+@keyframes ripple {
+    to { transform:scale(2.8); opacity:0; }
+}
+
+/* Hover Ripple */
+.hover-ripple:hover::before {
+    content:"";
+    position:absolute;
+    inset:0;
+    background: radial-gradient(circle, rgba(255,255,255,0.25) 20%, transparent 60%);
+}
+
+/* Wave Effect */
+.wave-effect::before {
+    content:"";
+    position:absolute;
+    inset:-50%;
+    background: linear-gradient(120deg, transparent, rgba(255,255,255,0.25), transparent);
+    animation: wave 3s linear infinite;
+}
+
+@keyframes wave {
+    to { transform: translateX(100%); }
+}
+
+/* ================= FEATURE ICON EFFECTS ================= */
+.feature-icons i {
+    transition:0.4s;
+}
+
+.ai-icon:hover {
+    color:#38bdf8;
+    filter: drop-shadow(0 0 12px #38bdf8);
+    transform: scale(1.3) rotate(6deg);
+}
+
+.blockchain-icon:hover {
+    color:#a78bfa;
+    filter: drop-shadow(0 0 12px #a78bfa);
+    transform: scale(1.3) rotate(-6deg);
+}
+
+.voice-icon:hover {
+    color:#34d399;
+    filter: drop-shadow(0 0 12px #34d399);
+    transform: scale(1.3);
+}
+
+/* Mobile */
+@media(max-width:768px) {
+    .branding-panel { display:none; }
+}
+/* ================= FLOATING LABEL ================= */
+.input-wrapper {
+    position: relative;
+    margin-bottom: 26px;
+}
+
+.input-wrapper label {
+    position: absolute;
+    left: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    color: #6b7280;
+    pointer-events: none;
+    transition: 0.35s ease;
+    background: white;
+    padding: 0 6px;
+    border-radius: 6px;
+}
+
+/* Float label when focused or typed */
+.input-wrapper input:focus + label,
+.input-wrapper input:not(:placeholder-shown) + label {
+    top: -8px;
+    font-size: 12px;
+    color: #22d3ee;
+}
+
+/* ================= SHINY ROUND HOVER ================= */
+.glow-field input {
+    width: 100%;
+    padding: 16px 44px;
+    border-radius: 16px;
+    border: 1px solid #e5e7eb;
+    outline: none;
+    transition: 0.4s ease;
+    background: white;
+}
+
+/* Hover Glow */
+.glow-field:hover input {
+    box-shadow: 0 0 0 4px rgba(34,211,238,0.15);
+}
+
+/* Focus Glow Ring */
+.glow-field input:focus {
+    border-color: #22d3ee;
+    box-shadow:
+        0 0 0 5px rgba(34,211,238,0.25),
+        0 0 18px rgba(139,92,246,0.35);
+}
+
+/* Round Shine Animation */
+.glow-field::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: 18px;
+    background: linear-gradient(120deg, #22d3ee, #8b5cf6, #22d3ee);
+    opacity: 0;
+    filter: blur(8px);
+    transition: 0.4s;
+    z-index: -1;
+}
+
+.glow-field:focus-within::after {
+    opacity: 1;
+}
+
+ .eye-icon {
+    transition: 0.25s ease;
+}
+
+.eye-icon:hover {
+    transform: translateY(-50%) scale(1.2);
+    color: #8b5cf6;
+}
+
+
+/* ================= FLOATING LABEL ================= */
+.input-wrapper {
+    position: relative;
+    margin-bottom: 26px;
+}
+
+.input-wrapper label {
+    position: absolute;
+    left: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    color: #6b7280;
+    pointer-events: none;
+    transition: 0.35s ease;
+    background: white;
+    padding: 0 6px;
+    border-radius: 6px;
+}
+
+ 
+/* Hover Glow */
+.glow-field:hover input {
+    box-shadow: 0 0 0 4px rgba(34,211,238,0.15);
+}
+
+/* Focus Glow Ring */
+.glow-field input:focus {
+    border-color: #22d3ee;
+    box-shadow:
+        0 0 0 5px rgba(34,211,238,0.25),
+        0 0 18px rgba(139,92,246,0.35);
+}
+
+/* Round Shine Animation */
+.glow-field::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: 18px;
+    background: linear-gradient(120deg, #22d3ee, #8b5cf6, #22d3ee);
+    opacity: 0;
+    filter: blur(8px);
+    transition: 0.4s;
+    z-index: -1;
+}
+
+.glow-field:focus-within::after {
+    opacity: 1;
+}
+
+.remember-row {
+    font-size: 14px;
+    color: #334155;
+    margin-bottom: 20px;
+}
+
+.remember-row input {
+    accent-color: #6366f1;
+    cursor: pointer;
+}
+
+/* Allow clicking through visual effects */
+.sparkle::before,
+.glow-field::after,
+.ripple::after,
+.wave-effect::before,
+.hover-ripple::before {
+    pointer-events: none;
+}
+
+/* Make sure checkbox stays clickable */
+.remember-row {
+    position: relative;
+    z-index: 10;
+}
+/* Right Login Background */
+.col-lg-6:not(.branding-panel) {
+    background: linear-gradient(135deg, #020617, #1e1b4b);
+}
+
+/* Remove white gaps */
+.container-fluid,
+.row {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+html, body {
+    margin: 0;
+    width: 100%;
+    overflow-x: hidden;
+}
+
+/* ===== FORCE FULL SCREEN NO WHITE SPACE ===== */
+html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100%;
+    overflow-x: hidden;
+    background: #020617; /* fallback dark */
+}
+
+/* Kill Bootstrap container padding */
+.container-fluid {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    max-width: 100% !important;
+}
+
+/* Kill Bootstrap row gutter */
+.row {
+    --bs-gutter-x: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+/* Force full width columns */
+.col-lg-6 {
+    padding: 0 !important;
+}
+
+/* ===== REMOVE BROWSER DEFAULT PASSWORD EYE ICON ===== */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+    display: none;
+}
+
+input[type="password"]::-webkit-credentials-auto-fill-button,
+input[type="password"]::-webkit-textfield-decoration-container {
+    display: none !important;
+    visibility: hidden;
+    pointer-events: none;
+}
+
 </style>
 {% endblock %}
 
 {% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Password toggle
-    const togglePassword = document.getElementById('togglePassword');
-    const passwordInput = document.getElementById('password');
-    
-    togglePassword.addEventListener('click', function() {
-        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-        passwordInput.setAttribute('type', type);
-        
-        const icon = this.querySelector('i');
-        if (type === 'password') {
-            icon.setAttribute('data-feather', 'eye');
+document.addEventListener("DOMContentLoaded", () => {
+
+    feather.replace();
+
+  // ================= PASSWORD EYE TOGGLE =================
+const toggle = document.getElementById("togglePassword");
+const password = document.getElementById("password");
+
+if (toggle && password) {
+
+    // Default state → hidden password
+    password.type = "password";
+    toggle.innerHTML = feather.icons["eye-off"].toSvg();
+
+    toggle.addEventListener("click", () => {
+
+        if (password.type === "password") {
+            // Show password
+            password.type = "text";
+            toggle.innerHTML = feather.icons["eye"].toSvg();
         } else {
-            icon.setAttribute('data-feather', 'eye-off');
+            // Hide password
+            password.type = "password";
+            toggle.innerHTML = feather.icons["eye-off"].toSvg();
         }
-        feather.replace();
+
     });
-    
-    // Login form animation
-    const form = document.getElementById('loginForm');
-    form.addEventListener('submit', function(e) {
-        const submitBtn = form.querySelector('button[type="submit"]');
-        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Signing in...';
-        submitBtn.disabled = true;
-    });
-    
-    // Auto-fill demo credentials
-    document.addEventListener('keydown', function(e) {
-        if (e.ctrlKey && e.shiftKey && e.key === 'D') {
-            document.getElementById('username').value = 'admin';
-            document.getElementById('password').value = 'RevolutionaryAI2025!';
+}
+
+    // ================= REMEMBER ME FOR 30 DAYS =================
+    const rememberCheckbox = document.getElementById("rememberMe");
+    const usernameInput = document.getElementById("username");
+    const loginForm = document.querySelector("form");
+
+    const STORAGE_KEY = "rememberedUser";
+
+    if (!rememberCheckbox || !usernameInput) return;
+
+    // Load saved user
+    const savedData = JSON.parse(localStorage.getItem(STORAGE_KEY));
+
+    if (savedData && savedData.expiry > Date.now()) {
+        usernameInput.value = savedData.username;
+        rememberCheckbox.checked = true;
+    } else {
+        localStorage.removeItem(STORAGE_KEY);
+    }
+
+    // Save on submit
+    loginForm.addEventListener("submit", () => {
+        if (rememberCheckbox.checked) {
+            const expiry = Date.now() + (30 * 24 * 60 * 60 * 1000);
+
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                username: usernameInput.value,
+                expiry: expiry
+            }));
+        } else {
+            localStorage.removeItem(STORAGE_KEY);
         }
     });
+
 });
+ // ================= FORGOT PASSWORD =================
+
+    /* const resetBtn = document.getElementById("resetBtn");
+
+if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+        const email = document.getElementById("resetEmail").value.trim();
+
+        if (!email) {
+            alert("Please enter your email address.");
+            return;
+        }
+
+        // TEMP DEMO (backend integration later)
+        alert("Reset link sent to " + email);
+
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(
+            document.getElementById("forgotModal")
+        );
+        modal.hide();
+    });
+}
+*/
+
+
 </script>
 {% endblock %}
