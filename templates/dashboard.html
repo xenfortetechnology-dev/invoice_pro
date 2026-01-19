@@ -10,9 +10,9 @@
             <div class="glass-card p-4">
                 <div class="row align-items-center">
                     <div class="col-md-8">
-                        <h1 class="display-6 fw-bold text-primary mb-2">
-                            Welcome back, {{ session.username }}!
-                        </h1>
+                       <h1 class="display-6 welcome-title mb-2">
+    Welcome back, {{ session.username }}
+</h1>
                         <p class="lead text-muted mb-0">
                             {{ today.strftime('%A, %B %d, %Y') }} • 
                             {% if ai_enabled %}AI-Powered Dashboard{% endif %}
@@ -44,7 +44,10 @@
                     </div>
                     <div>
                         <p class="text-muted mb-1 small">Total Revenue</p>
-                        <h3 class="fw-bold mb-0">₹{{ "%.2f"|format(total_revenue or 0) }}</h3>
+                        <h3 class="fw-bold mb-0">
+    ₹{{ "%.2f"|format(monthly_revenue_total or 0) }}
+</h3>
+
                         <small class="text-success">
                             <i data-feather="trending-up" size="14"></i> +12.5% this month
                         </small>
@@ -52,23 +55,26 @@
                 </div>
             </div>
         </div>
-        
-        <div class="col-md-3">
-            <div class="glass-card p-4 metric-card card-blue">
-                <div class="d-flex align-items-center">
-                    <div class="metric-icon bg-info bg-opacity-10 text-info rounded-circle p-3 me-3">
-                        <i data-feather="clock" size="24"></i>
-                    </div>
-                    <div>
-                        <p class="text-muted mb-1 small">Outstanding</p>
-                        <h3 class="fw-bold mb-0">₹{{ "%.2f"|format(outstanding_amount) }}</h3>
-                        <small class="text-info">
-                            <i data-feather="alert-circle" size="14"></i> Needs attention
-                        </small>
-                    </div>
-                </div>
+     <div class="col-md-3">
+    <a href="#recent-invoices" class="text-decoration-none d-block h-100">
+
+        <div class="glass-card p-4 metric-card card-red h-100 d-flex flex-column justify-content-between">
+
+            <div>
+                <p class="text-muted mb-1 small">Outstanding Amount</p>
+
+                <h3 class="fw-bold mb-0 text-dark">
+                    ₹{{ "%.2f"|format(outstanding_amount or 0) }}
+                </h3>
             </div>
+
         </div>
+
+    </a>
+</div>
+
+
+
         
         <div class="col-md-3">
             <div class="glass-card p-4 metric-card card-orange">
@@ -158,153 +164,159 @@
 </div>
 
     
-    <!-- Recent Activity and AI Insights -->
-    <div class="row mb-4">
-        <div class="col-lg-6">
-            <div class="glass-card p-4">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="fw-bold mb-0">Recent Invoices</h5>
-                    <a href="{{ url_for('invoice_management') }}" class="btn btn-sm btn-outline-primary">
-                        View All <i data-feather="arrow-right" size="14"></i>
-                    </a>
-                </div>
-                
-                {% if recent_invoices %}
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Invoice #</th>
-                                <th>Client</th>
-                                <th>Amount</th>
-                                <th>Status</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for invoice in recent_invoices %}
-                            <tr>
-                                <td>
-                                    <a href="{{ url_for('invoice_detail', id=invoice.id) }}" class="text-decoration-none">
-                                        {{ invoice.invoice_number }}
-                                    </a>
-                                    {% if invoice.ai_generated %}
-                                    <span class="badge bg-success bg-opacity-10 text-success ms-1">AI</span>
-                                    {% endif %}
-                                    {% if invoice.voice_command_created %}
-                                    <span class="badge bg-info bg-opacity-10 text-info ms-1">Voice</span>
-                                    {% endif %}
-                                </td>
-                                <td>{{ invoice.client.name }}</td>
-                                <td>₹{{ "%.2f"|format(invoice.total_amount) }}</td>
-                                <td>
-                                    <span class="badge 
-                                        {% if invoice.payment_status == 'Paid' %}bg-success{% 
-                                        elif invoice.payment_status == 'Unpaid' %}bg-danger{% 
-                                        else %}bg-warning{% endif %}">
-                                        {{ invoice.payment_status }}
-                                    </span>
-                                </td>
-                                <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <a href="{{ url_for('invoice_detail', id=invoice.id) }}" target="_blank" class="btn btn-outline-primary btn-sm">
-                                            <i data-feather="eye" size="14"></i>
-                                        </a>
-                                        <a href="{{ url_for('invoice_pdf', id=invoice.id) }}" class="btn btn-outline-secondary btn-sm">
-                                            <i data-feather="download" size="14"></i>
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% else %}
-                <div class="text-center py-4">
-                    <i data-feather="file-text" size="48" class="text-muted mb-3"></i>
-                    <p class="text-muted">No recent invoices found.</p>
-                    <a href="{{ url_for('create_invoice') }}" class="btn btn-primary">Create Your First Invoice</a>
-                </div>
-                {% endif %}
             </div>
         </div>
         
         <div class="col-lg-6">
-            <div class="glass-card p-4">
-                <h5 class="fw-bold mb-3">
-                    {% if ai_enabled %}
-                    <i data-feather="cpu" class="me-2 text-primary"></i>AI Insights
-                    {% else %}
-                    <i data-feather="alert-circle" class="me-2 text-warning"></i>Upcoming Payments
-                    {% endif %}
-                </h5>
-                
-                {% if ai_enabled and ai_insights %}
-                <!-- AI-powered insights -->
-                <div class="ai-insights">
-                    {% if ai_insights.cash_flow %}
-                    <div class="insight-card glass-card-sm p-3 mb-3">
-                        <h6 class="text-primary mb-2">Cash Flow Prediction</h6>
-                        <p class="small mb-1">
-                            Expected revenue next month: 
-                            <strong>₹{{ ai_insights.cash_flow.summary.total_predicted_revenue or 0 }}</strong>
-                        </p>
-                        <p class="small text-muted mb-0">
-                            Trend: {{ ai_insights.cash_flow.summary.cash_flow_trend or 'Stable' }}
-                        </p>
-                    </div>
-                    {% endif %}
-                    
-                    {% if ai_insights.payment_patterns %}
-                    <div class="insight-card glass-card-sm p-3 mb-3">
-                        <h6 class="text-success mb-2">Payment Analysis</h6>
-                        <p class="small mb-1">
-                            Collection health: 
-                            <strong>{{ ai_insights.payment_patterns.insights.overall_collection_health or 'Good' }}</strong>
-                        </p>
-                        {% if ai_insights.payment_patterns.insights.at_risk_clients %}
-                        <p class="small text-warning mb-0">
-                            <i data-feather="alert-triangle" size="14"></i>
-                            {{ ai_insights.payment_patterns.insights.at_risk_clients|length }} clients need attention
-                        </p>
-                        {% endif %}
-                    </div>
-                    {% endif %}
-                </div>
-                {% else %}
-                <!-- Upcoming payments fallback -->
-                {% if upcoming_payments %}
-                <div class="list-group list-group-flush">
-                    {% for payment in upcoming_payments %}
-                    <div class="list-group-item border-0 px-0">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-1">{{ payment.client.name }}</h6>
-                                <p class="mb-1 small text-muted">{{ payment.invoice_number }}</p>
-                                <small class="text-muted">Due: {{ payment.due_date.strftime('%d %b %Y') if payment.due_date else 'No due date' }}</small>
-                            </div>
-                            <div class="text-end">
-                                <span class="fw-bold">₹{{ "%.2f"|format(payment.total_amount) }}</span>
-                                {% if payment.due_date and payment.due_date < today.date() %}
-                                <br><small class="text-danger">Overdue</small>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="text-center py-4">
-                    <i data-feather="check-circle" size="48" class="text-success mb-3"></i>
-                    <p class="text-muted">All caught up! No upcoming payments.</p>
-                </div>
-                {% endif %}
-                {% endif %}
+    <div class="glass-card p-4">
+        <h5 class="fw-bold mb-3">
+            {% if ai_enabled %}
+                <i data-feather="cpu" class="me-2 text-primary"></i> AI Insights
+            {% else %}
+                <i data-feather="alert-circle" class="me-2 text-warning"></i> Upcoming Payments
+            {% endif %}
+        </h5>
+
+        {% if ai_enabled and ai_insights %}
+<!-- ✅ AI-powered insights -->
+<div class="ai-insights">
+
+    {% if ai_insights.cash_flow %}
+    <div class="insight-card glass-card-sm p-3 mb-3">
+        <h6 class="text-primary mb-2">Cash Flow Prediction</h6>
+        <p class="small mb-1">
+            Expected revenue next month:
+            <strong>₹{{ ai_insights.cash_flow.summary.total_predicted_revenue or 0 }}</strong>
+        </p>
+        <p class="small text-muted mb-0">
+            Trend: {{ ai_insights.cash_flow.summary.cash_flow_trend or 'Stable' }}
+        </p>
+    </div>
+    {% endif %}
+
+    {% if ai_insights.payment_patterns %}
+    <div class="insight-card glass-card-sm p-3 mb-3">
+        <h6 class="text-success mb-2">Payment Analysis</h6>
+        <p class="small mb-1">
+            Collection health:
+            <strong>{{ ai_insights.payment_patterns.insights.overall_collection_health or 'Good' }}</strong>
+        </p>
+
+        {% if ai_insights.payment_patterns.insights.at_risk_clients %}
+        <p class="small text-warning mb-0">
+            <i data-feather="alert-triangle" size="14"></i>
+            {{ ai_insights.payment_patterns.insights.at_risk_clients|length }} clients need attention
+        </p>
+        {% endif %}
+
+    </div>
+    {% endif %}
+
+</div>
+{% else %}
+<!-- ✅ Upcoming payments fallback -->
+
+{% if upcoming_payments %}
+<div class="list-group list-group-flush">
+
+    {% for payment in upcoming_payments %}
+    <div class="list-group-item border-0 px-0">
+        <div class="d-flex justify-content-between align-items-center">
+
+            <div>
+                <h6 class="mb-1">{{ payment.client.name }}</h6>
+                <small class="text-muted">{{ payment.invoice_number }}</small>
             </div>
+
+            <div class="text-end">
+                <strong>₹{{ "%.2f"|format(payment.total_amount) }}</strong>
+            </div>
+
         </div>
     </div>
-    
+    {% endfor %}
+
+</div>
+{% else %}
+<p class="text-muted">No upcoming payments.</p>
+{% endif %}
+{% endif %}
+  
+
+
+  <!-- ================= RECENT INVOICES ================= -->
+<div id="recent-invoices" class="row mb-4">
+    <div class="col-lg-6">
+
+        <div class="glass-card p-4">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0">Recent Invoices</h5>
+
+                <a href="{{ url_for('invoice_management') }}"
+                   class="btn btn-sm btn-outline-primary">
+                    View All
+                </a>
+            </div>
+
+            {% if recent_invoices %}
+            <div class="table-responsive">
+
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Invoice #</th>
+                            <th>Client</th>
+                            <th>Total</th>
+                            <th>Paid</th>
+                            <th>Balance</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for invoice in recent_invoices %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('invoice_detail', id=invoice.id) }}"
+                                   class="text-decoration-none fw-semibold">
+                                    {{ invoice.invoice_number }}
+                                </a>
+                            </td>
+
+                            <td>{{ invoice.client.name }}</td>
+                            <td>₹{{ "%.2f"|format(invoice.total_amount) }}</td>
+                            <td>₹{{ "%.2f"|format(invoice.amount_paid or 0) }}</td>
+
+                            <td>
+                                ₹{{ "%.2f"|format(invoice.total_amount - (invoice.amount_paid or 0)) }}
+                            </td>
+
+                            <td>
+                                {% if invoice.payment_status == 'Paid' %}
+                                    <span class="badge bg-success">Paid</span>
+                                {% elif invoice.payment_status == 'Partially Paid' %}
+                                    <span class="badge bg-warning text-dark">Partial</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Unpaid</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+                <p class="text-muted">No invoices found.</p>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+
     <!-- Blockchain Status (if enabled) -->
     {% if blockchain_enabled and blockchain_stats %}
     <div class="row mb-4">
@@ -409,6 +421,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
+    
     // Metric cards animation
     const metricCards = document.querySelectorAll('.metric-card');
     metricCards.forEach((card, index) => {
@@ -441,7 +454,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Add CSS animations
-const style = document.createElement('style');
+/*const style = document.createElement('style');
 style.textContent = `
 @keyframes slideUp {
     from {
@@ -474,7 +487,71 @@ style.textContent = `
 .insight-card:hover {
     transform: translateX(5px);
 }
-`;
+`;*/
 document.head.appendChild(style);
+
+ 
+let revenueChart;
+const revenueData = {{ monthly_revenue | tojson }};
+
+function getLastMonthsData(monthCount) {
+    if (monthCount === 12) return revenueData;
+    return revenueData.slice(-monthCount);
+}
+
+function renderChart(monthCount) {
+    const filtered = getLastMonthsData(monthCount);
+
+    const labels = filtered.map(item => item.month);
+    const values = filtered.map(item => item.revenue);
+
+    const ctx = document.getElementById("revenueChart").getContext("2d");
+
+    if (revenueChart) {
+        revenueChart.destroy();
+    }
+
+    revenueChart = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels,
+            datasets: [{
+                label: "Revenue",
+                data: values,
+                borderColor: "rgb(59,130,246)",
+                backgroundColor: "rgba(59,130,246,0.15)",
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false }},
+            scales: {
+                y: {
+                    ticks: {
+                        callback: v => "₹" + v.toLocaleString()
+                    }
+                }
+            }
+        }
+    });
+}
+
+/* ================= INIT ================= */
+document.addEventListener("DOMContentLoaded", () => {
+
+    // Default → Last 6 months
+    renderChart(6);
+
+    document.getElementById("revenue6m")
+        .addEventListener("change", () => renderChart(6));
+
+    document.getElementById("revenue12m")
+        .addEventListener("change", () => renderChart(12));
+}); 
 </script>
 {% endblock %}

@@ -22,6 +22,9 @@ import io
 import csv
 from flask import Response, request
 
+from datetime import datetime
+from sqlalchemy import func
+
 from voice_service import VoiceCommandProcessor, VoiceInvoiceBuilder
 
 from pdf_generator import generate_quotation_pdf
@@ -73,24 +76,98 @@ def logout():
     flash('You have been logged out successfully.', 'success')
     return redirect(url_for('login'))
 
+from datetime import datetime
+from sqlalchemy import func
+
 @app.route('/')
 @login_required
 def dashboard():
     """AI-powered dashboard with predictive analytics"""
     try:
-        # Get basic statistics
-        total_revenue = db.session.query(func.sum(Invoice.total_amount)).filter(
-            Invoice.payment_status == 'Paid'
-        ).scalar() or 0
-        
-        outstanding_amount = db.session.query(func.sum(Invoice.total_amount - Invoice.amount_paid)).filter(
-            Invoice.payment_status.in_(['Unpaid', 'Partially Paid'])
-        ).scalar() or 0
-        
+        today = datetime.now()
+        current_year = today.year
+        current_month = today.month
+
+        # ===============================
+        # ✅ CURRENT MONTH TOTAL REVENUE
+        # ===============================
+        total_revenue = (
+            db.session.query(func.sum(Invoice.total_amount))
+            .filter(
+                Invoice.payment_status == 'Paid',
+                func.extract('year', Invoice.invoice_date) == current_year,
+                func.extract('month', Invoice.invoice_date) == current_month
+            )
+            .scalar()
+        ) or 0
+
+        # ===============================
+        # ✅ OUTSTANDING AMOUNT
+        # ===============================
+        outstanding_amount = (
+            db.session.query(func.sum(Invoice.total_amount - Invoice.amount_paid))
+            .filter(Invoice.payment_status.in_(['Unpaid', 'Partially Paid']))
+            .scalar()
+        ) or 0
+
+        # ===============================
+        # ✅ BASIC COUNTS
+        # ===============================
         total_invoices = Invoice.query.count()
         total_clients = Client.query.count()
-        
-        # AI-powered insights
+
+        # ===============================
+        # ✅ RECENT ACTIVITY
+        # ===============================
+        recent_invoices = (
+            Invoice.query
+            .order_by(Invoice.created_at.desc())
+            .limit(10)
+            .all()
+        )
+
+        upcoming_payments = (
+            Invoice.query
+            .filter(
+                Invoice.due_date >= today.date(),
+                Invoice.payment_status.in_(['Unpaid', 'Partially Paid'])
+            )
+            .order_by(Invoice.due_date.asc())
+            .limit(10)
+            .all()
+        )
+
+        # ===============================
+        # ✅ CURRENT YEAR MONTH-WISE REVENUE (GRAPH)
+        # ===============================
+        revenue_rows = (
+            db.session.query(
+                func.extract('month', Invoice.invoice_date).label("month"),
+                func.sum(Invoice.total_amount).label("revenue")
+            )
+            .filter(
+                Invoice.payment_status == 'Paid',
+                func.extract('year', Invoice.invoice_date) == current_year
+            )
+            .group_by("month")
+            .order_by("month")
+            .all()
+        )
+
+        MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun",
+                       "Jul","Aug","Sep","Oct","Nov","Dec"]
+
+        monthly_revenue = [
+            {
+                "month": MONTH_NAMES[int(row.month) - 1],
+                "revenue": float(row.revenue or 0)
+            }
+            for row in revenue_rows
+        ]
+
+        # ===============================
+        # ✅ AI INSIGHTS
+        # ===============================
         ai_insights = {}
         if app.config.get("AI_FEATURES_ENABLED") and predictive_analytics:
             try:
@@ -102,44 +179,38 @@ def dashboard():
                 }
             except Exception as e:
                 logging.error(f"AI insights generation failed: {e}")
-        
-        # Recent activities
-        recent_invoices = Invoice.query.order_by(Invoice.created_at.desc()).limit(10).all()
-        upcoming_payments = Invoice.query.filter(
-            Invoice.due_date >= datetime.now().date(),
-            Invoice.payment_status.in_(['Unpaid', 'Partially Paid'])
-        ).order_by(Invoice.due_date.asc()).limit(10).all()
-        
-        # Analytics data
-        monthly_revenue = analytics_engine.get_monthly_revenue_trend()
-        client_analytics = analytics_engine.get_client_performance_metrics()
-        
-        # Blockchain statistics
+
+        # ===============================
+        # ✅ BLOCKCHAIN STATS
+        # ===============================
         blockchain_stats = {}
         if app.config.get("BLOCKCHAIN_ENABLED") and blockchain_service:
             try:
                 blockchain_stats = blockchain_service.get_blockchain_stats()
             except Exception as e:
                 logging.error(f"Blockchain stats failed: {e}")
-        
-        return render_template('dashboard.html',
-                             total_revenue=total_revenue,
-                             outstanding_amount=outstanding_amount,
-                             total_invoices=total_invoices,
-                             total_clients=total_clients,
-                             recent_invoices=recent_invoices,
-                             upcoming_payments=upcoming_payments,
-                             monthly_revenue=monthly_revenue,
-                             client_analytics=client_analytics,
-                             ai_insights=ai_insights,
-                             blockchain_stats=blockchain_stats,
-                             today=datetime.now())
-                             
+
+        # ===============================
+        # ✅ RENDER
+        # ===============================
+        return render_template(
+            'dashboard.html',
+            today=today,
+            total_revenue=total_revenue,   # 👈 current month revenue
+            outstanding_amount=outstanding_amount,
+            total_invoices=total_invoices,
+            total_clients=total_clients,
+            recent_invoices=recent_invoices,
+            upcoming_payments=upcoming_payments,
+            monthly_revenue=monthly_revenue,   # 👈 used by graph
+            ai_insights=ai_insights,
+            blockchain_stats=blockchain_stats
+        )
+
     except Exception as e:
         logging.error(f"Dashboard error: {e}")
         flash('Error loading dashboard data.', 'error')
         return render_template('dashboard.html', error=str(e))
-
 
 
 @app.route('/invoices')
@@ -1483,11 +1554,6 @@ def convert_to_invoice(qid):
 
     flash("Quotation converted to Invoice successfully!", "success")
     return redirect(url_for("quotation_list"))
-
-
- 
-
-
 @app.route("/quotations/<int:qid>/send-email")
 def send_email(qid):
     q = Quotation.query.get_or_404(qid)
@@ -1508,3 +1574,63 @@ def send_whatsapp(qid):
 
     flash("WhatsApp sent successfully (demo).")
     return redirect(url_for("quotation_list"))
+
+ 
+
+from datetime import date
+from sqlalchemy import func
+from app import db
+from models import Invoice
+
+@app.route('/dashboard')
+@login_required
+def dashboard_page():
+
+    # 📅 Get today's date
+    today = date.today()
+
+    # 📅 First day of current month
+    start_of_month = date(today.year, today.month, 1)
+
+    # 💰 Current Month Revenue (Only PAID invoices)
+    monthly_revenue_total = (
+        db.session.query(func.sum(Invoice.total_amount))
+        .filter(
+            Invoice.payment_status == 'Paid',
+            Invoice.invoice_date >= start_of_month,
+            Invoice.invoice_date <= today
+        )
+        .scalar()
+    ) or 0
+
+    # 💳 Outstanding Amount (Pending money only)
+    outstanding_amount = (
+        db.session.query(
+            func.sum(Invoice.total_amount - Invoice.amount_paid)
+        )
+        .filter(
+            Invoice.payment_status.in_(['Unpaid', 'Partially Paid'])
+        )
+        .scalar()
+    ) or 0
+
+    # 📄 Recent Invoices (ALL: Paid, Unpaid, Partial)
+    recent_invoices = (
+        Invoice.query
+        .order_by(Invoice.invoice_date.desc())
+        .limit(10)
+        .all()
+    )
+
+    print("✅ Current Month Revenue:", monthly_revenue_total)
+    print("✅ Outstanding Amount:", outstanding_amount)
+    print("✅ Recent Invoices Count:", len(recent_invoices))
+
+ 
+    return render_template(
+        "dashboard.html",
+        monthly_revenue_total=monthly_revenue_total,
+        outstanding_amount=outstanding_amount,
+        recent_invoices=recent_invoices   # ✅ Add this
+    )
+
