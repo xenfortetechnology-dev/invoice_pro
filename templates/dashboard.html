@@ -134,38 +134,52 @@
         </div>
     </div>
 
-    <!-- Quick Actions (Right Column) -->
-    <div class="col-lg-4">
-        <div class="glass-card p-4 h-100" style="max-height: 460px; overflow-y: auto;">
-            <h5 class="fw-bold mb-3">Quick Actions</h5>
-            <div class="d-grid gap-2">
-                <button class="btn btn-outline-primary glass-btn text-start" onclick="window.location.href='{{ url_for('create_invoice') }}'">
-                    <i data-feather="file-plus" class="me-2"></i> Create New Invoice
-                </button>
-                {% if ai_enabled %}
-                <button class="btn btn-outline-success glass-btn text-start" id="voiceInvoiceBtn">
-                    <i data-feather="mic" class="me-2"></i> Voice Create Invoice
-                </button>
-                <button class="btn btn-outline-info glass-btn text-start" data-bs-toggle="modal" data-bs-target="#documentScannerModal">
-                    <i data-feather="camera" class="me-2"></i> Scan Document
-                </button>
-                {% endif %}
-                <button class="btn btn-outline-warning glass-btn text-start" onclick="window.location.href='{{ url_for('analytics') }}'">
-                    <i data-feather="trending-up" class="me-2"></i> View Analytics
-                </button>
-                {% if blockchain_enabled %}
-                <button class="btn btn-outline-dark glass-btn text-start" id="blockchainStatsBtn">
-                    <i data-feather="shield" class="me-2"></i> Blockchain Status
-                </button>
-                {% endif %}
-            </div>
+   <!-- Quick Actions (Right Column) -->
+<div class="col-lg-4">
+    <div class="glass-card p-4 h-100" style="max-height: 460px; overflow-y: auto;">
+        <h5 class="fw-bold mb-3">Quick Actions</h5>
+
+        <div class="d-grid gap-2">
+
+            <!-- Create New Invoice -->
+            <a href="{{ url_for('create_invoice') }}"
+               class="btn btn-outline-primary glass-btn text-start">
+                <i data-feather="file-plus" class="me-2"></i> Create New Invoice
+            </a>
+
+            {% if ai_enabled %}
+            <!-- Voice Create Invoice -->
+          <!--
+             <button class="btn btn-outline-success glass-btn text-start" id="voiceInvoiceBtn">
+                <i data-feather="mic" class="me-2"></i> Voice Create Invoice
+            </button>
+        -->
+            
+            <!-- Scan Document 
+            <button class="btn btn-outline-info glass-btn text-start"
+                    data-bs-toggle="modal"
+                    data-bs-target="#documentScannerModal">
+                <i data-feather="camera" class="me-2"></i> Scan Document
+            </button>
+            {% endif %}
+        -->
+            <!-- View Analytics -->
+            <a href="{{ url_for('analytics') }}"
+               class="btn btn-outline-warning glass-btn text-start">
+                <i data-feather="trending-up" class="me-2"></i> View Analytics
+            </a>
+
+            {% if blockchain_enabled %}
+            <!-- Blockchain Status -->
+            <button class="btn btn-outline-dark glass-btn text-start" id="blockchainStatsBtn">
+                <i data-feather="shield" class="me-2"></i> Blockchain Status
+            </button>
+            {% endif %}
+
         </div>
     </div>
 </div>
 
-    
-            </div>
-        </div>
         
         <div class="col-lg-6">
     <div class="glass-card p-4">
@@ -259,59 +273,66 @@
                 </a>
             </div>
 
-            {% if recent_invoices %}
-            <div class="table-responsive">
+           {% if recent_invoices %}
+<div class="table-responsive" style="overflow-x:auto;">
+    <table class="table table-hover align-middle w-100 table-fixed">
 
-                <table class="table table-hover align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Invoice #</th>
-                            <th>Client</th>
-                            <th>Total</th>
-                            <th>Paid</th>
-                            <th>Balance</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
+        <thead class="table-light">
+            <tr>
+                <th style="width: 140px;">Invoice #</th>
+                <th style="width: 120px;">Client</th>
+                <th style="width: 90px;">Total</th>
+                <th style="width: 90px;">Paid</th>
+                <th style="width: 100px;">Balance</th>
+                <th style="width: 80px;">Status</th>
+            </tr>
+        </thead>
 
-                    <tbody>
-                        {% for invoice in recent_invoices %}
-                        <tr>
-                            <td>
-                                <a href="{{ url_for('invoice_detail', id=invoice.id) }}"
-                                   class="text-decoration-none fw-semibold">
-                                    {{ invoice.invoice_number }}
-                                </a>
-                            </td>
+        <tbody>
+            {% for invoice in recent_invoices %}
+            <tr>
 
-                            <td>{{ invoice.client.name }}</td>
-                            <td>₹{{ "%.2f"|format(invoice.total_amount) }}</td>
-                            <td>₹{{ "%.2f"|format(invoice.amount_paid or 0) }}</td>
+                <!-- Invoice Number -->
+                <td style="max-width:140px; word-break:break-word;">
+                    <a href="{{ url_for('invoice_detail', id=invoice.id) }}"
+                       class="text-decoration-none fw-semibold">
+                        {{ invoice.invoice_number }}
+                    </a>
+                </td>
 
-                            <td>
-                                ₹{{ "%.2f"|format(invoice.total_amount - (invoice.amount_paid or 0)) }}
-                            </td>
+                <td class="text-truncate" style="max-width:120px;">
+                    {{ invoice.client.name }}
+                </td>
 
-                            <td>
-                                {% if invoice.payment_status == 'Paid' %}
-                                    <span class="badge bg-success">Paid</span>
-                                {% elif invoice.payment_status == 'Partially Paid' %}
-                                    <span class="badge bg-warning text-dark">Partial</span>
-                                {% else %}
-                                    <span class="badge bg-danger">Unpaid</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                <td>₹{{ "%.2f"|format(invoice.total_amount) }}</td>
+                <td>₹{{ "%.2f"|format(invoice.amount_paid or 0) }}</td>
 
-            </div>
-            {% else %}
-            <div class="text-center py-4">
-                <p class="text-muted">No invoices found.</p>
-            </div>
-            {% endif %}
+                <td>
+                    ₹{{ "%.2f"|format(invoice.total_amount - (invoice.amount_paid or 0)) }}
+                </td>
+
+                <td>
+                    {% if invoice.payment_status == 'Paid' %}
+                        <span class="badge bg-success">Paid</span>
+                    {% elif invoice.payment_status == 'Partially Paid' %}
+                        <span class="badge bg-warning text-dark">Partial</span>
+                    {% else %}
+                        <span class="badge bg-danger">Unpaid</span>
+                    {% endif %}
+                </td>
+
+            </tr>
+            {% endfor %}
+        </tbody>
+
+    </table>
+</div>
+{% else %}
+<div class="text-center py-4">
+    <p class="text-muted">No invoices found.</p>
+</div>
+{% endif %}
+
 
         </div>
     </div>
@@ -364,146 +385,66 @@
 
 {% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize revenue chart
-    const ctx = document.getElementById('revenueChart').getContext('2d');
-    const revenueData = {{ monthly_revenue | tojson }};
-    
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: revenueData.map(item => item.month),
-            datasets: [{
-                label: 'Revenue',
-                data: revenueData.map(item => item.revenue),
-                borderColor: 'rgb(59, 130, 246)',
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                borderWidth: 3,
-                fill: true,
-                tension: 0.4,
-                pointBackgroundColor: 'rgb(59, 130, 246)',
-                pointBorderColor: '#fff',
-                pointBorderWidth: 2,
-                pointRadius: 6
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: {
-                        color: 'rgba(0,0,0,0.1)'
-                    },
-                    ticks: {
-                        callback: function(value) {
-                            return '₹' + value.toLocaleString();
-                        }
-                    }
-                },
-                x: {
-                    grid: {
-                        display: false
-                    }
-                }
-            },
-            elements: {
-                point: {
-                    hoverRadius: 8
-                }
-            }
-        }
-    });
-    
-    
-    // Metric cards animation
-    const metricCards = document.querySelectorAll('.metric-card');
-    metricCards.forEach((card, index) => {
-        card.style.animationDelay = `${index * 0.1}s`;
-        card.classList.add('animate-slide-up');
-    });
-    
-    // Voice invoice button
-    {% if ai_enabled %}
-    const voiceInvoiceBtn = document.getElementById('voiceInvoiceBtn');
-    if (voiceInvoiceBtn) {
-        voiceInvoiceBtn.addEventListener('click', function() {
-            // Trigger voice command modal
-            const modal = new bootstrap.Modal(document.getElementById('voiceCommandModal'));
-            modal.show();
-        });
-    }
-    {% endif %}
-    
-    // Blockchain stats button
-    {% if blockchain_enabled %}
-    const blockchainStatsBtn = document.getElementById('blockchainStatsBtn');
-    if (blockchainStatsBtn) {
-        blockchainStatsBtn.addEventListener('click', function() {
-            // Show detailed blockchain information
-            alert('Blockchain verification active. All invoices are secured with cryptographic hashes.');
-        });
-    }
-    {% endif %}
-});
-
-// Add CSS animations
-/*const style = document.createElement('style');
-style.textContent = `
-@keyframes slideUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.animate-slide-up {
-    animation: slideUp 0.6s ease-out forwards;
-}
-
-.metric-card {
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.metric-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-}
-
-.insight-card {
-    transition: transform 0.2s ease;
-}
-
-.insight-card:hover {
-    transform: translateX(5px);
-}
-`;*/
-document.head.appendChild(style);
-
- 
 let revenueChart;
+
+// Safe backend data
 const revenueData = {{ monthly_revenue | tojson }};
 
-function getLastMonthsData(monthCount) {
-    if (monthCount === 12) return revenueData;
-    return revenueData.slice(-monthCount);
+// Convert YYYY-MM → "Jan 2026"
+function formatMonth(label) {
+    const [year, month] = label.split("-");
+    const date = new Date(year, month - 1);
+    return date.toLocaleString("default", { month: "short", year: "numeric" });
 }
 
-function renderChart(monthCount) {
-    const filtered = getLastMonthsData(monthCount);
+// Build calendar months dynamically
+function buildMonthSeries(monthCount) {
+    const today = new Date();
+    const result = [];
+    const currentYear = today.getFullYear();
 
-    const labels = filtered.map(item => item.month);
-    const values = filtered.map(item => item.revenue);
+    // ✅ 12M → Full current year Jan → Dec
+    if (monthCount === 12) {
+        for (let m = 0; m < 12; m++) {
+            const d = new Date(currentYear, m, 1);
+            const key = `${currentYear}-${String(m + 1).padStart(2, "0")}`;
+            const match = revenueData.find(r => r.month === key);
+
+            result.push({
+                month: key,
+                revenue: match ? match.revenue : 0
+            });
+        }
+        return result;
+    }
+
+    // ✅ 6M → Last 6 months from current month
+    for (let i = 5; i >= 0; i--) {
+        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        const match = revenueData.find(r => r.month === key);
+
+        result.push({
+            month: key,
+            revenue: match ? match.revenue : 0
+        });
+    }
+
+    return result;
+}
+
+// Calculate max revenue for Y-axis scaling
+function getMaxRevenue(data) {
+    return Math.max(...data.map(d => d.revenue), 1000);
+}
+
+// Render chart
+function renderChart(monthCount) {
+    const filtered = buildMonthSeries(monthCount);
+
+    const labels = filtered.map(d => formatMonth(d.month));
+    const values = filtered.map(d => d.revenue);
+    const maxRevenue = getMaxRevenue(filtered);
 
     const ctx = document.getElementById("revenueChart").getContext("2d");
 
@@ -518,8 +459,6 @@ function renderChart(monthCount) {
             datasets: [{
                 label: "Revenue",
                 data: values,
-                borderColor: "rgb(59,130,246)",
-                backgroundColor: "rgba(59,130,246,0.15)",
                 borderWidth: 3,
                 fill: true,
                 tension: 0.4,
@@ -529,22 +468,28 @@ function renderChart(monthCount) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false }},
+            plugins: {
+                legend: { display: false }
+            },
             scales: {
                 y: {
+                    beginAtZero: true,
+                   suggestedMax: Math.max(maxRevenue, 5000),   // 👈 force visible scale,
                     ticks: {
-                        callback: v => "₹" + v.toLocaleString()
-                    }
+    stepSize: 1000,               // 👈 fixed interval
+    callback: value => "₹" + value.toLocaleString()
+}
+
                 }
             }
         }
     });
 }
 
-/* ================= INIT ================= */
+// ================= INIT =================
 document.addEventListener("DOMContentLoaded", () => {
 
-    // Default → Last 6 months
+    // Default → Current 6 months
     renderChart(6);
 
     document.getElementById("revenue6m")
@@ -552,6 +497,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.getElementById("revenue12m")
         .addEventListener("change", () => renderChart(12));
-}); 
+});
 </script>
 {% endblock %}

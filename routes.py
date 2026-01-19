@@ -30,6 +30,10 @@ from voice_service import VoiceCommandProcessor, VoiceInvoiceBuilder
 from pdf_generator import generate_quotation_pdf
 from flask import send_file
 from models import BankDetails
+from datetime import date
+from sqlalchemy import func
+from app import db
+from models import Invoice
 
 # Initialize analytics engine
 analytics_engine = AnalyticsEngine(db.session)
@@ -1575,12 +1579,7 @@ def send_whatsapp(qid):
     flash("WhatsApp sent successfully (demo).")
     return redirect(url_for("quotation_list"))
 
- 
 
-from datetime import date
-from sqlalchemy import func
-from app import db
-from models import Invoice
 
 @app.route('/dashboard')
 @login_required
@@ -1622,15 +1621,36 @@ def dashboard_page():
         .all()
     )
 
+    # 📊 Monthly revenue for last 12 months (Paid invoices only)
+    monthly_revenue_rows = (
+        db.session.query(
+            func.strftime('%Y-%m', Invoice.invoice_date).label("month"),
+            func.sum(Invoice.total_amount).label("revenue")
+        )
+        .filter(Invoice.payment_status == 'Paid')
+        .group_by("month")
+        .order_by("month")
+        .all()
+    )
+
+    monthly_revenue = [
+        {
+            "month": row.month,
+            "revenue": float(row.revenue)
+        }
+        for row in monthly_revenue_rows
+    ]
+
     print("✅ Current Month Revenue:", monthly_revenue_total)
     print("✅ Outstanding Amount:", outstanding_amount)
     print("✅ Recent Invoices Count:", len(recent_invoices))
+    print("📊 Monthly Revenue Data:", monthly_revenue)
 
- 
     return render_template(
         "dashboard.html",
         monthly_revenue_total=monthly_revenue_total,
         outstanding_amount=outstanding_amount,
-        recent_invoices=recent_invoices   # ✅ Add this
+        recent_invoices=recent_invoices,
+        monthly_revenue=monthly_revenue   # ✅ NEW
     )
 
