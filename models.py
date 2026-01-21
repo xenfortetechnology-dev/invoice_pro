@@ -1,6 +1,7 @@
 from datetime import datetime
 from sqlalchemy import func, JSON
-from app import db
+from extensions import db
+
 
 class Company(db.Model):
     __tablename__ = 'company'

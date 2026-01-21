@@ -126,7 +126,7 @@ html, body {
     <nav class="glass-nav sidebar d-flex flex-column p-3">
 
         <!-- Brand -->
-        <a class="navbar-brand fw-bold text-primary mb-4" href="{{ url_for('dashboard') }}">
+        <a class="navbar-brand fw-bold text-primary mb-4" href="{{ url_for('dashboard_page') }}">
             <i data-feather="zap" class="me-2"></i>
             Revolutionary Invoice
         </a>
@@ -134,7 +134,7 @@ html, body {
         <!-- Nav Items -->
         <ul class="nav nav-pills flex-column mb-auto">
             <li class="nav-item">
-                <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
+                <a class="nav-link {% if request.endpoint == 'dashboard_page' %}active{% endif %}" href="{{ url_for('dashboard_page') }}">
                     <i data-feather="home" class="me-2"></i> Dashboard
                 </a>
             </li>
