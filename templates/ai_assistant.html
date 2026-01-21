@@ -113,9 +113,9 @@
                         <button class="btn btn-sm btn-outline-primary me-1" onclick="sendQuickMessage('Which clients need follow-up?')">
                             👥 Client Follow-up
                         </button>
-                        <button class="btn btn-sm btn-outline-primary" onclick="sendQuickMessage('Analyze my payment trends')">
+                        <!-- <button class="btn btn-sm btn-outline-primary" onclick="sendQuickMessage('Analyze my payment trends')">
                             💰 Payment Analysis
-                        </button>
+                        </button> -->
                     </div>
                 </div>
             </div>
@@ -461,85 +461,106 @@ function hideTypingIndicator() {
     }
 }
 
-function processAIResponse(userMessage) {
-    // Simulate AI processing based on message content
-    let response = generateAIResponse(userMessage);
-    addMessage('ai', response);
+function processAIResponse(message) {
+    fetch("/api/ai/chat", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ message })
+    })
+    .then(res => res.json())
+    .then(data => {
+        // ✅ AI replied successfully
+        if (data.reply) {
+            addMessage("ai", data.reply);
+            return;
+        }
+
+        // ⚠️ AI unavailable → fallback
+        console.warn("AI unavailable, using local logic", data);
+        const fallback = generateAIResponse(message);
+        addMessage("ai", fallback);
+    })
+    .catch(err => {
+        console.error("AI server error", err);
+        const fallback = generateAIResponse(message);
+        addMessage("ai", fallback);
+    });
 }
 
-const demoData = {
-    clients: {
-        total: 52,
-        active: 41,
-        inactive: 11,
-        activeNames: [
-            "ABC Corp", "Tech Solutions", "Innovate Ltd", "Green Energy",
-            "FutureWorks", "Blue Ocean", "Bright Minds", "Starline Co", "NextGen"
-        ],
-        inactiveNames: ["XYZ Ltd", "OldTown Inc", "Legacy Systems"],
-        details: {
-            "ABC Corp": {
-                status: "Active",
-                lastInvoice: "2025-12-01",
-                outstandingAmount: "₹15,000",
-                lastPaymentDate: "2025-11-28"
-            },
-            "Tech Solutions": {
-                status: "Active",
-                lastInvoice: "2025-12-05",
-                outstandingAmount: "₹0",
-                lastPaymentDate: "2025-12-02"
-            },
-            "XYZ Ltd": {
-                status: "Inactive",
-                lastInvoice: "2025-09-15",
-                outstandingAmount: "₹45,000",
-                lastPaymentDate: "2025-09-10"
-            }
-        }
+
+// const demoData = {
+//     clients: {
+//         total: 52,
+//         active: 41,
+//         inactive: 11,
+//         activeNames: [
+//             "ABC Corp", "Tech Solutions", "Innovate Ltd", "Green Energy",
+//             "FutureWorks", "Blue Ocean", "Bright Minds", "Starline Co", "NextGen"
+//         ],
+//         inactiveNames: ["XYZ Ltd", "OldTown Inc", "Legacy Systems"],
+//         details: {
+//             "ABC Corp": {
+//                 status: "Active",
+//                 lastInvoice: "2025-12-01",
+//                 outstandingAmount: "₹15,000",
+//                 lastPaymentDate: "2025-11-28"
+//             },
+//             "Tech Solutions": {
+//                 status: "Active",
+//                 lastInvoice: "2025-12-05",
+//                 outstandingAmount: "₹0",
+//                 lastPaymentDate: "2025-12-02"
+//             },
+//             "XYZ Ltd": {
+//                 status: "Inactive",
+//                 lastInvoice: "2025-09-15",
+//                 outstandingAmount: "₹45,000",
+//                 lastPaymentDate: "2025-09-10"
+//             }
+//         }
         
-    },
-    invoices: {
-        total: 182,
-        paid: 146,
-        unpaid: 26,
-        overdue: 10,
-        byClient: {
-            "ABC Corp": 12,
-            "Tech Solutions": 8,
-            "XYZ Ltd": 5,
-            "Innovate Ltd": 10,
-            "Green Energy": 7,
-            "OldTown Inc": 4,
-            "FutureWorks": 9,
-            "Legacy Systems": 2,
-            "Blue Ocean": 6,
-            "Bright Minds": 9,
-            "Starline Co": 5,
-            "NextGen": 5
-        }
-    },
-    payments: {
-        delayedClients: ["XYZ Ltd", "OldTown Inc"],
-        earlyPayers: ["ABC Corp", "Bright Minds"],
-        averageDelayDays: 8.5,
-        successRate: 94.2
-    },
-    finance: {
-    incomeToday: 32000,
-    incomeWeek: 150000,      
-    incomeMonth: 425000,
-    incomeYear: 5100000,
-    revenueToday: 36000,
-    revenueWeek: 170000,      
-    revenueMonth: 468000,
-    revenueYear: 5600000,
-    profitMonth: 283000,
-    expensesMonth: 185000,
-    growth: "15%"
-}
+//     },
+//     invoices: {
+//         total: 182,
+//         paid: 146,
+//         unpaid: 26,
+//         overdue: 10,
+//         byClient: {
+//             "ABC Corp": 12,
+//             "Tech Solutions": 8,
+//             "XYZ Ltd": 5,
+//             "Innovate Ltd": 10,
+//             "Green Energy": 7,
+//             "OldTown Inc": 4,
+//             "FutureWorks": 9,
+//             "Legacy Systems": 2,
+//             "Blue Ocean": 6,
+//             "Bright Minds": 9,
+//             "Starline Co": 5,
+//             "NextGen": 5
+//         }
+//     },
+//     payments: {
+//         delayedClients: ["XYZ Ltd", "OldTown Inc"],
+//         earlyPayers: ["ABC Corp", "Bright Minds"],
+//         averageDelayDays: 8.5,
+//         successRate: 94.2
+//     },
+//     finance: {
+//     incomeToday: 32000,
+//     incomeWeek: 150000,      
+//     incomeMonth: 425000,
+//     incomeYear: 5100000,
+//     revenueToday: 36000,
+//     revenueWeek: 170000,      
+//     revenueMonth: 468000,
+//     revenueYear: 5600000,
+//     profitMonth: 283000,
+//     expensesMonth: 185000,
+//     growth: "15%"
+// }
 
-};
+// };
 
 function generateAIResponse(message) {
     const msg = message.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();

@@ -3,25 +3,31 @@ import os
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
-import openai
+# import openai
 from sqlalchemy import func
-from app import db
+from extensions import db
+
 from models import Invoice, Client, InvoiceLineItem, AIInteraction, InventoryItem
+# from openai import OpenAI
+import ai_client
 
 # Initialize OpenAI client
-openai.api_key = os.environ.get("OPENAI_API_KEY")
+# openai.api_key = os.environ.get("OPENAI_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
+
 
 class AIInvoiceAssistant:
     """AI-powered invoice assistance with GPT-4o"""
     
     def __init__(self):
-        self.model = "gpt-4o"  # the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+        pass
         
     def analyze_client_history(self, client_id: int) -> Dict[str, Any]:
         """Analyze client's invoice history to provide insights"""
         try:
-            client = Client.query.get(client_id)
-            if not client:
+            db_client = Client.query.get(client_id)
+            if not db_client:
                 return {"error": "Client not found"}
             
             # Get client's invoice history
@@ -40,10 +46,13 @@ class AIInvoiceAssistant:
                 invoice_data.append(invoice_info)
             
             # AI analysis prompt
+            if not ai_client.AI_AVAILABLE:
+                return {"error": "AI unavailable", "reason": ai_client.LAST_AI_ERROR}
+            
             prompt = f"""
             Analyze the following client invoice history and provide insights in JSON format:
             
-            Client: {client.name}
+            Client: {db_client.name}
             Invoice History: {json.dumps(invoice_data, indent=2)}
             
             Provide analysis in this JSON format:
@@ -66,8 +75,8 @@ class AIInvoiceAssistant:
             }}
             """
             
-            response = openai.chat.completions.create(
-                model=self.model,
+            response = ai_client.client.chat.completions.create(
+                model=ai_client.MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"}
             )
@@ -75,9 +84,9 @@ class AIInvoiceAssistant:
             analysis = json.loads(response.choices[0].message.content)
             
             # Update client with AI insights
-            client.ai_risk_score = analysis.get("risk_assessment", {}).get("score", 0.0)
-            client.predicted_ltv = analysis.get("predicted_ltv", 0.0)
-            client.preferred_products = analysis.get("preferred_products", [])
+            db_client.ai_risk_score = analysis.get("risk_assessment", {}).get("score", 0.0)
+            db_client.predicted_ltv = analysis.get("predicted_ltv", 0.0)
+            db_client.preferred_products = analysis.get("preferred_products", [])
             
             db.session.commit()
             
@@ -90,8 +99,8 @@ class AIInvoiceAssistant:
     def suggest_invoice_items(self, client_id: int, context: str = "") -> List[Dict[str, Any]]:
         """AI-powered item suggestions based on client history and context"""
         try:
-            client = Client.query.get(client_id)
-            if not client:
+            db_client = Client.query.get(client_id)
+            if not db_client:
                 return []
             
             # Get recent invoices for this client
@@ -117,10 +126,13 @@ class AIInvoiceAssistant:
                                 "price": item.selling_price, "stock": item.current_stock}
                                for item in inventory_items if item.current_stock > 0]
             
+            if not ai_client.AI_AVAILABLE:
+                return []
+            
             prompt = f"""
             Based on the client history and available inventory, suggest relevant invoice items:
             
-            Client: {client.name}
+            Client: {db_client.name}
             Context: {context}
             Client Purchase History: {json.dumps(client_history[-20:], indent=2)}
             Available Inventory: {json.dumps(inventory_context[:50], indent=2)}
@@ -139,8 +151,8 @@ class AIInvoiceAssistant:
             }}
             """
             
-            response = openai.chat.completions.create(
-                model=self.model,
+            response = ai_client.client.chat.completions.create(
+                model=ai_client.MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"}
             )
@@ -155,13 +167,16 @@ class AIInvoiceAssistant:
     def optimize_pricing(self, items: List[Dict], client_id: int) -> List[Dict]:
         """AI-powered pricing optimization"""
         try:
-            client = Client.query.get(client_id)
+            if not ai_client.AI_AVAILABLE:
+                return items
+            
+            db_client = Client.query.get(client_id)
             market_data = self._get_market_pricing_data()
             
             prompt = f"""
             Optimize pricing for the following items based on client profile and market data:
             
-            Client Profile: Risk Score: {client.ai_risk_score}, LTV: {client.predicted_ltv}
+            Client Profile: Risk Score: {db_client.ai_risk_score}, LTV: {db_client.predicted_ltv}
             Items: {json.dumps(items, indent=2)}
             Market Data: {json.dumps(market_data, indent=2)}
             
@@ -178,8 +193,8 @@ class AIInvoiceAssistant:
             }}
             """
             
-            response = openai.chat.completions.create(
-                model=self.model,
+            response = ai_client.client.chat.completions.create(
+                model=ai_client.MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"}
             )
@@ -206,7 +221,7 @@ class PredictiveAnalytics:
     """Advanced predictive analytics for business insights"""
     
     def __init__(self):
-        self.model = "gpt-4o"  # the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+        pass
     
     def predict_cash_flow(self, months_ahead: int = 6) -> Dict[str, Any]:
         """Predict cash flow for upcoming months"""
@@ -242,6 +257,9 @@ class PredictiveAnalytics:
             upcoming_data = [{"due_date": inv.due_date.strftime("%Y-%m-%d"), 
                             "amount": float(inv.total_amount)} for inv in upcoming_invoices]
             
+            if not ai_client.AI_AVAILABLE:
+                return {"error": "AI unavailable", "reason": ai_client.LAST_AI_ERROR}
+            
             prompt = f"""
             Predict cash flow for the next {months_ahead} months based on historical data and upcoming payments:
             
@@ -268,8 +286,8 @@ class PredictiveAnalytics:
             }}
             """
             
-            response = openai.chat.completions.create(
-                model=self.model,
+            response = ai_client.client.chat.completions.create(
+                model=ai_client.MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"}
             )
@@ -305,6 +323,9 @@ class PredictiveAnalytics:
                     "total_business": float(data.total_business)
                 })
             
+            if not ai_client.AI_AVAILABLE:
+                return {"error": "AI unavailable", "reason": ai_client.LAST_AI_ERROR}
+            
             prompt = f"""
             Analyze client payment patterns and provide insights:
             
@@ -334,8 +355,8 @@ class PredictiveAnalytics:
             }}
             """
             
-            response = openai.chat.completions.create(
-                model=self.model,
+            response = ai_client.client.chat.completions.create(
+                model=ai_client.MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"}
             )
@@ -351,7 +372,7 @@ class InventoryAI:
     """AI-powered inventory management and demand forecasting"""
     
     def __init__(self):
-        self.model = "gpt-4o"  # the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+        pass
     
     def forecast_demand(self, item_id: int, days_ahead: int = 30) -> Dict[str, Any]:
         """Forecast demand for inventory items"""
@@ -372,6 +393,9 @@ class InventoryAI:
             
             historical_sales = [{"date": sale.invoice_date.strftime("%Y-%m-%d"), 
                                "quantity": float(sale.quantity)} for sale in sales_data]
+            
+            if not ai_client.AI_AVAILABLE:
+                return {"error": "AI unavailable", "reason": ai_client.LAST_AI_ERROR}
             
             prompt = f"""
             Forecast demand for inventory item based on historical sales:
@@ -403,8 +427,8 @@ class InventoryAI:
             }}
             """
             
-            response = openai.chat.completions.create(
-                model=self.model,
+            response = ai_client.client.chat.completions.create(
+                model=ai_client.MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"}
             )
@@ -422,27 +446,52 @@ class InventoryAI:
             logging.error(f"Demand forecasting failed: {e}")
             return {"error": str(e)}
 
-def initialize_ai_models():
-    """Initialize AI services and perform health checks"""
-    try:
-        # Test OpenAI connection
-        if not openai.api_key:
-            raise Exception("OpenAI API key not configured")
-        
-        # Initialize AI services
-        global ai_assistant, predictive_analytics, inventory_ai
-        ai_assistant = AIInvoiceAssistant()
-        predictive_analytics = PredictiveAnalytics()
-        inventory_ai = InventoryAI()
-        
-        logging.info("AI services initialized successfully")
-        return True
-        
-    except Exception as e:
-        logging.error(f"Failed to initialize AI services: {e}")
-        return False
+# For OpenAI
+
+# def initialize_ai_models():
+#     global ai_assistant, predictive_analytics, inventory_ai
+#     try:
+#         print("🚀 Initializing AI services...")
+#         print("🔑 OpenAI Key present:", bool(openai.api_key))
+
+#         if not openai.api_key:
+#             raise Exception("OpenAI API key not configured")
+
+#         ai_assistant = AIInvoiceAssistant()
+#         predictive_analytics = PredictiveAnalytics()
+#         inventory_ai = InventoryAI()
+
+#         print("✅ AI services initialized")
+#         return True
+
+#     except Exception as e:
+#         print("❌ AI INIT FAILED:", e)
+#         return False
+
 
 # Global AI service instances
 ai_assistant = None
 predictive_analytics = None
 inventory_ai = None
+
+
+# For OpenRouter
+def initialize_ai_models():
+    """
+    Initializes AI business services AFTER ai_client is ready
+    """
+    global ai_assistant, predictive_analytics, inventory_ai
+
+    from ai_client import AI_AVAILABLE
+
+    if not AI_AVAILABLE:
+        logging.warning("⚠️ AI client unavailable — services not created")
+        return False
+
+    ai_assistant = AIInvoiceAssistant()
+    predictive_analytics = PredictiveAnalytics()
+    inventory_ai = InventoryAI()
+
+    logging.info("✅ AI business services initialized")
+    return True
+

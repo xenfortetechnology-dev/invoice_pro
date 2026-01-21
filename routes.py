@@ -7,11 +7,13 @@ from werkzeug.utils import secure_filename
 from sqlalchemy import func, and_, or_, extract, desc
 from sqlalchemy.orm import joinedload
 
-from app import app, db, mail 
+from app import app, mail 
 from models import *
 from utils import *
 from pdf_generator import generate_invoice_pdf, generate_challan_pdf
-from ai_services import ai_assistant, predictive_analytics, inventory_ai
+import ai_services
+from extensions import db
+
 from blockchain_service import blockchain_service, smart_contract_manager
 from ocr_service import ocr_processor, receipt_processor
 from voice_service import voice_processor, voice_invoice_builder
@@ -34,6 +36,9 @@ from datetime import date
 from sqlalchemy import func
 from app import db
 from models import Invoice
+
+import ai_services
+import ai_client 
 
 # Initialize analytics engine
 analytics_engine = AnalyticsEngine(db.session)
@@ -67,7 +72,7 @@ def login():
             db.session.commit()
             
             flash('Welcome back! AI-powered invoice system is ready.', 'success')
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('dashboard_page'))
         else:
             flash('Invalid credentials. Please try again.', 'error')
     
@@ -80,141 +85,10 @@ def logout():
     flash('You have been logged out successfully.', 'success')
     return redirect(url_for('login'))
 
-from datetime import datetime
-from sqlalchemy import func
-
 @app.route('/')
-@login_required
-def dashboard():
-    """AI-powered dashboard with predictive analytics"""
-    try:
-        today = datetime.now()
-        current_year = today.year
-        current_month = today.month
-
-        # ===============================
-        # ✅ CURRENT MONTH TOTAL REVENUE
-        # ===============================
-        total_revenue = (
-            db.session.query(func.sum(Invoice.total_amount))
-            .filter(
-                Invoice.payment_status == 'Paid',
-                func.extract('year', Invoice.invoice_date) == current_year,
-                func.extract('month', Invoice.invoice_date) == current_month
-            )
-            .scalar()
-        ) or 0
-
-        # ===============================
-        # ✅ OUTSTANDING AMOUNT
-        # ===============================
-        outstanding_amount = (
-            db.session.query(func.sum(Invoice.total_amount - Invoice.amount_paid))
-            .filter(Invoice.payment_status.in_(['Unpaid', 'Partially Paid']))
-            .scalar()
-        ) or 0
-
-        # ===============================
-        # ✅ BASIC COUNTS
-        # ===============================
-        total_invoices = Invoice.query.count()
-        total_clients = Client.query.count()
-
-        # ===============================
-        # ✅ RECENT ACTIVITY
-        # ===============================
-        recent_invoices = (
-            Invoice.query
-            .order_by(Invoice.created_at.desc())
-            .limit(10)
-            .all()
-        )
-
-        upcoming_payments = (
-            Invoice.query
-            .filter(
-                Invoice.due_date >= today.date(),
-                Invoice.payment_status.in_(['Unpaid', 'Partially Paid'])
-            )
-            .order_by(Invoice.due_date.asc())
-            .limit(10)
-            .all()
-        )
-
-        # ===============================
-        # ✅ CURRENT YEAR MONTH-WISE REVENUE (GRAPH)
-        # ===============================
-        revenue_rows = (
-            db.session.query(
-                func.extract('month', Invoice.invoice_date).label("month"),
-                func.sum(Invoice.total_amount).label("revenue")
-            )
-            .filter(
-                Invoice.payment_status == 'Paid',
-                func.extract('year', Invoice.invoice_date) == current_year
-            )
-            .group_by("month")
-            .order_by("month")
-            .all()
-        )
-
-        MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun",
-                       "Jul","Aug","Sep","Oct","Nov","Dec"]
-
-        monthly_revenue = [
-            {
-                "month": MONTH_NAMES[int(row.month) - 1],
-                "revenue": float(row.revenue or 0)
-            }
-            for row in revenue_rows
-        ]
-
-        # ===============================
-        # ✅ AI INSIGHTS
-        # ===============================
-        ai_insights = {}
-        if app.config.get("AI_FEATURES_ENABLED") and predictive_analytics:
-            try:
-                cash_flow_prediction = predictive_analytics.predict_cash_flow(6)
-                payment_patterns = predictive_analytics.analyze_client_payment_patterns()
-                ai_insights = {
-                    'cash_flow': cash_flow_prediction,
-                    'payment_patterns': payment_patterns
-                }
-            except Exception as e:
-                logging.error(f"AI insights generation failed: {e}")
-
-        # ===============================
-        # ✅ BLOCKCHAIN STATS
-        # ===============================
-        blockchain_stats = {}
-        if app.config.get("BLOCKCHAIN_ENABLED") and blockchain_service:
-            try:
-                blockchain_stats = blockchain_service.get_blockchain_stats()
-            except Exception as e:
-                logging.error(f"Blockchain stats failed: {e}")
-
-        # ===============================
-        # ✅ RENDER
-        # ===============================
-        return render_template(
-            'dashboard.html',
-            today=today,
-            total_revenue=total_revenue,   # 👈 current month revenue
-            outstanding_amount=outstanding_amount,
-            total_invoices=total_invoices,
-            total_clients=total_clients,
-            recent_invoices=recent_invoices,
-            upcoming_payments=upcoming_payments,
-            monthly_revenue=monthly_revenue,   # 👈 used by graph
-            ai_insights=ai_insights,
-            blockchain_stats=blockchain_stats
-        )
-
-    except Exception as e:
-        logging.error(f"Dashboard error: {e}")
-        flash('Error loading dashboard data.', 'error')
-        return render_template('dashboard.html', error=str(e))
+def index():
+    """Redirect root to dashboard"""
+    return redirect(url_for('dashboard_page'))
 
 
 @app.route('/invoices')
@@ -263,7 +137,7 @@ def invoice_management():
     
     # AI insights for invoices
     ai_invoice_insights = {}
-    if app.config.get("AI_FEATURES_ENABLED") and ai_assistant:
+    if app.config.get("AI_FEATURES_ENABLED") and ai_services.ai_assistant:
         try:
             # Get payment delay predictions
             ai_invoice_insights = analytics_engine.get_ai_invoice_insights(
@@ -373,9 +247,9 @@ def create_invoice():
             invoice.qr_payment_code = generate_payment_qr_code(invoice)
 
             # AI risk assessment
-            if app.config.get("AI_FEATURES_ENABLED") and ai_assistant:
+            if app.config.get("AI_FEATURES_ENABLED") and ai_services.ai_assistant:
                 try:
-                    risk_assessment = ai_assistant.analyze_client_history(client_id)
+                    risk_assessment = ai_services.ai_assistant.analyze_client_history(client_id)
                     invoice.ai_risk_assessment = risk_assessment
                     invoice.predicted_payment_date = predict_payment_date(invoice, risk_assessment)
                 except Exception as e:
@@ -413,9 +287,9 @@ def create_invoice():
     ai_suggestions = {}
     client_id = request.args.get('client_id')
 
-    if client_id and app.config.get("AI_FEATURES_ENABLED") and ai_assistant:
+    if client_id and app.config.get("AI_FEATURES_ENABLED") and ai_services.ai_assistant:
         try:
-            ai_suggestions = ai_assistant.suggest_invoice_items(int(client_id))
+            ai_suggestions = ai_services.ai_assistant.suggest_invoice_items(int(client_id))
         except Exception as e:
             logging.error(f"AI suggestions failed: {e}")
 
@@ -440,9 +314,9 @@ def invoice_detail(id):
     
     # AI insights for this invoice
     ai_insights = {}
-    if app.config.get("AI_FEATURES_ENABLED") and ai_assistant:
+    if app.config.get("AI_FEATURES_ENABLED") and ai_services.ai_assistant:
         try:
-            client_analysis = ai_assistant.analyze_client_history(invoice.client_id)
+            client_analysis = ai_services.ai_assistant.analyze_client_history(invoice.client_id)
             ai_insights = {
                 'payment_prediction': client_analysis.get('risk_assessment', {}),
                 'similar_invoices': analytics_engine.find_similar_invoices(id)
@@ -657,7 +531,7 @@ def client_management():
 
     # AI insights for clients
     client_insights = {}
-    if app.config.get("AI_FEATURES_ENABLED") and ai_assistant:
+    if app.config.get("AI_FEATURES_ENABLED") and ai_services.ai_assistant:
         try:
             for client in client_list:
                 if client.ai_risk_score > 0:
@@ -884,11 +758,11 @@ def analytics():
         }
         
         # AI-powered predictions
-        if app.config.get("AI_FEATURES_ENABLED") and predictive_analytics:
+        if app.config.get("AI_FEATURES_ENABLED") and ai_services.predictive_analytics:
             try:
                 analytics_data['ai_predictions'] = {
-                    'cash_flow': predictive_analytics.predict_cash_flow(6),
-                    'payment_patterns': predictive_analytics.analyze_client_payment_patterns()
+                    'cash_flow': ai_services.predictive_analytics.predict_cash_flow(6),
+                    'payment_patterns': ai_services.predictive_analytics.analyze_client_payment_patterns()
                 }
             except Exception as e:
                 logging.error(f"AI predictions failed: {e}")
@@ -1047,12 +921,12 @@ def api_voice_command():
 @login_required
 def api_ai_suggestions(client_id):
     """Get AI suggestions for invoice items"""
-    if not app.config.get("AI_FEATURES_ENABLED") or not ai_assistant:
+    if not app.config.get("AI_FEATURES_ENABLED") or not ai_services.ai_assistant:
         return jsonify({'error': 'AI features not available'})
     
     try:
         context = request.args.get('context', '')
-        suggestions = ai_assistant.suggest_invoice_items(client_id, context)
+        suggestions = ai_services.ai_assistant.suggest_invoice_items(client_id, context)
         return jsonify({'suggestions': suggestions})
         
     except Exception as e:
@@ -1116,12 +990,12 @@ def api_blockchain_verify(invoice_id):
 @login_required
 def api_inventory_forecast(item_id):
     """Inventory demand forecasting API"""
-    if not app.config.get("AI_FEATURES_ENABLED") or not inventory_ai:
+    if not app.config.get("AI_FEATURES_ENABLED") or not ai_services.inventory_ai:
         return jsonify({'error': 'AI inventory features not available'})
     
     try:
         days_ahead = request.args.get('days', 30, type=int)
-        forecast = inventory_ai.forecast_demand(item_id, days_ahead)
+        forecast = ai_services.inventory_ai.forecast_demand(item_id, days_ahead)
         return jsonify(forecast)
         
     except Exception as e:
@@ -1654,3 +1528,125 @@ def dashboard_page():
         monthly_revenue=monthly_revenue   # ✅ NEW
     )
 
+
+# AI Chat API
+@app.route("/api/ai/chat", methods=["POST"])
+@login_required
+def ai_chat():
+    data = request.get_json()
+    message = (data.get("message") or "").lower()
+
+    try:
+        # -------------------------
+        # CREATE INVOICE (AI)
+        # -------------------------
+        if "create" in message and "invoice" in message:
+            top_client = (
+                db.session.query(Client)
+                .join(Invoice)
+                .group_by(Client.id)
+                .order_by(func.sum(Invoice.total_amount).desc())
+                .first()
+            )
+
+            if not top_client:
+                return jsonify(reply="❌ No clients found to create an invoice.")
+
+            return jsonify(reply=(
+                f"🧾 Creating invoice for <b>{top_client.name}</b>.<br>"
+                f"<a href='{url_for('create_invoice', client_id=top_client.id)}'>"
+                f"👉 Click here to continue</a>"
+            ))
+        
+        # -------------------------
+        # CLIENT FOLLOW-UP
+        # -------------------------
+        if "follow" in message:
+            clients = (
+                db.session.query(Client.name)
+                .join(Invoice)
+                .filter(Invoice.payment_status.in_(["Unpaid", "Overdue"]))
+                .distinct()
+                .all()
+            )
+
+            if not clients:
+                return jsonify(reply="🎉 No clients currently need follow-up.")
+
+            names = ", ".join(c.name for c in clients)
+            return jsonify(reply=f"📋 Clients needing follow-up:<br><b>{names}</b>")
+
+        # -------------------------
+        # PAYMENT ANALYSIS (AI)
+        # -------------------------
+        if "payment" in message and "analy" in message:
+            if not ai_services.predictive_analytics:
+                return jsonify(error="AI unavailable")
+
+            analysis = ai_services.predictive_analytics.analyze_client_payment_patterns()
+            return jsonify(reply=format_payment_analysis(analysis))
+
+        # -------------------------
+        # REVENUE
+        # -------------------------
+        if "revenue" in message:
+            total = (
+                db.session.query(func.sum(Invoice.total_amount))
+                .filter(Invoice.payment_status == "Paid")
+                .scalar() or 0
+            )
+            return jsonify(reply=f"💰 Total revenue collected: ₹{int(total):,}")
+
+        # -------------------------
+        # CLIENT COUNT
+        # -------------------------
+        if "how many" in message and "client" in message:
+            count = Client.query.count()
+            return jsonify(reply=f"👥 You have <b>{count}</b> clients.")
+
+        # -------------------------
+        # FALLBACK → AI CHAT
+        # -------------------------
+        if ai_services.ai_assistant:
+            reply = ai_services.ai_assistant.general_chat(message)
+            return jsonify(reply=reply)
+
+        return jsonify(error="AI unavailable")
+
+    except Exception as e:
+        return jsonify(error=str(e))
+
+
+def format_payment_analysis(data):
+    segments = data.get("payment_behavior_segments", [])
+    output = ["📊 <b>Payment Analysis</b><br>"]
+
+    for s in segments:
+        output.append(
+            f"• <b>{s['segment_name']}</b>: "
+            f"{s['client_count']} clients "
+            f"(avg delay {round(s['avg_delay_days'],1)} days)"
+        )
+
+    return "<br>".join(output)
+
+# For OpenAI service status check
+# @app.route("/api/ai/status")
+# def ai_status():
+#     return {
+#         "ai_assistant": ai_services.ai_assistant is not None,
+#         "predictive_analytics": ai_services.predictive_analytics is not None,
+#         "inventory_ai": ai_services.inventory_ai is not None
+#     }
+
+# For Openrouter service status check
+@app.route("/api/ai/status")
+def ai_status():
+    return {
+        "provider": ai_client.PROVIDER,
+        "available": ai_client.AI_AVAILABLE,
+        "model": ai_client.MODEL,
+        "ai_assistant": ai_services.ai_assistant is not None,
+        "predictive_analytics": ai_services.predictive_analytics is not None,
+        "inventory_ai": ai_services.inventory_ai is not None
+    }
