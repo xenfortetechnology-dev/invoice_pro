@@ -1585,13 +1585,13 @@ def send_whatsapp(qid):
 @login_required
 def dashboard_page():
 
-    # 📅 Get today's date
+    # Get today's date
     today = date.today()
 
-    # 📅 First day of current month
+    #  First day of current month
     start_of_month = date(today.year, today.month, 1)
 
-    # 💰 Current Month Revenue (Only PAID invoices)
+    #  Current Month Revenue (Only PAID invoices)
     monthly_revenue_total = (
         db.session.query(func.sum(Invoice.total_amount))
         .filter(
@@ -1602,7 +1602,7 @@ def dashboard_page():
         .scalar()
     ) or 0
 
-    # 💳 Outstanding Amount (Pending money only)
+    #  Outstanding Amount (Pending money only)
     outstanding_amount = (
         db.session.query(
             func.sum(Invoice.total_amount - Invoice.amount_paid)
@@ -1613,7 +1613,7 @@ def dashboard_page():
         .scalar()
     ) or 0
 
-    # 📄 Recent Invoices (ALL: Paid, Unpaid, Partial)
+    #  Recent Invoices (ALL: Paid, Unpaid, Partial)
     recent_invoices = (
         Invoice.query
         .order_by(Invoice.invoice_date.desc())
@@ -1621,7 +1621,7 @@ def dashboard_page():
         .all()
     )
 
-    # 📊 Monthly revenue for last 12 months (Paid invoices only)
+    #  Monthly revenue for last 12 months (Paid invoices only)
     monthly_revenue_rows = (
         db.session.query(
             func.strftime('%Y-%m', Invoice.invoice_date).label("month"),
@@ -1641,10 +1641,10 @@ def dashboard_page():
         for row in monthly_revenue_rows
     ]
 
-    print("✅ Current Month Revenue:", monthly_revenue_total)
-    print("✅ Outstanding Amount:", outstanding_amount)
-    print("✅ Recent Invoices Count:", len(recent_invoices))
-    print("📊 Monthly Revenue Data:", monthly_revenue)
+    print(" Current Month Revenue:", monthly_revenue_total)
+    print(" Outstanding Amount:", outstanding_amount)
+    print(" Recent Invoices Count:", len(recent_invoices))
+    print(" Monthly Revenue Data:", monthly_revenue)
 
     return render_template(
         "dashboard.html",

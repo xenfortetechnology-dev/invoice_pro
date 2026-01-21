@@ -149,20 +149,25 @@
 
             {% if ai_enabled %}
             <!-- Voice Create Invoice -->
-          <!--
-             <button class="btn btn-outline-success glass-btn text-start" id="voiceInvoiceBtn">
-                <i data-feather="mic" class="me-2"></i> Voice Create Invoice
-            </button>
-        -->
+          
+         <button class="btn btn-outline-success glass-btn text-start"
+        id="voiceInvoiceBtn"
+        disabled>
+    <i data-feather="mic" class="me-2"></i> Voice Create Invoice
+    </button>
+
+        
             
-            <!-- Scan Document 
-            <button class="btn btn-outline-info glass-btn text-start"
-                    data-bs-toggle="modal"
-                    data-bs-target="#documentScannerModal">
-                <i data-feather="camera" class="me-2"></i> Scan Document
+           <!--Scan Document-->   
+           <button class="btn btn-outline-info glass-btn text-start"
+            data-bs-toggle="modal"
+            data-bs-target="#documentScannerModal"
+            disabled>
+            <i data-feather="camera" class="me-2"></i> Scan Document
             </button>
+
             {% endif %}
-        -->
+        
             <!-- View Analytics -->
             <a href="{{ url_for('analytics') }}"
                class="btn btn-outline-warning glass-btn text-start">
