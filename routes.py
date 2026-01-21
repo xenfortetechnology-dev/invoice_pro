@@ -1033,9 +1033,7 @@ def api_voice_command():
         voice_text = data.get('text', '')
         context = data.get('context', {})
         
-        result = voice_processor.process_voice_command(
-            session['user_id'], voice_text, context
-        )
+        result = voice_processor.process(voice_text)
         
         return jsonify(result)
         
@@ -1361,11 +1359,7 @@ def handle_voice_command():
                 "message": "No voice text received"
             }), 400
 
-        result = voice_processor.process_voice_command(
-            user_id=user_id,
-            voice_text=voice_text,
-            context={}
-        )
+        result = voice_processor.process(voice_text)
 
         return jsonify(result)
 

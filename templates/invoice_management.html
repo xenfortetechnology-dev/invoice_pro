@@ -380,25 +380,31 @@ document.addEventListener('DOMContentLoaded', function() {
     const invoiceCheckboxes = document.querySelectorAll('.invoice-checkbox');
     const bulkActions = document.querySelector('.bulk-actions');
     
-    selectAllCheckbox.addEventListener('change', function() {
-        invoiceCheckboxes.forEach(checkbox => {
-            checkbox.checked = this.checked;
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            invoiceCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            toggleBulkActions();
         });
-        toggleBulkActions();
-    });
+    }
     
     invoiceCheckboxes.forEach(checkbox => {
         checkbox.addEventListener('change', function() {
             const checkedCount = document.querySelectorAll('.invoice-checkbox:checked').length;
-            selectAllCheckbox.checked = checkedCount === invoiceCheckboxes.length;
-            selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < invoiceCheckboxes.length;
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = checkedCount === invoiceCheckboxes.length;
+                selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < invoiceCheckboxes.length;
+            }
             toggleBulkActions();
         });
     });
     
     function toggleBulkActions() {
         const checkedCount = document.querySelectorAll('.invoice-checkbox:checked').length;
-        bulkActions.style.display = checkedCount > 0 ? 'inline-flex' : 'none';
+        if (bulkActions) {
+            bulkActions.style.display = checkedCount > 0 ? 'inline-flex' : 'none';
+        }
     }
  
 
@@ -606,7 +612,7 @@ function showList() {
 }
 
 </script>
-<script src="{{ url_for('static', filename='js/voice-command.js') }}"></script>
+
 <script>
   feather.replace();  // re-render icons after everything loads
 </script>

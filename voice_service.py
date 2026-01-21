@@ -599,15 +599,28 @@ def extract_item(text: str):
     """
     add pen quantity 2 price 10
     """
-    item_match = re.search(r"add (\w+)", text)
+    item_match = re.search(r"add ([a-zA-Z0-9\s]+)", text)
+    # Check for quantity (optional)
     qty_match = re.search(r"quantity (\d+)", text)
-    price_match = re.search(r"price (\d+)", text)
+    # Check for price/rate (optional)
+    price_match = re.search(r"(?:price|rate) (\d+)", text)
+    # Check for unit (optional)
+    unit_match = re.search(r"unit ([a-zA-Z]+)", text)
+    # Check for tax/gst (optional)
+    tax_match = re.search(r"(?:tax|gst) (\d+)", text)
 
-    if item_match and qty_match and price_match:
+    if item_match:
+        # Stop capturing at keywords
+        raw_name = item_match.group(1)
+        # Split by any of the keywords
+        name = re.split(r" quantity| price| rate| unit| tax| gst", raw_name)[0].strip()
+        
         return {
-            "name": item_match.group(1),
-            "quantity": int(qty_match.group(1)),
-            "price": int(price_match.group(1))
+            "name": name,
+            "quantity": int(qty_match.group(1)) if qty_match else 1,
+            "price": int(price_match.group(1)) if price_match else 0,
+            "unit": unit_match.group(1).capitalize() if unit_match else None,
+            "tax": int(tax_match.group(1)) if tax_match else 18
         }
     return None
 
@@ -644,31 +657,40 @@ class VoiceCommandProcessor:
 
             return {
                 "success": True,
-                "message": f"Invoice started for {client.name}. Now add items."
+                "message": f"Invoice started for {client.name}. Now add items.",
+                "intent": "create_invoice",
+                "client_id": client.id
             }
 
         # --------------------
         # ADD ITEM
         # --------------------
         if "add" in text or "சேர்க்க" in text:
-            if not ACTIVE_INVOICE["client"]:
-                return {
-                    "success": False,
-                    "message": "No active invoice. Say 'Invoice for Aravind' first."
-                }
-
+            # We removed the strict check for ACTIVE_INVOICE["client"] to allow UI usage
+            # but we still check if item valid
+            
             item = extract_item(text)
             if not item:
                 return {
                     "success": False,
-                    "message": "Say like: 'Add pen quantity 2 price 10'"
+                    "message": "Say like: 'Add pen' (optional: quantity 2 price 10)"
                 }
 
-            ACTIVE_INVOICE["items"].append(item)
+            # Only update backend state if we have a client context, otherwise just return intent for UI
+            if ACTIVE_INVOICE["client"]:
+                 ACTIVE_INVOICE["items"].append(item)
 
             return {
                 "success": True,
-                "message": f"{item['name']} added. Qty {item['quantity']} Price {item['price']}"
+                "message": f"{item['name']} added. Qty {item['quantity']} Price {item['price']} Tax {item['tax']}%",
+                "intent": "add_item",
+                "entities": {
+                    "item_description": item['name'],
+                    "quantity": item['quantity'],
+                    "amount": item['price'],
+                    "unit": item['unit'],
+                    "tax": item['tax']
+                }
             }
 
         # --------------------
@@ -725,7 +747,9 @@ class VoiceCommandProcessor:
 
             return {
                 "success": True,
-                "message": f"Invoice saved successfully. Total ₹{total}"
+                "message": f"Invoice saved successfully. Total ₹{total}",
+                "intent": "save_invoice",
+                "invoice_id": invoice.id
             }
 
         # --------------------
@@ -750,3 +774,4 @@ class VoiceInvoiceBuilder:
 # =========================
 voice_processor = VoiceCommandProcessor()
 voice_invoice_builder = VoiceInvoiceBuilder()
+
