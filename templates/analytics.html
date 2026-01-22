@@ -17,40 +17,42 @@
                         <p class="text-muted mb-0">AI-powered insights and comprehensive business intelligence</p>
                     </div>
 
-                    
+
                     <div class="col-md-4 text-end">
                         <div class="d-flex gap-2 justify-content-end">
                             <div class="dropdown time-range-dropdown">
-                                <button class="btn btn-outline-primary glass-btn dropdown-toggle" data-bs-toggle="dropdown">
+                                <button class="btn btn-outline-primary glass-btn dropdown-toggle"
+                                    data-bs-toggle="dropdown">
                                     <i data-feather="calendar" class="me-1"></i> Time Range
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end">
                                     <li><a class="dropdown-item" href="?range=7d">Last 7 Days</a></li>
                                     <li><a class="dropdown-item" href="?range=30d">Last 30 Days</a></li>
                                     <li><a class="dropdown-item" href="?range=90d">Last 3 Months</a></li>
-                                    <li><a class="dropdown-item" href="?range=12m" class="active">Last 12 Months</a></li>
+                                    <li><a class="dropdown-item" href="?range=12m" class="active">Last 12 Months</a>
+                                    </li>
                                     <li><a class="dropdown-item" href="?range=all">All Time</a></li>
                                 </ul>
                             </div>
-            <div class="dropdown">
-    <button class="btn btn-success glass-btn dropdown-toggle" data-bs-toggle="dropdown">
-        <i data-feather="download" class="me-1"></i> Export
-    </button>
-    <ul class="dropdown-menu glass-dropdown dropdown-menu-end">
-        <li>
-    <a class="dropdown-item" href="/analytics/export/excel">
-        <i data-feather="file-text" class="me-2"></i> Excel
-    </a>
-</li>
+                            <div class="dropdown">
+                                <button class="btn btn-success glass-btn dropdown-toggle" data-bs-toggle="dropdown">
+                                    <i data-feather="download" class="me-1"></i> Export
+                                </button>
+                                <ul class="dropdown-menu glass-dropdown dropdown-menu-end">
+                                    <li>
+                                        <a class="dropdown-item" href="/analytics/export/excel">
+                                            <i data-feather="file-text" class="me-2"></i> Excel
+                                        </a>
+                                    </li>
 
-<li>
-    <a class="dropdown-item" href="/analytics/export/pdf">
-        <i data-feather="file" class="me-2"></i> PDF Report
-    </a>
-</li>
+                                    <li>
+                                        <a class="dropdown-item" href="/analytics/export/pdf">
+                                            <i data-feather="file" class="me-2"></i> PDF Report
+                                        </a>
+                                    </li>
 
-    </ul>
-</div>
+                                </ul>
+                            </div>
 
                         </div>
                     </div>
@@ -60,14 +62,16 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Key Performance Indicators -->
     <div class="row mb-4">
         <div class="col-lg-3 col-md-6 mb-3">
             <div class="glass-card p-4 kpi-card">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h3 class="fw-bold text-success mb-1">₹{{ "%.0f"|format(analytics_data.revenue_trends.summary.total_revenue if analytics_data.revenue_trends.summary else 0) }}</h3>
+                        <h3 class="fw-bold text-success mb-1">₹{{
+                            "%.0f"|format(analytics_data.revenue_trends.summary.total_revenue if
+                            analytics_data.revenue_trends.summary else 0) }}</h3>
                         <p class="text-muted mb-0 small">Total Revenue</p>
                         <small class="text-success">
                             <i data-feather="trending-up" size="14"></i> +{{ "%.1f"|format(12.5) }}% vs last period
@@ -79,12 +83,14 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="col-lg-3 col-md-6 mb-3">
             <div class="glass-card p-4 kpi-card">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h3 class="fw-bold text-primary mb-1">{{ analytics_data.profitability_analysis.overall.profit_margin_percentage if analytics_data.profitability_analysis.overall else 0 }}%</h3>
+                        <h3 class="fw-bold text-primary mb-1">{{
+                            analytics_data.profitability_analysis.overall.profit_margin_percentage if
+                            analytics_data.profitability_analysis.overall else 0 }}%</h3>
                         <p class="text-muted mb-0 small">Profit Margin</p>
                         <small class="text-primary">
                             <i data-feather="trending-up" size="14"></i> Healthy margin
@@ -96,12 +102,13 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="col-lg-3 col-md-6 mb-3">
             <div class="glass-card p-4 kpi-card">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h3 class="fw-bold text-info mb-1">{{ analytics_data.payment_analytics.avg_payment_delay_days if analytics_data.payment_analytics else 0 }}</h3>
+                        <h3 class="fw-bold text-info mb-1">{{ analytics_data.payment_analytics.avg_payment_delay_days if
+                            analytics_data.payment_analytics else 0 }}</h3>
                         <p class="text-muted mb-0 small">Avg Payment Delay (Days)</p>
                         <small class="text-info">
                             <i data-feather="clock" size="14"></i> Collection efficiency
@@ -113,12 +120,13 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="col-lg-3 col-md-6 mb-3">
             <div class="glass-card p-4 kpi-card">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h3 class="fw-bold text-warning mb-1">{{ analytics_data.client_performance.top_clients|length if analytics_data.client_performance.top_clients else 0 }}</h3>
+                        <h3 class="fw-bold text-warning mb-1">{{ analytics_data.client_performance.top_clients|length if
+                            analytics_data.client_performance.top_clients else 0 }}</h3>
                         <p class="text-muted mb-0 small">Active Clients</p>
                         <small class="text-warning">
                             <i data-feather="users" size="14"></i> Growing base
@@ -131,43 +139,44 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Charts Section -->
     <div class="row mb-4">
         <!-- Revenue Trends -->
-<div class="col-lg-8 mb-4">
-  <div class="glass-card p-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h5 class="fw-bold mb-0">Revenue & Profit Trends</h5>
-      <div class="chart-legend">
-        <span class="legend-item"><span class="legend-color bg-primary"></span> Revenue</span>
-        <span class="legend-item"><span class="legend-color bg-success"></span> Profit</span>
-      </div>
-    </div>
+        <div class="col-lg-8 mb-4">
+            <div class="glass-card p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0">Revenue & Profit Trends</h5>
+                    <div class="chart-legend">
+                        <span class="legend-item"><span class="legend-color bg-primary"></span> Revenue</span>
+                        <span class="legend-item"><span class="legend-color bg-success"></span> Profit</span>
+                    </div>
+                </div>
 
-    <!-- chart container -->
-    <div class="chart-container" style="height: 500px">
-      <canvas id="revenueProfitChart"  height="400"></canvas>
-    </div>
-  </div>
-</div>
+                <!-- chart container -->
+                <div class="chart-container" style="height: 500px">
+                    <canvas id="revenueProfitChart" height="400"></canvas>
+                </div>
+            </div>
+        </div>
 
-        
+
         <!-- Payment Status Distribution -->
         <div class="col-lg-4 mb-4">
             <div class="glass-card p-4">
                 <h5 class="fw-bold mb-3">Payment Status</h5>
                 <div class="chart-container">
-  <canvas id="paymentStatusChart"></canvas>
-</div>
+                    <canvas id="paymentStatusChart"></canvas>
+                </div>
 
-                
+
                 <div class="payment-status-details mt-3">
                     {% if analytics_data.payment_analytics.payment_status_distribution %}
                     {% for status in analytics_data.payment_analytics.payment_status_distribution %}
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <span class="status-label">
-                            <span class="status-dot bg-{{ 'success' if status.status == 'Paid' else 'danger' if status.status == 'Unpaid' else 'warning' }}"></span>
+                            <span
+                                class="status-dot bg-{{ 'success' if status.status == 'Paid' else 'danger' if status.status == 'Unpaid' else 'warning' }}"></span>
                             {{ status.status }}
                         </span>
                         <span class="fw-bold">₹{{ "%.0f"|format(status.amount) }}</span>
@@ -178,7 +187,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- AI Insights Section -->
     {% if analytics_data.ai_predictions %}
     <div class="row mb-4">
@@ -188,7 +197,7 @@
                     <i data-feather="cpu" class="me-2 text-primary"></i>
                     AI-Powered Insights
                 </h5>
-                
+
                 <div class="row">
                     <!-- Cash Flow Prediction -->
                     <div class="col-lg-6 mb-3">
@@ -197,12 +206,15 @@
                             {% if analytics_data.ai_predictions.cash_flow %}
                             <div class="prediction-summary">
                                 <p class="mb-2">
-                                    <strong>Next Month Forecast:</strong> 
-                                    ₹{{ "%.0f"|format(analytics_data.ai_predictions.cash_flow.summary.total_predicted_revenue or 0) }}
+                                    <strong>Next Month Forecast:</strong>
+                                    ₹{{
+                                    "%.0f"|format(analytics_data.ai_predictions.cash_flow.summary.total_predicted_revenue
+                                    or 0) }}
                                 </p>
                                 <p class="mb-2">
-                                    <strong>Trend:</strong> 
-                                    <span class="badge bg-{{ 'success' if analytics_data.ai_predictions.cash_flow.summary.cash_flow_trend == 'improving' else 'warning' if analytics_data.ai_predictions.cash_flow.summary.cash_flow_trend == 'stable' else 'danger' }}">
+                                    <strong>Trend:</strong>
+                                    <span
+                                        class="badge bg-{{ 'success' if analytics_data.ai_predictions.cash_flow.summary.cash_flow_trend == 'improving' else 'warning' if analytics_data.ai_predictions.cash_flow.summary.cash_flow_trend == 'stable' else 'danger' }}">
                                         {{ analytics_data.ai_predictions.cash_flow.summary.cash_flow_trend.title() }}
                                     </span>
                                 </p>
@@ -211,7 +223,7 @@
                             {% endif %}
                         </div>
                     </div>
-                    
+
                     <!-- Payment Behavior Analysis -->
                     <div class="col-lg-6 mb-3">
                         <div class="ai-insight-card glass-card-sm p-3">
@@ -220,26 +232,33 @@
                             <div class="behavior-analysis">
                                 <div class="mb-2">
                                     <strong>Collection Health:</strong>
-                                    <span class="badge bg-success">{{ analytics_data.ai_predictions.payment_patterns.insights.overall_collection_health.title() }}</span>
+                                    <span class="badge bg-success">{{
+                                        analytics_data.ai_predictions.payment_patterns.insights.overall_collection_health.title()
+                                        }}</span>
                                 </div>
-                                
+
                                 {% if analytics_data.ai_predictions.payment_patterns.insights.best_performing_clients %}
                                 <div class="mb-2">
                                     <strong>Top Performers:</strong>
                                     <div class="client-list">
-                                        {% for client in analytics_data.ai_predictions.payment_patterns.insights.best_performing_clients[:3] %}
-                                        <span class="badge bg-success bg-opacity-10 text-success me-1">{{ client }}</span>
+                                        {% for client in
+                                        analytics_data.ai_predictions.payment_patterns.insights.best_performing_clients[:3]
+                                        %}
+                                        <span class="badge bg-success bg-opacity-10 text-success me-1">{{ client
+                                            }}</span>
                                         {% endfor %}
                                     </div>
                                 </div>
                                 {% endif %}
-                                
+
                                 {% if analytics_data.ai_predictions.payment_patterns.insights.at_risk_clients %}
                                 <div class="mb-2">
                                     <strong>Needs Attention:</strong>
                                     <div class="client-list">
-                                        {% for client in analytics_data.ai_predictions.payment_patterns.insights.at_risk_clients[:3] %}
-                                        <span class="badge bg-warning bg-opacity-10 text-warning me-1">{{ client }}</span>
+                                        {% for client in
+                                        analytics_data.ai_predictions.payment_patterns.insights.at_risk_clients[:3] %}
+                                        <span class="badge bg-warning bg-opacity-10 text-warning me-1">{{ client
+                                            }}</span>
                                         {% endfor %}
                                     </div>
                                 </div>
@@ -249,7 +268,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- AI Recommendations -->
                 <div class="ai-recommendations mt-3">
                     <h6 class="text-info mb-2">Recommended Actions</h6>
@@ -278,13 +297,13 @@
         </div>
     </div>
     {% endif %}
-    
+
     <!-- Client Performance -->
     <div class="row mb-4">
         <div class="col-lg-8 mb-4">
             <div class="glass-card p-4">
                 <h5 class="fw-bold mb-3">Top Performing Clients</h5>
-                
+
                 {% if analytics_data.client_performance.top_clients %}
                 <div class="table-responsive">
                     <table class="table table-hover">
@@ -313,7 +332,9 @@
                                 <td>₹{{ "%.0f"|format(client.avg_invoice_value) }}</td>
                                 <td>
                                     <div class="performance-bar">
-                                        <div class="performance-fill" style="width: {{ (client.total_revenue / analytics_data.client_performance.top_clients[0].total_revenue * 100) if analytics_data.client_performance.top_clients else 0 }}%"></div>
+                                        <div class="performance-fill"
+                                            style="width: {{ (client.total_revenue / analytics_data.client_performance.top_clients[0].total_revenue * 100) if analytics_data.client_performance.top_clients else 0 }}%">
+                                        </div>
                                     </div>
                                 </td>
                             </tr>
@@ -324,16 +345,16 @@
                 {% endif %}
             </div>
         </div>
-        
-     <div class="col-lg-4 mb-4">
-                <div class="glass-card p-4">
-                    <h5 class="fw-bold mb-3">Client Distribution</h5>
 
-                    <div class="chart-container">
+        <div class="col-lg-4 mb-4">
+            <div class="glass-card p-4">
+                <h5 class="fw-bold mb-3">Client Distribution</h5>
+
+                <div class="chart-container">
                     <canvas id="clientTypeChart"></canvas>
-                    </div>
+                </div>
 
-                    <div class="client-stats mt-3">
+                <div class="client-stats mt-3">
                     {% if analytics_data.client_performance.client_types %}
                     {% for type_data in analytics_data.client_performance.client_types %}
                     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -342,12 +363,12 @@
                     </div>
                     {% endfor %}
                     {% endif %}
-                    </div>
                 </div>
+            </div>
         </div>
 
     </div>
-    
+
     <!-- Blockchain Analytics (if enabled) -->
     {% if analytics_data.blockchain_insights %}
     <div class="row mb-4">
@@ -357,7 +378,7 @@
                     <i data-feather="shield" class="me-2 text-info"></i>
                     Blockchain Analytics
                 </h5>
-                
+
                 <div class="row">
                     <div class="col-md-3">
                         <div class="blockchain-stat text-center">
@@ -367,20 +388,24 @@
                     </div>
                     <div class="col-md-3">
                         <div class="blockchain-stat text-center">
-                            <h3 class="text-success">{{ analytics_data.blockchain_insights.verified_invoices or 0 }}</h3>
+                            <h3 class="text-success">{{ analytics_data.blockchain_insights.verified_invoices or 0 }}
+                            </h3>
                             <p class="text-muted small">Verified Invoices</p>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="blockchain-stat text-center">
-                            <h3 class="text-primary">{{ analytics_data.blockchain_insights.total_transactions or 0 }}</h3>
+                            <h3 class="text-primary">{{ analytics_data.blockchain_insights.total_transactions or 0 }}
+                            </h3>
                             <p class="text-muted small">Transactions</p>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="blockchain-stat text-center">
-                            <span class="badge bg-{{ 'success' if analytics_data.blockchain_insights.chain_integrity else 'danger' }} p-2">
-                                <i data-feather="{{ 'shield-check' if analytics_data.blockchain_insights.chain_integrity else 'shield-off' }}" size="20"></i>
+                            <span
+                                class="badge bg-{{ 'success' if analytics_data.blockchain_insights.chain_integrity else 'danger' }} p-2">
+                                <i data-feather="{{ 'shield-check' if analytics_data.blockchain_insights.chain_integrity else 'shield-off' }}"
+                                    size="20"></i>
                                 {{ 'Secure' if analytics_data.blockchain_insights.chain_integrity else 'Error' }}
                             </span>
                             <p class="text-muted small mt-2">Chain Integrity</p>
@@ -391,41 +416,44 @@
         </div>
     </div>
     {% endif %}
-    
+
     <!-- Detailed Reports -->
     <div class="row">
         <div class="col-12">
             <div class="glass-card p-4">
                 <h5 class="fw-bold mb-3">Generate Detailed Reports</h5>
-                
+
                 <div class="row">
                     <div class="col-md-3">
                         <div class="report-card glass-card-sm p-3 text-center">
                             <i data-feather="file-text" size="32" class="text-primary mb-2"></i>
                             <h6>Monthly Report</h6>
                             <p class="small text-muted">Comprehensive monthly business summary</p>
-                            <button class="btn btn-outline-primary btn-sm" onclick="generateReport('monthly')">Generate</button>
+                            <button class="btn btn-outline-primary btn-sm"
+                                onclick="generateReport('monthly')">Generate</button>
                         </div>
                     </div>
-                    
+
                     <div class="col-md-3">
                         <div class="report-card glass-card-sm p-3 text-center">
                             <i data-feather="users" size="32" class="text-success mb-2"></i>
                             <h6>Client Analysis</h6>
                             <p class="small text-muted">Detailed client performance metrics</p>
-                            <button class="btn btn-outline-success btn-sm" onclick="generateReport('clients')">Generate</button>
+                            <button class="btn btn-outline-success btn-sm"
+                                onclick="generateReport('clients')">Generate</button>
                         </div>
                     </div>
-                    
+
                     <div class="col-md-3">
                         <div class="report-card glass-card-sm p-3 text-center">
                             <i data-feather="dollar-sign" size="32" class="text-warning mb-2"></i>
                             <h6>Financial Report</h6>
                             <p class="small text-muted">Revenue, profit, and tax analysis</p>
-                            <button class="btn btn-outline-warning btn-sm" onclick="generateReport('financial')">Generate</button>
+                            <button class="btn btn-outline-warning btn-sm"
+                                onclick="generateReport('financial')">Generate</button>
                         </div>
                     </div>
-                    
+
                     <div class="col-md-3">
                         <div class="report-card glass-card-sm p-3 text-center">
                             <i data-feather="cpu" size="32" class="text-info mb-2"></i>
@@ -443,23 +471,24 @@
 
 {% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    initializeCharts();
-    
-    // KPI card animations
-    const kpiCards = document.querySelectorAll('.kpi-card');
-    kpiCards.forEach((card, index) => {
-        card.style.animationDelay = `${index * 0.1}s`;
-        card.classList.add('animate-slide-up');
-    });
-});
+    document.addEventListener('DOMContentLoaded', function () {
+        initializeCharts();
 
-function initializeCharts() {
-    // Revenue & Profit Trends Chart
-    const revenueProfitCtx = document.getElementById('revenueProfitChart').getContext('2d');
-    const revenueData = {{ analytics_data.revenue_trends.monthly_data | tojson if analytics_data.revenue_trends else [] }};
-    const profitData = {{ analytics_data.profitability_analysis.monthly_trends | tojson if analytics_data.profitability_analysis else [] }};
-    
+        // KPI card animations
+        const kpiCards = document.querySelectorAll('.kpi-card');
+        kpiCards.forEach((card, index) => {
+            card.style.animationDelay = `${index * 0.1}s`;
+            card.classList.add('animate-slide-up');
+        });
+    });
+
+    function initializeCharts() {
+        // Revenue & Profit Trends Chart
+        const revenueProfitCtx = document.getElementById('revenueProfitChart').getContext('2d');
+        const revenueData = {{ analytics_data.revenue_trends.monthly_data | tojson if analytics_data.revenue_trends and analytics_data.revenue_trends.monthly_data else[]
+    }};
+    const profitData = {{ analytics_data.profitability_analysis.monthly_trends | tojson if analytics_data.profitability_analysis and analytics_data.profitability_analysis.monthly_trends else[] }};
+
     new Chart(revenueProfitCtx, {
         type: 'line',
         data: {
@@ -497,7 +526,7 @@ function initializeCharts() {
                         color: 'rgba(0,0,0,0.1)'
                     },
                     ticks: {
-                        callback: function(value) {
+                        callback: function (value) {
                             return '₹' + value.toLocaleString();
                         }
                     }
@@ -510,11 +539,11 @@ function initializeCharts() {
             }
         }
     });
-    
+
     // Payment Status Chart
     const paymentStatusCtx = document.getElementById('paymentStatusChart').getContext('2d');
-    const paymentData = {{ analytics_data.payment_analytics.payment_status_distribution | tojson if analytics_data.payment_analytics else [] }};
-    
+    const paymentData = {{ analytics_data.payment_analytics.payment_status_distribution | tojson if analytics_data.payment_analytics and analytics_data.payment_analytics.payment_status_distribution else[] }};
+
     new Chart(paymentStatusCtx, {
         type: 'doughnut',
         data: {
@@ -540,11 +569,11 @@ function initializeCharts() {
             }
         }
     });
-    
+
     // Client Type Distribution Chart
     const clientTypeCtx = document.getElementById('clientTypeChart').getContext('2d');
-    const clientTypeData = {{ analytics_data.client_performance.client_types | tojson if analytics_data.client_performance else [] }};
-    
+    const clientTypeData = {{ analytics_data.client_performance.client_types | tojson if analytics_data.client_performance and analytics_data.client_performance.client_types else[] }};
+
     new Chart(clientTypeCtx, {
         type: 'pie',
         data: {
@@ -571,12 +600,12 @@ function initializeCharts() {
             }
         }
     });
-    
+
     // Cash Flow Prediction Chart (if AI data available)
     {% if analytics_data.ai_predictions and analytics_data.ai_predictions.cash_flow %}
     const cashFlowCtx = document.getElementById('cashFlowPredictionChart').getContext('2d');
     const predictionData = {{ analytics_data.ai_predictions.cash_flow.monthly_predictions | tojson }};
-    
+
     new Chart(cashFlowCtx, {
         type: 'bar',
         data: {
@@ -601,7 +630,7 @@ function initializeCharts() {
                 y: {
                     beginAtZero: true,
                     ticks: {
-                        callback: function(value) {
+                        callback: function (value) {
                             return '₹' + value.toLocaleString();
                         }
                     }
@@ -612,32 +641,32 @@ function initializeCharts() {
     {% endif %}
 }
 
-function exportAnalyticsToPDF() {
-    alert("Analytics PDF exported successfully (demo).");
-}
+    function exportAnalyticsToPDF() {
+        alert("Analytics PDF exported successfully (demo).");
+    }
 
-function exportAnalyticsToExcel() {
-    alert("Analytics Excel exported successfully (demo).");
-}
+    function exportAnalyticsToExcel() {
+        alert("Analytics Excel exported successfully (demo).");
+    }
 
 
-function generateReport(type) {
-    const reportTypes = {
-        'monthly': 'Monthly Business Report',
-        'clients': 'Client Analysis Report',
-        'financial': 'Financial Summary Report',
-        'ai': 'AI Insights Report'
-    };
-    
-    alert(`Generating ${reportTypes[type]}...`);
-    
-    // In a real application, this would make an API call to generate the report
-    // window.location.href = `/api/reports/${type}?format=pdf`;
-}
+    function generateReport(type) {
+        const reportTypes = {
+            'monthly': 'Monthly Business Report',
+            'clients': 'Client Analysis Report',
+            'financial': 'Financial Summary Report',
+            'ai': 'AI Insights Report'
+        };
 
-// Add CSS animations
-const style = document.createElement('style');
-style.textContent = `
+        alert(`Generating ${reportTypes[type]}...`);
+
+        // In a real application, this would make an API call to generate the report
+        // window.location.href = `/api/reports/${type}?format=pdf`;
+    }
+
+    // Add CSS animations
+    const style = document.createElement('style');
+    style.textContent = `
 .dropdown-menu {
     position: fixed !important;
     z-index: 9999 !important;
@@ -767,6 +796,6 @@ style.textContent = `
     z-index: 1;
 }
 `;
-document.head.appendChild(style);
+    document.head.appendChild(style);
 </script>
 {% endblock %}

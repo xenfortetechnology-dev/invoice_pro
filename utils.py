@@ -13,6 +13,9 @@ from werkzeug.security import check_password_hash as werkzeug_check_password_has
 from app import db
 from models import Invoice, Client, InvoiceLineItem, Company
 
+def safe_dict(value):
+        return value if isinstance(value, dict) else {}
+
 def generate_password_hash(password):
     """Generate password hash"""
     return werkzeug_generate_password_hash(password)
@@ -504,4 +507,5 @@ def get_outstanding_invoices_summary():
         'overdue_count': overdue.count or 0,
         'overdue_amount': float(overdue.total_overdue or 0)
     }
+
 
