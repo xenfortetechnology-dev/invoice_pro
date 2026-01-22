@@ -1,11 +1,38 @@
+# --------------------
 # Python cache files
-_pycache_/
-*.pyc
+# --------------------
+__pycache__/
+*.py[cod]
 
-# Database file
-instance/revolutionary_invoice.db
+# --------------------
+# Virtual environments
+# --------------------
+.venv/
+env/
+venv/
 
-# Optional: IDE/system files
-*.idea/
-*.vscode/
-*.DS_Store
+# --------------------
+# Environment variables
+# --------------------
+.env
+.env.*
+.env.local
+
+# --------------------
+# Database files (local only)
+# --------------------
+instance/
+*.db
+*.sqlite3
+
+# --------------------
+# IDE / OS files
+# --------------------
+.idea/
+.vscode/
+.DS_Store
+
+# --------------------
+# Project-specific
+# --------------------
+seed_revolutionary_invoice.py
