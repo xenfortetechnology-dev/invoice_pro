@@ -126,6 +126,10 @@
   color: var(--text-primary-light);
 }
 
+/* footer */
+.bg-light{
+  background: none !important;
+}
 
 }
 
@@ -300,6 +304,8 @@ body {
 .glass-btn:active {
   transform: translateY(0);
 }
+
+
 
 /* Primary glass button */
 .glass-btn-primary {
