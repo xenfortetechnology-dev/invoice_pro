@@ -13,6 +13,9 @@ from werkzeug.security import check_password_hash as werkzeug_check_password_has
 from app import db
 from models import Invoice, Client, InvoiceLineItem, Company
 
+def safe_dict(value):
+        return value if isinstance(value, dict) else {}
+
 def generate_password_hash(password):
     """Generate password hash"""
     return werkzeug_generate_password_hash(password)
@@ -110,29 +113,44 @@ def generate_invoice_number():
     return invoice_number
 import smtplib
 from email.message import EmailMessage
+import config
 
 def send_invoice_email(invoice, recipient_email):
+    from pdf_generator import generate_invoice_pdf
+    
+    # Check if email credentials are configured
+    if not config.MAIL_USERNAME or not config.MAIL_PASSWORD:
+        raise Exception("Email credentials not configured. Set MAIL_USERNAME and MAIL_PASSWORD environment variables.")
+    
     # Build your email message
     msg = EmailMessage()
     msg['Subject'] = f"Invoice #{invoice.invoice_number}"
-    msg['From'] = "your_email@example.com"  # replace with your sender email
+    msg['From'] = config.MAIL_DEFAULT_SENDER
     msg['To'] = recipient_email
     msg.set_content(f"Dear {invoice.client.name},\n\nPlease find attached Invoice #{invoice.invoice_number}.\n\nThanks!")
 
-    # Optional: attach PDF (if you have a PDF file path)
-    pdf_path = f"invoices/invoice_{invoice.id}.pdf"
+    # Generate PDF in-memory and attach
     try:
-        with open(pdf_path, 'rb') as f:
-            pdf_data = f.read()
+        pdf_buffer = generate_invoice_pdf(invoice)
+        pdf_buffer.seek(0)
+        pdf_data = pdf_buffer.read()
         msg.add_attachment(pdf_data, maintype='application', subtype='pdf', filename=f"Invoice_{invoice.invoice_number}.pdf")
-    except FileNotFoundError:
-        print("Warning: PDF not found, sending email without attachment.")
+    except Exception as e:
+        print(f"Warning: PDF generation failed ({e}), sending email without attachment.")
 
-    # Send email via SMTP (example using Gmail)
+    # Send email via SMTP
     try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-            smtp.login('your_email@example.com', 'your_app_password')  # use app password
-            smtp.send_message(msg)
+        if config.MAIL_USE_TLS:
+            # Use TLS on standard port (usually 587)
+            with smtplib.SMTP(config.MAIL_SERVER, config.MAIL_PORT) as smtp:
+                smtp.starttls()
+                smtp.login(config.MAIL_USERNAME, config.MAIL_PASSWORD)
+                smtp.send_message(msg)
+        else:
+            # Use SSL on port 465
+            with smtplib.SMTP_SSL(config.MAIL_SERVER, config.MAIL_PORT) as smtp:
+                smtp.login(config.MAIL_USERNAME, config.MAIL_PASSWORD)
+                smtp.send_message(msg)
     except Exception as e:
         raise Exception(f"SMTP failed: {e}")
 
@@ -504,4 +522,5 @@ def get_outstanding_invoices_summary():
         'overdue_count': overdue.count or 0,
         'overdue_amount': float(overdue.total_overdue or 0)
     }
+
 

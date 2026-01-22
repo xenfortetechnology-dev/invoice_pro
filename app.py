@@ -1,5 +1,6 @@
 import os
 import logging
+from dotenv import load_dotenv
 from flask import Flask
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
