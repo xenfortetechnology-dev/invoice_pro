@@ -1,14 +1,19 @@
 import os
 import logging
+from dotenv import load_dotenv
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
 from datetime import datetime
 from flask_mail import Mail
 from flask import render_template, make_response, flash, redirect, url_for
 from flask_login import login_required
+from dotenv import load_dotenv
+from extensions import db
 
+from ai_client import init_ai
+from ai_services import initialize_ai_models
+load_dotenv()
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 
@@ -38,7 +43,6 @@ app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max file size
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
 # Initialize SQLAlchemy
-db = SQLAlchemy(model_class=Base)
 db.init_app(app)
 
 '''
@@ -100,7 +104,9 @@ with app.app_context():
     # Initialize AI models if enabled
     if app.config["AI_FEATURES_ENABLED"]:
         try:
-            initialize_ai_models()
+            # initialize_ai_models() # For OpenAI
+            init_ai()                     # OpenRouter client
+            initialize_ai_models()      # AI business logic
             logging.info("AI models initialized successfully")
         except Exception as e:
             logging.error(f"Failed to initialize AI models: {e}")
@@ -151,3 +157,4 @@ with app.app_context():
 def inject_today():
     return {'today': datetime.now()}
 
+__all__ = ["app", "db", "mail"]
