@@ -408,6 +408,8 @@ def edit_invoice(id):
     invoice = Invoice.query.get_or_404(id)
 
     if request.method == 'POST':
+        action = request.form.get('action', 'update')
+
         # Update fields from the form
         invoice.notes = request.form.get('notes', invoice.notes)
         invoice.terms_conditions = request.form.get('terms_conditions', invoice.terms_conditions)
@@ -416,11 +418,20 @@ def edit_invoice(id):
         client_id = request.form.get('client_id')
         if client_id:
             invoice.client_id = int(client_id)
+            
+        # Handle specific actions
+        if action == 'mark_paid':
+            invoice.payment_status = 'Paid'
+            flash('Invoice marked as Paid!', 'success')
+        elif action == 'mark_unpaid':
+            invoice.payment_status = 'Unpaid'
+            flash('Invoice marked as Unpaid!', 'success')
+        else:
+            flash('Invoice updated successfully!', 'success')
 
         # You can update other invoice fields here as needed
 
         db.session.commit()
-        flash('Invoice updated successfully!', 'success')
         
         # Always return a response after POST
         return redirect(url_for('invoice_detail', id=invoice.id))
@@ -1225,6 +1236,7 @@ def handle_voice_command():
         data = request.get_json(force=True)
 
         voice_text = data.get("text", "").strip()
+        language = data.get("language", "en-IN")
         user_id = data.get("user_id", 1)  # default for now
 
         if not voice_text:
@@ -1233,7 +1245,7 @@ def handle_voice_command():
                 "message": "No voice text received"
             }), 400
 
-        result = voice_processor.process(voice_text)
+        result = voice_processor.process(voice_text, language=language)
 
         return jsonify(result)
 

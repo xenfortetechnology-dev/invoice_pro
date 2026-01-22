@@ -78,6 +78,9 @@ function handleVoiceResponse(data) {
                     const row = getLastItemRow();
                     if (!row) return;
 
+                    if (data.entities.hsn_code) {
+                        row.querySelector('[name="hsn_code"]').value = data.entities.hsn_code;
+                    }
                     row.querySelector('[name="description"]').value = data.entities.item_description;
                     row.querySelector('[name="quantity"]').value = data.entities.quantity || 1;
                     row.querySelector('[name="unit_price"]').value = data.entities.amount || 0;

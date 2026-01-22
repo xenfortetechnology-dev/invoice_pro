@@ -22,6 +22,11 @@
                     <div class="col-md-4 text-end">
                         <div class="d-flex gap-2 justify-content-end">
                             {% if ai_enabled %}
+                            <select class="form-select form-select-sm glass-input d-inline-block w-auto me-2"
+                                id="voiceLangSelect">
+                                <option value="en-IN">English (India)</option>
+                                <option value="ta-IN">Tamil (India)</option>
+                            </select>
                             <button class="btn btn-success glass-btn" id="voiceCreateBtn">
                                 <i data-feather="mic" class="me-1"></i> Voice Assist
                             </button>
@@ -388,7 +393,7 @@ Subject to local jurisdiction only.</textarea>
             // Start SpeechRecognition here
         });
         // Initialize first row
-        addItemRow();
+        // addItemRow();
 
         // Add new item row button
         document.getElementById('addItemBtn').addEventListener('click', addItemRow);
@@ -592,6 +597,7 @@ Subject to local jurisdiction only.</textarea>
     }
     document.addEventListener("DOMContentLoaded", () => {
         const voiceBtn = document.getElementById("voiceCreateBtn");
+        const langSelect = document.getElementById("voiceLangSelect");
 
         if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
             alert("Your browser does not support voice recognition.");
@@ -601,32 +607,61 @@ Subject to local jurisdiction only.</textarea>
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
 
-        recognition.lang = "en-IN"; // you can change this locale
+        recognition.lang = "en-IN"; // Default
         recognition.continuous = false;
         recognition.interimResults = false;
 
+        // Update language when dropdown changes
+        if (langSelect) {
+            langSelect.addEventListener("change", () => {
+                recognition.lang = langSelect.value;
+                console.log("🗣 Language set to:", recognition.lang);
+            });
+        }
+
+        let isListening = false;
+
         voiceBtn.addEventListener("click", () => {
-            recognition.start();
-            voiceBtn.classList.add("active");
-            voiceBtn.innerHTML = '<i data-feather="mic-off" class="me-1"></i> Listening...';
-            feather.replace();
+            if (isListening) {
+                recognition.stop();
+                return;
+            }
+
+            // Update lang just in case
+            if (langSelect) recognition.lang = langSelect.value;
+
+            try {
+                recognition.start();
+                isListening = true;
+                voiceBtn.classList.add("active");
+                voiceBtn.innerHTML = '<i data-feather="mic-off" class="me-1"></i> Listening...';
+                feather.replace();
+            } catch (e) {
+                console.error("Recognition start error:", e);
+                isListening = false;
+            }
         });
 
         recognition.onresult = (event) => {
             const command = event.results[0][0].transcript.trim();
-            console.log("Recognized Command:", command);
+            console.log("🗣 Spoken:", command);
+            console.log("📤 Sending to backend with language:", recognition.lang);
 
             // Send to backend
             fetch('/api/voice-command', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': "{{ csrf_token() if csrf_token else '' }}" // Best practice if CSRF is enabled, though might not be needed if not configured
+                    'X-CSRFToken': "{{ csrf_token() if csrf_token else '' }}"
                 },
-                body: JSON.stringify({ text: command })
+                body: JSON.stringify({
+                    text: command,
+                    language: recognition.lang
+                })
             })
                 .then(response => response.json())
                 .then(data => {
+                    console.log("🧠 Backend response:", data);
                     if (data.success) {
                         // Show success message
                         const alertDiv = document.createElement('div');
