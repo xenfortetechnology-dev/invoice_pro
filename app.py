@@ -1,5 +1,6 @@
 import os
 import logging
+from dotenv import load_dotenv
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
@@ -8,6 +9,9 @@ from datetime import datetime
 from flask_mail import Mail
 from flask import render_template, make_response, flash, redirect, url_for
 from flask_login import login_required
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
