@@ -199,17 +199,17 @@ Subject to local jurisdiction only.</textarea>
                         </div>
 
                         <div class="d-flex justify-content-between mb-2">
-                            <span>CGST %:</span>
+                            <span>CGST:</span>
                             <span id="cgstAmount">₹0.00</span>
                         </div>
 
                         <div class="d-flex justify-content-between mb-2">
-                            <span>SGST %:</span>
+                            <span>SGST:</span>
                             <span id="sgstAmount">₹0.00</span>
                         </div>
 
                         <div class="d-flex justify-content-between mb-2">
-                            <span>IGST %:</span>
+                            <span>IGST:</span>
                             <span id="igstAmount">₹0.00</span>
                         </div>
 
@@ -375,8 +375,8 @@ Subject to local jurisdiction only.</textarea>
                 max="100" step="0.01" value="9">
         </td>
         <td>
-            <input type="number" class="form-control form-control-sm glass-input" placeholder="18" name="tax_percentage"
-                min="0" max="100" step="0.01" value="18">
+            <input type="number" class="form-control form-control-sm glass-input" placeholder="..."
+                name="igst_percentage" readonly>
         </td>
         <td>
             <div class="item-amount fw-bold">₹0.00</div>
@@ -526,11 +526,25 @@ Subject to local jurisdiction only.</textarea>
     function calculateItemAmount(row) {
         const quantity = parseFloat(row.querySelector('[name="quantity"]').value) || 0;
         const unitPrice = parseFloat(row.querySelector('[name="unit_price"]').value) || 0;
-        const taxPercentage = parseFloat(row.querySelector('[name="tax_percentage"]').value) || 0;
 
-        const lineTotal = quantity * unitPrice;
-        const taxAmount = (lineTotal * taxPercentage) / 100;
-        const totalAmount = lineTotal + taxAmount;
+        const cgstPercent = parseFloat(row.querySelector('[name="cgst_percentage"]').value) || 0;
+        const sgstPercent = parseFloat(row.querySelector('[name="sgst_percentage"]').value) || 0;
+
+        const igstPercent = cgstPercent + sgstPercent;
+
+        const lineAmount = quantity * unitPrice;
+
+        const cgstAmount = (lineAmount * cgstPercent) / 100;
+        const sgstAmount = (lineAmount * sgstPercent) / 100;
+        const igstAmount = (lineAmount * igstPercent) / 100;
+
+        const totalAmount = lineAmount + cgstAmount + sgstAmount + igstAmount;
+
+        const igstInput = row.querySelector('[name="igst_percentage"]');
+        if (igstInput) {
+            igstInput.value = igstPercent.toFixed(2);
+            igstInput.readOnly = true;
+        }
 
         row.querySelector('.item-amount').textContent = `₹${totalAmount.toFixed(2)}`;
     }
@@ -538,41 +552,43 @@ Subject to local jurisdiction only.</textarea>
     // Update invoice summary
     function updateInvoiceSummary() {
         let subtotal = 0;
-        let totalTax = 0;
+        let totalCgst = 0;
+        let totalSgst = 0;
+        let totalIgst = 0;
 
         document.querySelectorAll('.item-row').forEach(row => {
             const quantity = parseFloat(row.querySelector('[name="quantity"]').value) || 0;
             const unitPrice = parseFloat(row.querySelector('[name="unit_price"]').value) || 0;
-            const taxPercentage = parseFloat(row.querySelector('[name="tax_percentage"]').value) || 0;
 
-            const lineTotal = quantity * unitPrice;
-            const taxAmount = (lineTotal * taxPercentage) / 100;
+            const cgstPercent = parseFloat(row.querySelector('[name="cgst_percentage"]').value) || 0;
+            const sgstPercent = parseFloat(row.querySelector('[name="sgst_percentage"]').value) || 0;
 
-            subtotal += lineTotal;
-            totalTax += taxAmount;
+            const igstPercent = cgstPercent + sgstPercent;
+
+            const lineAmount = quantity * unitPrice;
+
+            const cgstAmount = (lineAmount * cgstPercent) / 100;
+            const sgstAmount = (lineAmount * sgstPercent) / 100;
+            const igstAmount = (lineAmount * igstPercent) / 100;
+
+            subtotal += lineAmount;
+            totalCgst += cgstAmount;
+            totalSgst += sgstAmount;
+            totalIgst += igstAmount;
         });
 
-        const clientSelect = document.getElementById('client_id');
-        const selectedClient = clientSelect.options[clientSelect.selectedIndex];
-
-        let cgst = 0, sgst = 0, igst = 0;
-        if (selectedClient && selectedClient.dataset.address && selectedClient.dataset.address.includes('Tamil Nadu')) {
-            cgst = totalTax / 2;
-            sgst = totalTax / 2;
-        } else {
-            igst = totalTax;
-        }
-
-        const total = subtotal + totalTax;
+        const totalAmount = subtotal + totalCgst + totalSgst + totalIgst;
 
         document.getElementById('subtotalAmount').textContent = `₹${subtotal.toFixed(2)}`;
-        document.getElementById('cgstAmount').textContent = `₹${cgst.toFixed(2)}`;
-        document.getElementById('sgstAmount').textContent = `₹${sgst.toFixed(2)}`;
-        document.getElementById('igstAmount').textContent = `₹${igst.toFixed(2)}`;
-        document.getElementById('totalAmount').textContent = `₹${total.toFixed(2)}`;
+        document.getElementById('cgstAmount').textContent = `₹${totalCgst.toFixed(2)}`;
+        document.getElementById('sgstAmount').textContent = `₹${totalSgst.toFixed(2)}`;
+        document.getElementById('igstAmount').textContent = `₹${totalIgst.toFixed(2)}`;
+        document.getElementById('totalAmount').textContent = `₹${totalAmount.toFixed(2)}`;
 
-        document.getElementById('amountInWords').textContent = `${convertNumberToWords(Math.floor(total))} Rupees Only`;
+        document.getElementById('amountInWords').textContent =
+            `${convertNumberToWords(Math.floor(totalAmount))} Rupees Only`;
     }
+
 
     // Convert number to words (simplified)
     function convertNumberToWords(num) {
