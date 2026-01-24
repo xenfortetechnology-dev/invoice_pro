@@ -1,25 +1,27 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Revolutionary Invoice System{% endblock %}</title>
-    
+
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
+
     <!-- Font Awesome Icons -->
-   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap" rel="stylesheet">
 
     <!-- Feather Icons -->
     <script src="https://unpkg.com/feather-icons"></script>
-    
+
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
+
     <!-- Custom CSS -->
-<link rel="stylesheet" href="{{ url_for('static', filename='css/glassmorphism.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/glassmorphism.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
 
     <style>
         /* Sidebar styles */
@@ -32,93 +34,103 @@
             background: rgba(48, 70, 214);
             backdrop-filter: blur(12px);
         }
-   /* Default content (when sidebar exists) */
-.content {
-    margin-left: 250px;
-    padding: 2rem;
-}
 
-/* LOGIN PAGE FIX (no sidebar) */
-body:not(.has-sidebar) .content {
-    margin-left: 0 !important;
-    padding: 0 !important;
-}
-html, body {
-    margin: 0;
-    padding: 0;
-}
+        /* Default content (when sidebar exists) */
+        .content {
+            margin-left: 250px;
+            padding: 2rem;
+        }
 
-/* ================= SIDEBAR HOVER EFFECTS ================= */
+        /* LOGIN PAGE FIX (no sidebar) */
+        body:not(.has-sidebar) .content {
+            margin-left: 0 !important;
+            padding: 0 !important;
+        }
 
-.nav-link {
-    position: relative;
-    transition: all 0.3s ease;
-    border-radius: 10px;
-}
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+        }
 
-/* Hover Glow */
-.nav-link:hover {
-    background: rgba(255, 255, 255, 0.12);
-    transform: translateX(6px);
-    box-shadow: 0 0 12px rgba(0, 140, 255, 0.35);
-}
+        /* ================= SIDEBAR HOVER EFFECTS ================= */
 
-/* Icon Shine */
-.nav-link i {
-    transition: transform 0.3s ease, filter 0.3s ease;
-}
+        .nav-link {
+            position: relative;
+            transition: all 0.3s ease;
+            border-radius: 10px;
+        }
 
-.nav-link:hover i {
-    transform: scale(1.15);
-    filter: drop-shadow(0 0 6px rgba(0, 150, 255, 0.8));
-}
+        /* Hover Glow */
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.12);
+            transform: translateX(6px);
+            box-shadow: 0 0 12px rgba(0, 140, 255, 0.35);
+        }
 
-/* Active Page Highlight */
-.nav-link.active {
-    background: linear-gradient(90deg, rgba(0,150,255,0.25), transparent);
-    box-shadow: inset 3px 0 0 rgba(0, 150, 255, 0.9);
-}
+        /* Icon Shine */
+        .nav-link i {
+            transition: transform 0.3s ease, filter 0.3s ease;
+        }
 
-/* Click Ripple Effect */
-.nav-link::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: radial-gradient(circle, rgba(255,255,255,0.35) 10%, transparent 60%);
-    opacity: 0;
-    transition: opacity 0.4s ease;
-}
+        .nav-link:hover i {
+            transform: scale(1.15);
+            filter: drop-shadow(0 0 6px rgba(0, 150, 255, 0.8));
+        }
 
-.nav-link:active::after {
-    opacity: 1;
-}
- 
+        /* Active Page Highlight */
+        .nav-link.active {
+            background: linear-gradient(90deg, rgba(0, 150, 255, 0.25), transparent);
+            box-shadow: inset 3px 0 0 rgba(0, 150, 255, 0.9);
+        }
 
-.glass-btn {
-    transition: all 0.3s ease;
-}
+        /* Click Ripple Effect */
+        .nav-link::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.35) 10%, transparent 60%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
 
-.glass-btn:hover {
-    transform: translateY(-2px) scale(1.03);
-    box-shadow: 0 0 15px rgba(0,150,255,0.4);
-}
-
-@keyframes glowPulse {
-    0% { filter: drop-shadow(0 0 3px rgba(0,150,255,0.4)); }
-    50% { filter: drop-shadow(0 0 10px rgba(0,150,255,0.9)); }
-    100% { filter: drop-shadow(0 0 3px rgba(0,150,255,0.4)); }
-}
-
-.nav-link:hover i {
-    animation: glowPulse 1s infinite alternate;
-}
+        .nav-link:active::after {
+            opacity: 1;
+        }
 
 
+        .glass-btn {
+            transition: all 0.3s ease;
+        }
+
+        .glass-btn:hover {
+            transform: translateY(-2px) scale(1.03);
+            box-shadow: 0 0 15px rgba(0, 150, 255, 0.4);
+        }
+
+        @keyframes glowPulse {
+            0% {
+                filter: drop-shadow(0 0 3px rgba(0, 150, 255, 0.4));
+            }
+
+            50% {
+                filter: drop-shadow(0 0 10px rgba(0, 150, 255, 0.9));
+            }
+
+            100% {
+                filter: drop-shadow(0 0 3px rgba(0, 150, 255, 0.4));
+            }
+        }
+
+        .nav-link:hover i {
+            animation: glowPulse 1s infinite alternate;
+        }
     </style>
-    
+
     {% block head %}{% endblock %}
 </head>
+
 <body class="bg-gradient {% if session.user_id %}has-sidebar{% endif %}">
 
     {% if session.user_id %}
@@ -134,26 +146,29 @@ html, body {
         <!-- Nav Items -->
         <ul class="nav nav-pills flex-column mb-auto">
             <li class="nav-item">
-                <a class="nav-link {% if request.endpoint == 'dashboard_page' %}active{% endif %}" href="{{ url_for('dashboard_page') }}">
+                <a class="nav-link {% if request.endpoint == 'dashboard_page' %}active{% endif %}"
+                    href="{{ url_for('dashboard_page') }}">
                     <i data-feather="home" class="me-2"></i> Dashboard
                 </a>
             </li>
             <li>
-                <a class="nav-link {% if request.endpoint == 'invoice_management' %}active{% endif %}" href="{{ url_for('invoice_management') }}">
+                <a class="nav-link {% if request.endpoint == 'invoice_management' %}active{% endif %}"
+                    href="{{ url_for('invoice_management') }}">
                     <i data-feather="file-text" class="me-2"></i> Invoices
                 </a>
             </li>
-        <li>
-  <a class="nav-link {% if request.endpoint == 'quotation_form' %}active{% endif %}" 
-     href="{{ url_for('quotation_form') }}">
-     
-    <i data-feather="file-text" class="me-2"></i> Quotation
-  </a>
-</li>
+            <li>
+                <a class="nav-link {% if request.endpoint == 'quotation_form' %}active{% endif %}"
+                    href="{{ url_for('quotation_form') }}">
+
+                    <i data-feather="file-text" class="me-2"></i> Quotation
+                </a>
+            </li>
 
 
             <li>
-                <a class="nav-link {% if request.endpoint == 'client_management' %}active{% endif %}" href="{{ url_for('client_management') }}">
+                <a class="nav-link {% if request.endpoint == 'client_management' %}active{% endif %}"
+                    href="{{ url_for('client_management') }}">
                     <i data-feather="users" class="me-2"></i> Clients
                 </a>
             </li>
@@ -163,42 +178,40 @@ html, body {
                 </a>
             </li>
             <li>
-                <a class="nav-link {% if request.endpoint == 'analytics' %}active{% endif %}" href="{{ url_for('analytics') }}">
+                <a class="nav-link {% if request.endpoint == 'analytics' %}active{% endif %}"
+                    href="{{ url_for('analytics') }}">
                     <i data-feather="trending-up" class="me-2"></i> Analytics
                 </a>
             </li>
-           <li class="nav-item">
-  <a class="nav-link d-flex justify-content-between align-items-center"
-     data-bs-toggle="collapse"
-     href="#deliveryMenu"
-     role="button"
-     aria-expanded="false"
-     aria-controls="deliveryMenu">
-    <span><i data-feather="truck" class="me-1"></i> Delivery</span>
-    <i data-feather="chevron-down" class="ms-auto"></i>
-  </a>
-  <div class="collapse ps-4" id="deliveryMenu">
-    <ul class="nav flex-column">
-      <li class="nav-item">
-        <a class="nav-link {% if request.endpoint == 'create_challan' %}active{% endif %}"
-           href="{{ url_for('create_challan') }}">
-          Create Challan
-        </a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link {% if request.endpoint == 'delivery_challan' %}active{% endif %}"
-           href="{{ url_for('delivery_challan') }}">
-          View Challan
-        </a>
-      </li>
-    </ul>
-  </div>
-</li>
+            <li class="nav-item">
+                <a class="nav-link d-flex justify-content-between align-items-center" data-bs-toggle="collapse"
+                    href="#deliveryMenu" role="button" aria-expanded="false" aria-controls="deliveryMenu">
+                    <span><i data-feather="truck" class="me-1"></i> Delivery</span>
+                    <i data-feather="chevron-down" class="ms-auto"></i>
+                </a>
+                <div class="collapse ps-4" id="deliveryMenu">
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'create_challan' %}active{% endif %}"
+                                href="{{ url_for('create_challan') }}">
+                                Create Challan
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'delivery_challan' %}active{% endif %}"
+                                href="{{ url_for('delivery_challan') }}">
+                                View Challan
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </li>
 
 
             {% if ai_enabled %}
             <li>
-                <a class="nav-link {% if request.endpoint == 'ai_assistant_page' %}active{% endif %}" href="{{ url_for('ai_assistant_page') }}">
+                <a class="nav-link {% if request.endpoint == 'ai_assistant_page' %}active{% endif %}"
+                    href="{{ url_for('ai_assistant_page') }}">
                     <i data-feather="cpu" class="me-2"></i> AI Assistant
                 </a>
             </li>
@@ -227,12 +240,14 @@ html, body {
             </button>
             <ul class="dropdown-menu glass-dropdown w-100">
                 <li><a class="dropdown-item" href="{{ url_for('settings') }}">
-                    <i data-feather="settings" class="me-2"></i> Settings
-                </a></li>
-                <li><hr class="dropdown-divider"></li>
+                        <i data-feather="settings" class="me-2"></i> Settings
+                    </a></li>
+                <li>
+                    <hr class="dropdown-divider">
+                </li>
                 <li><a class="dropdown-item" href="{{ url_for('logout') }}">
-                    <i data-feather="log-out" class="me-2"></i> Logout
-                </a></li>
+                        <i data-feather="log-out" class="me-2"></i> Logout
+                    </a></li>
             </ul>
         </div>
 
@@ -242,25 +257,27 @@ html, body {
     <!-- Main Content -->
     <main class="content">
         {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="container mt-3">
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show glass-card" role="alert">
-                            <i data-feather="{% if category == 'success' %}check-circle{% elif category == 'error' %}alert-circle{% else %}info{% endif %}" class="me-2"></i>
-                            {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% endif %}
+        {% if messages %}
+        <div class="container mt-3">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show glass-card"
+                role="alert">
+                <i data-feather="{% if category == 'success' %}check-circle{% elif category == 'error' %}alert-circle{% else %}info{% endif %}"
+                    class="me-2"></i>
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
         {% endwith %}
-        
+
         {% block content %}{% endblock %}
     </main>
 
     <!-- Footer -->
-{% if session.user_id %}
-<footer class="footer bg-light border-top text-center py-3">
+    {% if session.user_id %}
+    <footer class="footer bg-light border-top text-center py-3">
 
         <h5 class="fw-bold text-primary mb-1">
             ⚡ Revolutionary Invoice System
@@ -274,13 +291,16 @@ html, body {
             <span class="badge bg-success">AI Enabled</span>
             <span class="badge bg-primary">Blockchain Secured</span>
         </div>
-</footer>
-{% endif %}
+    </footer>
+    {% endif %}
 
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
+
+    <!-- Tom Select JS -->
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+
     <!-- Custom JavaScript -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     {% if ai_enabled %}
@@ -292,9 +312,9 @@ html, body {
     <script src="{{ url_for('static', filename='js/blockchain-verify.js') }}"></script>
     {% endif %}
     <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
-    
+
     {% block scripts %}{% endblock %}
-    
+
     <script>
         const themeToggle = document.getElementById("themeToggle");
         const themeIcon = document.getElementById("themeIcon");
@@ -317,4 +337,5 @@ html, body {
         });
     </script>
 </body>
+
 </html>

@@ -54,14 +54,11 @@
 
     <form method="POST" class="edit-invoice-form">
         <div class="mb-3">
-            <label for="client" class="form-label">Client</label>
-            <select class="form-select" name="client_id" id="client">
-                {% for client in clients %}
-                <option value="{{ client.id }}" {% if client.id==invoice.client_id %}selected{% endif %}>
-                    {{ client.name }}
-                </option>
-                {% endfor %}
-            </select>
+            <div class="mb-3">
+                <label class="form-label">Client</label>
+                <input type="text" class="form-control" value="{{ invoice.client.name }}" disabled>
+            </div>
+
         </div>
 
         <div class="mb-3">

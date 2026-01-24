@@ -367,12 +367,12 @@ Subject to local jurisdiction only.</textarea>
                 min="0" step="0.01" required>
         </td>
         <td>
-            <input type="number" class="form-control form-control-sm glass-input" placeholder="18" name=""
-                min="0" max="100" step="0.01" value="9">
+            <input type="number" class="form-control form-control-sm glass-input" placeholder="18" name="" min="0"
+                max="100" step="0.01" value="9">
         </td>
         <td>
-            <input type="number" class="form-control form-control-sm glass-input" placeholder="18" name=""
-                min="0" max="100" step="0.01" value="9">
+            <input type="number" class="form-control form-control-sm glass-input" placeholder="18" name="" min="0"
+                max="100" step="0.01" value="9">
         </td>
         <td>
             <input type="number" class="form-control form-control-sm glass-input" placeholder="18" name="tax_percentage"
@@ -395,6 +395,17 @@ Subject to local jurisdiction only.</textarea>
     let lineItems = [];
 
     document.addEventListener('DOMContentLoaded', function () {
+        // Initialize Tom Select for Client Dropdown
+        const clientSelect = new TomSelect('#client_id', {
+            create: false,
+            sortField: {
+                field: "text",
+                direction: "asc"
+            },
+            placeholder: "Select a client...",
+            maxOptions: null // Show all options, but let it scroll
+        });
+
         const voiceBtn = document.getElementById("voiceCreateBtn");
         if (!voiceBtn) return; // Stop if button doesn't exist
 

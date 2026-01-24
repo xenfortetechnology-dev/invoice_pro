@@ -413,7 +413,7 @@
 
 
         // Blockchain verification buttons
-        {% if blockchain_enabled %}
+        // {% if blockchain_enabled %}
         const blockchainVerifyBtns = document.querySelectorAll('.blockchain-verify-btn');
         blockchainVerifyBtns.forEach(btn => {
             btn.addEventListener('click', function () {
@@ -421,7 +421,7 @@
                 verifyInvoiceOnBlockchain(invoiceId);
             });
         });
-        {% endif %}
+        // {% endif %}
 
         // Auto-refresh every 30 seconds for real-time updates
         setTimeout(() => {
