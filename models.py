@@ -365,3 +365,40 @@ class Quotation(db.Model):
     terms = db.Column(db.Text)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# ==========================
+# BUSINESS VALIDATIONS & HOOKS
+# ==========================
+from sqlalchemy import event
+
+@event.listens_for(InvoiceLineItem, 'before_insert')
+@event.listens_for(InvoiceLineItem, 'before_update')
+def validate_line_item(mapper, connection, target):
+    """
+    Validate line item data before save.
+    1. Ensure tax is 0-100.
+    2. Ensure quantity is positive.
+    3. Auto-calculate total if missing.
+    """
+    if target.tax_percentage:
+        if not (0 <= target.tax_percentage <= 100):
+            raise ValueError("Tax percentage must be between 0 and 100")
+            
+    if target.quantity and target.quantity < 0:
+        raise ValueError("Quantity cannot be negative")
+
+    # Auto-calculate totals if not set
+    if target.unit_price is not None and target.quantity is not None:
+        base_amount = target.quantity * target.unit_price
+        tax_amount = (base_amount * target.tax_percentage / 100) if target.tax_percentage else 0
+        target.tax_amount = tax_amount
+        target.total_amount = base_amount + tax_amount
+
+@event.listens_for(Invoice, 'before_insert')
+def set_invoice_defaults(mapper, connection, target):
+    """Set defaults for invoice."""
+    if not target.invoice_date:
+        target.invoice_date = datetime.utcnow().date()
+        
+    if not target.payment_status:
+        target.payment_status = 'Unpaid'

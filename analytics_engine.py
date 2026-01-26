@@ -64,7 +64,8 @@ class AnalyticsEngine:
         return client_performance
 
     
-    def __init__(self):
+    def __init__(self, db_session):
+        self.db_session = db_session
         self.cache = {}
         self.cache_timeout = 300  # 5 minutes
     
@@ -178,12 +179,30 @@ class AnalyticsEngine:
                 ],
                 'segments': client_segments,
                 'lifecycle': lifecycle_analysis,
-                'risk_analysis': risk_analysis
+                'risk_analysis': risk_analysis,
+                'client_types': self._analyze_client_types()
             }
             
         except Exception as e:
             logging.error(f"Client performance analysis failed: {e}")
             return {'error': str(e)}
+
+    def _analyze_client_types(self) -> List[Dict[str, Any]]:
+        """Analyze client types distribution"""
+        try:
+            type_data = db.session.query(
+                Client.client_type,
+                func.count(Client.id).label('count')
+            ).group_by(Client.client_type).all()
+            
+            return [
+                {'type': item.client_type or 'Regular', 'count': item.count}
+                for item in type_data
+            ]
+            
+        except Exception as e:
+            logging.error(f"Client type analysis failed: {e}")
+            return []
     
     def get_payment_analytics(self) -> Dict[str, Any]:
         """Advanced payment behavior analytics"""
@@ -272,89 +291,108 @@ class AnalyticsEngine:
             logging.error(f"Payment analytics failed: {e}")
             return {'error': str(e)}
     
-    def get_profitability_analysis(self) -> Dict[str, Any]:
-        """Detailed profitability analysis with cost tracking"""
+    def get_profitability_analysis(self):
+        """Detailed profitability analysis with explicit joins"""
         try:
-            # Overall profitability
-            overall_profit = db.session.query(
-                func.sum(InvoiceLineItem.unit_price * InvoiceLineItem.quantity).label('total_revenue'),
-                func.sum(InvoiceLineItem.cost_price * InvoiceLineItem.quantity).label('total_cost')
-            ).join(Invoice).filter(
-                Invoice.payment_status == 'Paid'
-            ).first()
-            
+            # ---------- Overall Profit ----------
+            overall_profit = (
+                self.db_session.query(
+                    func.sum(InvoiceLineItem.unit_price * InvoiceLineItem.quantity).label("total_revenue"),
+                    func.sum(InvoiceLineItem.cost_price * InvoiceLineItem.quantity).label("total_cost")
+                )
+                .select_from(InvoiceLineItem)
+                .join(Invoice, InvoiceLineItem.invoice_id == Invoice.id)
+                .filter(Invoice.payment_status == "Paid")
+                .first()
+            )
+
             total_revenue = float(overall_profit.total_revenue or 0)
             total_cost = float(overall_profit.total_cost or 0)
             total_profit = total_revenue - total_cost
             profit_margin = (total_profit / total_revenue * 100) if total_revenue > 0 else 0
-            
-            # Monthly profitability trends
-            monthly_profit = db.session.query(
-                func.strftime('%Y-%m', Invoice.invoice_date).label('month'),
-                func.sum(InvoiceLineItem.unit_price * InvoiceLineItem.quantity).label('revenue'),
-                func.sum(InvoiceLineItem.cost_price * InvoiceLineItem.quantity).label('cost')
-            ).join(Invoice).filter(
-                Invoice.payment_status == 'Paid',
-                Invoice.invoice_date >= (datetime.now() - timedelta(days=365)).date()
-            ).group_by('month').order_by('month').all()
-            
+
+            # ---------- Monthly Profitability ----------
+            monthly_profit = (
+                self.db_session.query(
+                    func.strftime('%Y-%m', Invoice.invoice_date).label('month'),
+                    func.sum(InvoiceLineItem.unit_price * InvoiceLineItem.quantity).label('revenue'),
+                    func.sum(InvoiceLineItem.cost_price * InvoiceLineItem.quantity).label('cost')
+                )
+                .select_from(InvoiceLineItem)
+                .join(Invoice, InvoiceLineItem.invoice_id == Invoice.id)
+                .filter(
+                    Invoice.payment_status == "Paid",
+                    Invoice.invoice_date >= (datetime.now() - timedelta(days=365)).date()
+                )
+                .group_by('month')
+                .order_by('month')
+                .all()
+            )
+
             monthly_data = []
             for item in monthly_profit:
                 revenue = float(item.revenue or 0)
                 cost = float(item.cost or 0)
                 profit = revenue - cost
                 margin = (profit / revenue * 100) if revenue > 0 else 0
-                
+
                 monthly_data.append({
-                    'month': item.month,
-                    'revenue': revenue,
-                    'cost': cost,
-                    'profit': profit,
-                    'margin_percentage': round(margin, 2)
+                    "month": item.month,
+                    "revenue": revenue,
+                    "cost": cost,
+                    "profit": profit,
+                    "margin_percentage": round(margin, 2)
                 })
-            
-            # Client profitability analysis
-            client_profitability = db.session.query(
-                Client.id,
-                Client.name,
-                func.sum(InvoiceLineItem.unit_price * InvoiceLineItem.quantity).label('revenue'),
-                func.sum(InvoiceLineItem.cost_price * InvoiceLineItem.quantity).label('cost')
-            ).join(Invoice).join(InvoiceLineItem).filter(
-                Invoice.payment_status == 'Paid'
-            ).group_by(Client.id).order_by(
-                func.sum(InvoiceLineItem.unit_price * InvoiceLineItem.quantity).desc()
-            ).limit(10).all()
-            
+
+            # ---------- Client Profitability ----------
+            client_profitability = (
+                self.db_session.query(
+                    Client.id,
+                    Client.name,
+                    func.sum(InvoiceLineItem.unit_price * InvoiceLineItem.quantity).label("revenue"),
+                    func.sum(InvoiceLineItem.cost_price * InvoiceLineItem.quantity).label("cost")
+                )
+                .select_from(InvoiceLineItem)
+                .join(Invoice, InvoiceLineItem.invoice_id == Invoice.id)
+                .join(Client, Invoice.client_id == Client.id)
+                .filter(Invoice.payment_status == "Paid")
+                .group_by(Client.id)
+                .order_by(func.sum(InvoiceLineItem.unit_price * InvoiceLineItem.quantity).desc())
+                .limit(10)
+                .all()
+            )
+
             client_data = []
             for client in client_profitability:
                 revenue = float(client.revenue or 0)
                 cost = float(client.cost or 0)
                 profit = revenue - cost
                 margin = (profit / revenue * 100) if revenue > 0 else 0
-                
+
                 client_data.append({
-                    'id': client.id,
-                    'name': client.name,
-                    'revenue': revenue,
-                    'cost': cost,
-                    'profit': profit,
-                    'margin_percentage': round(margin, 2)
+                    "id": client.id,
+                    "name": client.name,
+                    "revenue": revenue,
+                    "cost": cost,
+                    "profit": profit,
+                    "margin_percentage": round(margin, 2)
                 })
-            
+
             return {
-                'overall': {
-                    'total_revenue': total_revenue,
-                    'total_cost': total_cost,
-                    'total_profit': total_profit,
-                    'profit_margin_percentage': round(profit_margin, 2)
+                "overall": {
+                    "total_revenue": total_revenue,
+                    "total_cost": total_cost,
+                    "total_profit": total_profit,
+                    "profit_margin_percentage": round(profit_margin, 2)
                 },
-                'monthly_trends': monthly_data,
-                'top_profitable_clients': client_data
+                "monthly_trends": monthly_data,
+                "top_profitable_clients": client_data
             }
-            
+
         except Exception as e:
             logging.error(f"Profitability analysis failed: {e}")
-            return {'error': str(e)}
+            return {"error": str(e)}
+
     
     def get_ai_insights(self) -> Dict[str, Any]:
         """AI-powered business insights and recommendations"""
@@ -762,11 +800,6 @@ class AnalyticsEngine:
         except Exception as e:
             logging.error(f"Similarity calculation failed: {e}")
             return 0.0
-
-    def __init__(self, db_session):
-        self.db_session = db_session
-
-    # Existing methods ...
 
     def get_lead_stats(self):
         

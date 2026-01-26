@@ -1,52 +1,80 @@
 # ai_client.py
 import os
 import logging
-from openai import OpenAI
+import requests
+import json
 
 # Global AI state
-client = None
 AI_AVAILABLE = False
 LAST_AI_ERROR = None
 MODEL = None
-PROVIDER = "openrouter"
-
+API_KEY = None
 
 def init_ai():
-    global client, AI_AVAILABLE, LAST_AI_ERROR, MODEL
+    global AI_AVAILABLE, LAST_AI_ERROR, MODEL, API_KEY
 
-    logging.info("🔍 init_ai() called")
+    logging.info("🔍 init_ai() called for Gemini")
 
-    api_key = os.getenv("OPENROUTER_API_KEY")
-    model = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
+    API_KEY = os.getenv("GEMINI_API_KEY")
+    MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
-    logging.info(f"🔑 OPENROUTER_API_KEY present: {bool(api_key)}")
-    logging.info(f"🧠 Requested model: {model}")
+    logging.info(f"🔑 GEMINI_API_KEY present: {bool(API_KEY)}")
+    logging.info(f"🧠 Requested model: {MODEL}")
 
-    if not api_key:
+    if not API_KEY:
         AI_AVAILABLE = False
-        LAST_AI_ERROR = "OPENROUTER_API_KEY missing"
-        logging.error("❌ OpenRouter API key missing")
+        LAST_AI_ERROR = "GEMINI_API_KEY missing"
+        logging.error("❌ Gemini API key missing")
         return False
+
+    AI_AVAILABLE = True
+    LAST_AI_ERROR = None
+    logging.info(f"🚀 Gemini READY | model={MODEL}")
+    return True
+
+def generate_json_response(prompt: str):
+    """
+    Generate a JSON response from Gemini using REST API.
+    """
+    global AI_AVAILABLE, LAST_AI_ERROR, MODEL, API_KEY
+    
+    if not AI_AVAILABLE:
+        logging.error("❌ AI not available, cannot generate response")
+        raise Exception("AI not initialized")
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent?key={API_KEY}"
+    
+    headers = {
+        "Content-Type": "application/json"
+    }
+    
+    # Structure prompt to enforce JSON
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt + "\n\nReturn strict JSON only. Do not use markdown."}]
+        }],
+        "generationConfig": {
+            "response_mime_type": "application/json"
+        }
+    }
 
     try:
-        client = OpenAI(
-            api_key=api_key,
-            base_url="https://openrouter.ai/api/v1",
-            default_headers={
-                "HTTP-Referer": "http://localhost:5000",
-                "X-Title": "Revolutionary Invoice AI"
-            }
-        )
-
-        MODEL = model
-        AI_AVAILABLE = True
-        LAST_AI_ERROR = None
-
-        logging.info(f"🚀 OpenRouter READY | model={MODEL}")
-        return True
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        # Extract content
+        try:
+            raw_text = data['candidates'][0]['content']['parts'][0]['text']
+            # Sanitize just in case
+            if "```" in raw_text:
+                raw_text = raw_text.replace("```json", "").replace("```", "")
+            return json.loads(raw_text)
+        except (KeyError, IndexError) as e:
+            logging.error(f"❌ Unexpected Gemini response structure: {data}")
+            raise Exception("Invalid response structure from Gemini")
 
     except Exception as e:
-        AI_AVAILABLE = False
-        LAST_AI_ERROR = str(e)
-        logging.exception("❌ OpenRouter initialization failed")
-        return False
+        logging.exception(f"❌ Gemini Generation Failed: {e}")
+        raise

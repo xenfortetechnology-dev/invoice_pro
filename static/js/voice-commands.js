@@ -10,7 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const recognition = new SpeechRecognition();
-    recognition.lang = "ta-IN";        // Tamil + English both work
+    recognition.lang = "en-IN";        // English (India) for better command recognition
     recognition.continuous = true;
     recognition.interimResults = false;
 
@@ -44,9 +44,9 @@ document.addEventListener("DOMContentLoaded", () => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ text: transcript })
         })
-        .then(res => res.json())
-        .then(handleVoiceResponse)
-        .catch(err => console.error("Voice API error:", err));
+            .then(res => res.json())
+            .then(handleVoiceResponse)
+            .catch(err => console.error("Voice API error:", err));
     };
 
     recognition.onerror = (event) => {
@@ -72,25 +72,66 @@ function handleVoiceResponse(data) {
     switch (data.intent) {
 
         case "add_item":
-            addItemRow();
-            setTimeout(() => {
-                const row = getLastItemRow();
-                if (!row) return;
+            if (typeof addItemRow === "function") {
+                addItemRow();
+                setTimeout(() => {
+                    const row = getLastItemRow();
+                    if (!row) return;
 
-                row.querySelector('[name="description"]').value = data.entities.item_description;
-                row.querySelector('[name="quantity"]').value = data.entities.quantity || 1;
-                row.querySelector('[name="unit_price"]').value = data.entities.amount || 0;
+                    if (data.entities.hsn_code) {
+                        row.querySelector('[name="hsn_code"]').value = data.entities.hsn_code;
+                    }
+                    row.querySelector('[name="description"]').value = data.entities.item_description;
+                    row.querySelector('[name="quantity"]').value = data.entities.quantity || 1;
+                    row.querySelector('[name="unit_price"]').value = data.entities.amount || 0;
 
-                updateInvoiceSummary();
-            }, 50);
+                    if (data.entities.unit) {
+                        // Attempt to set unit if it matches one of the options (Nos, Kg, etc)
+                        // Simple matching
+                        const unitSelect = row.querySelector('[name="unit"]');
+                        // iterate options to find case-insensitive match
+                        for (let i = 0; i < unitSelect.options.length; i++) {
+                            if (unitSelect.options[i].value.toLowerCase() === data.entities.unit.toLowerCase()) {
+                                unitSelect.selectedIndex = i;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (data.entities.tax) {
+                        row.querySelector('[name="tax_percentage"]').value = data.entities.tax;
+                    }
+
+                    if (typeof updateInvoiceSummary === "function") {
+                        updateInvoiceSummary();
+                    }
+                }, 50);
+            } else {
+                console.log("Not on create page, using backend state");
+                alert(data.message);
+            }
             break;
 
         case "save_invoice":
-            document.getElementById("saveInvoiceBtn")?.click();
+            const saveBtn = document.getElementById("saveInvoiceBtn");
+            if (saveBtn) {
+                saveBtn.click();
+            } else {
+                alert(data.message);
+                if (data.invoice_id) {
+                    window.location.href = `/invoice/${data.invoice_id}`;
+                }
+            }
             break;
 
         case "create_invoice":
-            alert(data.message);
+            if (data.client_id) {
+                // Redirects to create invoice page with client pre-selected (requires backend support or just navigation)
+                // Assuming we want to just go to the page:
+                window.location.href = `/create_invoice?client_id=${data.client_id}`;
+            } else {
+                alert(data.message);
+            }
             break;
 
         default:

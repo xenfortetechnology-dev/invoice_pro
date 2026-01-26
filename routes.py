@@ -10,10 +10,9 @@ from sqlalchemy.orm import joinedload
 from app import app, mail 
 from models import *
 from utils import *
-from pdf_generator import generate_invoice_pdf, generate_challan_pdf
-import ai_services
-from extensions import db
-
+from utils import safe_dict
+from pdf_generator import generate_invoice_pdf, generate_challan_pdf, AnalyticsReportGenerator
+from ai_services import ai_assistant, predictive_analytics, inventory_ai
 from blockchain_service import blockchain_service, smart_contract_manager
 from ocr_service import ocr_processor, receipt_processor
 from voice_service import voice_processor, voice_invoice_builder
@@ -42,6 +41,8 @@ import ai_client
 
 # Initialize analytics engine
 analytics_engine = AnalyticsEngine(db.session)
+from report_generator import AnalyticsReportGenerator
+report_generator = AnalyticsReportGenerator()
 
 def login_required(f):
     """Decorator to require login for routes"""
@@ -408,6 +409,8 @@ def edit_invoice(id):
     invoice = Invoice.query.get_or_404(id)
 
     if request.method == 'POST':
+        action = request.form.get('action', 'update')
+
         # Update fields from the form
         invoice.notes = request.form.get('notes', invoice.notes)
         invoice.terms_conditions = request.form.get('terms_conditions', invoice.terms_conditions)
@@ -416,11 +419,20 @@ def edit_invoice(id):
         client_id = request.form.get('client_id')
         if client_id:
             invoice.client_id = int(client_id)
+            
+        # Handle specific actions
+        if action == 'mark_paid':
+            invoice.payment_status = 'Paid'
+            flash('Invoice marked as Paid!', 'success')
+        elif action == 'mark_unpaid':
+            invoice.payment_status = 'Unpaid'
+            flash('Invoice marked as Unpaid!', 'success')
+        else:
+            flash('Invoice updated successfully!', 'success')
 
         # You can update other invoice fields here as needed
 
         db.session.commit()
-        flash('Invoice updated successfully!', 'success')
         
         # Always return a response after POST
         return redirect(url_for('invoice_detail', id=invoice.id))
@@ -739,6 +751,37 @@ def export_clients_pdf():
         mimetype="application/pdf"
     )
 
+
+def _get_analytics_data_dict(time_range='12m'):
+    """Helper to gather all analytics data as a dictionary"""
+    analytics_data = {
+        'revenue_trends': analytics_engine.get_revenue_trends(time_range),
+        'client_performance': analytics_engine.get_client_performance_metrics(),
+        'payment_analytics': analytics_engine.get_payment_analytics(),
+        'profitability_analysis': analytics_engine.get_profitability_analysis(),
+        'ai_predictions': {},
+        'blockchain_insights': {}
+    }
+    
+    # AI-powered predictions
+    if app.config.get("AI_FEATURES_ENABLED") and predictive_analytics:
+        try:
+            analytics_data['ai_predictions'] = {
+                'cash_flow': predictive_analytics.predict_cash_flow(6),
+                'payment_patterns': predictive_analytics.analyze_client_payment_patterns()
+            }
+        except Exception as e:
+            logging.error(f"AI predictions failed: {e}")
+    
+    # Blockchain analytics
+    if app.config.get("BLOCKCHAIN_ENABLED") and blockchain_service:
+        try:
+            analytics_data['blockchain_insights'] = blockchain_service.get_blockchain_stats()
+        except Exception as e:
+            logging.error(f"Blockchain analytics failed: {e}")
+            
+    return analytics_data
+
 @app.route('/analytics')
 @login_required
 def analytics():
@@ -747,32 +790,9 @@ def analytics():
         # Time range for analytics
         time_range = request.args.get('range', '12m')  # 12 months default
         
-        # Generate comprehensive analytics
-        analytics_data = {
-            'revenue_trends': analytics_engine.get_revenue_trends(time_range),
-            'client_performance': analytics_engine.get_client_performance_metrics(),
-            'payment_analytics': analytics_engine.get_payment_analytics(),
-            'profitability_analysis': analytics_engine.get_profitability_analysis(),
-            'ai_predictions': {},
-            'blockchain_insights': {}
-        }
+        # Generate comprehensive analytics using helper
+        analytics_data = _get_analytics_data_dict(time_range)
         
-        # AI-powered predictions
-        if app.config.get("AI_FEATURES_ENABLED") and ai_services.predictive_analytics:
-            try:
-                analytics_data['ai_predictions'] = {
-                    'cash_flow': ai_services.predictive_analytics.predict_cash_flow(6),
-                    'payment_patterns': ai_services.predictive_analytics.analyze_client_payment_patterns()
-                }
-            except Exception as e:
-                logging.error(f"AI predictions failed: {e}")
-        
-        # Blockchain analytics
-        if app.config.get("BLOCKCHAIN_ENABLED") and blockchain_service:
-            try:
-                analytics_data['blockchain_insights'] = blockchain_service.get_blockchain_stats()
-            except Exception as e:
-                logging.error(f"Blockchain analytics failed: {e}")
         print("Client Performance Data:", analytics_data['client_performance'])
         print("Full Analytics Data:", analytics_data)
 
@@ -907,9 +927,7 @@ def api_voice_command():
         voice_text = data.get('text', '')
         context = data.get('context', {})
         
-        result = voice_processor.process_voice_command(
-            session['user_id'], voice_text, context
-        )
+        result = voice_processor.process(voice_text)
         
         return jsonify(result)
         
@@ -1054,169 +1072,39 @@ def inject_globals():
 @app.route('/analytics/export/pdf')
 @login_required
 def export_analytics_pdf():
-
-    output = io.BytesIO()
-    p = canvas.Canvas(output, pagesize=letter)
-    width, height = letter
-
-   
-    PAGE_MARGIN = 10
-
-    def draw_page_border():
-        p.setStrokeColorRGB(0, 0, 0)
-        p.setLineWidth(2)
-        p.rect(
-            PAGE_MARGIN,
-            PAGE_MARGIN,
-            width - PAGE_MARGIN * 2,
-            height - PAGE_MARGIN * 2
+    try:
+        analytics_data = _get_analytics_data_dict()
+        pdf_file = report_generator.generate_pdf_report(analytics_data)
+        
+        return send_file(
+            pdf_file,
+            as_attachment=True,
+            download_name=f"analytics_report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+            mimetype="application/pdf"
         )
+    except Exception as e:
+        logging.error(f"PDF export failed: {e}")
+        flash(f"Failed to export PDF: {e}", "error")
+        return redirect(url_for('analytics'))
 
-    draw_page_border()
-
-
-    total_revenue = db.session.query(func.sum(Invoice.total_amount)).scalar() or 0
-    total_clients = Client.query.count()
-    total_invoices = Invoice.query.count()
-    generated_on = datetime.now().strftime('%d-%m-%Y %H:%M')
-
-    y = height - 80
-
-    
-    p.setFont("Helvetica-Bold", 20)
-    p.drawCentredString(width / 2, y, "ANALYTICS REPORT")
-    y -= 30
-
-    p.setFont("Helvetica", 11)
-    p.drawCentredString(width / 2, y, f"Generated On : {generated_on}")
-    y -= 30
-
-    # Divider
-    p.setLineWidth(1)
-    p.line(50, y, width - 50, y)
-    y -= 40
-
-   
-    metrics = [
-        ("Total Revenue", f"₹{total_revenue:,.2f}"),
-        ("Total Clients", str(total_clients)),
-        ("Total Invoices", str(total_invoices)),
-    ]
-
-    card_width = width - 140
-    card_height = 50
-    x = 70
-
-    for label, value in metrics:
-
-        if y - card_height < 80:
-            p.showPage()
-            draw_page_border()
-            y = height - 120
-
-        # Card background
-        p.setFillColorRGB(0.95, 0.97, 1)
-        p.roundRect(x, y - card_height, card_width, card_height, 10, fill=1)
-
-        # Card border
-        p.setStrokeColorRGB(0, 0, 0)
-        p.roundRect(x, y - card_height, card_width, card_height, 10, fill=0)
-
-        p.setFillColorRGB(0, 0, 0)
-
-        # Text
-        p.setFont("Helvetica-Bold", 14)
-        p.drawString(x + 25, y - 30, label)
-
-        p.setFont("Helvetica", 13)
-        p.drawRightString(x + card_width - 25, y - 30, value)
-
-        y -= card_height + 30
-
-   
-    p.setFont("Helvetica", 10)
-    p.drawCentredString(
-        width / 2,
-        30,
-        "System Generated Business Analytics Report"
-    )
-
-    p.save()
-    output.seek(0)
-
-    return send_file(
-        output,
-        as_attachment=True,
-        download_name="analytics_report.pdf",
-        mimetype="application/pdf"
-    )
-
-@app.route('/analytics/export/excel')
-
+@app.route('/analytics/export/excel', endpoint="analytics_export_excel")
 @login_required
 def export_analytics_excel():
+    try:
+        analytics_data = _get_analytics_data_dict()
+        excel_file = report_generator.generate_excel_report(analytics_data)
+        
+        return send_file(
+            excel_file,
+            as_attachment=True,
+            download_name=f"analytics_report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    except Exception as e:
+        logging.error(f"Excel export failed: {e}")
+        flash(f"Failed to export Excel: {e}", "error")
+        return redirect(url_for('analytics'))
 
-    total_revenue = db.session.query(func.sum(Invoice.total_amount)).scalar() or 0
-    total_clients = Client.query.count()
-    total_invoices = Invoice.query.count()
-    generated_on = datetime.now().strftime('%d-%m-%Y %H:%M')
-
-    data = [
-        ["Generated On", generated_on],
-        ["Total Revenue", total_revenue],
-        ["Total Clients", total_clients],
-        ["Total Invoices", total_invoices],
-    ]
-
-    df = pd.DataFrame(data, columns=["Metric", "Value"])
-
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-        df.to_excel(writer, index=False, sheet_name="Analytics")
-
-        workbook = writer.book
-        worksheet = writer.sheets["Analytics"]
-
-        # Formatting
-        header_format = workbook.add_format({
-            "bold": True,
-            "font_size": 12,
-            "align": "center",
-            "border": 1
-        })
-
-        cell_format = workbook.add_format({
-            "font_size": 11,
-            "border": 1
-        })
-
-        currency_format = workbook.add_format({
-            "num_format": "₹#,##0.00",
-            "border": 1
-        })
-
-        # Apply formatting
-        worksheet.set_column("A:A", 25)
-        worksheet.set_column("B:B", 25)
-
-        worksheet.write_row("A1", ["Metric", "Value"], header_format)
-
-        for row in range(1, len(data) + 1):
-            worksheet.write(row, 0, df.iloc[row - 1, 0], cell_format)
-
-            if df.iloc[row - 1, 0] == "Total Revenue":
-                worksheet.write(row, 1, df.iloc[row - 1, 1], currency_format)
-            else:
-                worksheet.write(row, 1, df.iloc[row - 1, 1], cell_format)
-
-    output.seek(0)
-
-    return send_file(
-        output,
-        as_attachment=True,
-        download_name="analytics_report.xlsx",
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
 
 
 voice_processor = VoiceCommandProcessor()
@@ -1227,6 +1115,7 @@ def handle_voice_command():
         data = request.get_json(force=True)
 
         voice_text = data.get("text", "").strip()
+        language = data.get("language", "en-IN")
         user_id = data.get("user_id", 1)  # default for now
 
         if not voice_text:
@@ -1235,11 +1124,7 @@ def handle_voice_command():
                 "message": "No voice text received"
             }), 400
 
-        result = voice_processor.process_voice_command(
-            user_id=user_id,
-            voice_text=voice_text,
-            context={}
-        )
+        result = voice_processor.process(voice_text, language=language)
 
         return jsonify(result)
 
@@ -1527,126 +1412,8 @@ def dashboard_page():
         recent_invoices=recent_invoices,
         monthly_revenue=monthly_revenue   # ✅ NEW
     )
+    
 
 
-# AI Chat API
-@app.route("/api/ai/chat", methods=["POST"])
-@login_required
-def ai_chat():
-    data = request.get_json()
-    message = (data.get("message") or "").lower()
-
-    try:
-        # -------------------------
-        # CREATE INVOICE (AI)
-        # -------------------------
-        if "create" in message and "invoice" in message:
-            top_client = (
-                db.session.query(Client)
-                .join(Invoice)
-                .group_by(Client.id)
-                .order_by(func.sum(Invoice.total_amount).desc())
-                .first()
-            )
-
-            if not top_client:
-                return jsonify(reply="❌ No clients found to create an invoice.")
-
-            return jsonify(reply=(
-                f"🧾 Creating invoice for <b>{top_client.name}</b>.<br>"
-                f"<a href='{url_for('create_invoice', client_id=top_client.id)}'>"
-                f"👉 Click here to continue</a>"
-            ))
-        
-        # -------------------------
-        # CLIENT FOLLOW-UP
-        # -------------------------
-        if "follow" in message:
-            clients = (
-                db.session.query(Client.name)
-                .join(Invoice)
-                .filter(Invoice.payment_status.in_(["Unpaid", "Overdue"]))
-                .distinct()
-                .all()
-            )
-
-            if not clients:
-                return jsonify(reply="🎉 No clients currently need follow-up.")
-
-            names = ", ".join(c.name for c in clients)
-            return jsonify(reply=f"📋 Clients needing follow-up:<br><b>{names}</b>")
-
-        # -------------------------
-        # PAYMENT ANALYSIS (AI)
-        # -------------------------
-        if "payment" in message and "analy" in message:
-            if not ai_services.predictive_analytics:
-                return jsonify(error="AI unavailable")
-
-            analysis = ai_services.predictive_analytics.analyze_client_payment_patterns()
-            return jsonify(reply=format_payment_analysis(analysis))
-
-        # -------------------------
-        # REVENUE
-        # -------------------------
-        if "revenue" in message:
-            total = (
-                db.session.query(func.sum(Invoice.total_amount))
-                .filter(Invoice.payment_status == "Paid")
-                .scalar() or 0
-            )
-            return jsonify(reply=f"💰 Total revenue collected: ₹{int(total):,}")
-
-        # -------------------------
-        # CLIENT COUNT
-        # -------------------------
-        if "how many" in message and "client" in message:
-            count = Client.query.count()
-            return jsonify(reply=f"👥 You have <b>{count}</b> clients.")
-
-        # -------------------------
-        # FALLBACK → AI CHAT
-        # -------------------------
-        if ai_services.ai_assistant:
-            reply = ai_services.ai_assistant.general_chat(message)
-            return jsonify(reply=reply)
-
-        return jsonify(error="AI unavailable")
-
-    except Exception as e:
-        return jsonify(error=str(e))
 
 
-def format_payment_analysis(data):
-    segments = data.get("payment_behavior_segments", [])
-    output = ["📊 <b>Payment Analysis</b><br>"]
-
-    for s in segments:
-        output.append(
-            f"• <b>{s['segment_name']}</b>: "
-            f"{s['client_count']} clients "
-            f"(avg delay {round(s['avg_delay_days'],1)} days)"
-        )
-
-    return "<br>".join(output)
-
-# For OpenAI service status check
-# @app.route("/api/ai/status")
-# def ai_status():
-#     return {
-#         "ai_assistant": ai_services.ai_assistant is not None,
-#         "predictive_analytics": ai_services.predictive_analytics is not None,
-#         "inventory_ai": ai_services.inventory_ai is not None
-#     }
-
-# For Openrouter service status check
-@app.route("/api/ai/status")
-def ai_status():
-    return {
-        "provider": ai_client.PROVIDER,
-        "available": ai_client.AI_AVAILABLE,
-        "model": ai_client.MODEL,
-        "ai_assistant": ai_services.ai_assistant is not None,
-        "predictive_analytics": ai_services.predictive_analytics is not None,
-        "inventory_ai": ai_services.inventory_ai is not None
-    }
