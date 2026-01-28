@@ -35,6 +35,8 @@
 #     window.events.closed += on_closed
 #     webview.start(gui='edgechromium')
 
+
+
 import threading
 import webview
 from app import app
@@ -60,3 +62,17 @@ if __name__ == "__main__":
     )
 
     webview.start()
+
+
+
+# for web application testing
+
+# from app import app
+
+# if __name__ == "__main__":
+#     app.run(
+#         host="127.0.0.1",
+#         port=5004,
+#         debug=True,         # 🔹 Enables code reload on changes
+#         use_reloader=True   # 🔹 Watches files for changes
+#     )
