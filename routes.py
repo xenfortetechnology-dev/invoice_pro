@@ -15,18 +15,16 @@ from pdf_generator import generate_invoice_pdf, generate_challan_pdf, AnalyticsR
 from ai_services import ai_assistant, predictive_analytics, inventory_ai
 from blockchain_service import blockchain_service, smart_contract_manager
 from ocr_service import ocr_processor, receipt_processor
-from voice_service import voice_processor, voice_invoice_builder
+from voice_service import get_voice_processor, get_voice_session
 from analytics_engine import AnalyticsEngine
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 import io
 import csv
-from flask import Response, request
+from flask import Response, request, render_template_string
 
 from datetime import datetime
 from sqlalchemy import func
-
-from voice_service import VoiceCommandProcessor, VoiceInvoiceBuilder
 
 from pdf_generator import generate_quotation_pdf
 from flask import send_file
@@ -198,15 +196,31 @@ def create_invoice():
 
             line_items_data = json.loads(request.form.get('line_items', '[]'))
             subtotal = 0
-            total_tax = 0
+            total_cgst = 0
+            total_sgst = 0
+            total_igst = 0
 
             for i, item_data in enumerate(line_items_data, 1):
                 quantity = float(item_data['quantity'])
                 unit_price = float(item_data['unit_price'])
-                tax_percentage = float(item_data.get('tax_percentage', 18.0))
+                
+                # Get individual tax percentages
+                cgst_percentage = float(item_data.get('cgst_percentage', 0.0))
+                sgst_percentage = float(item_data.get('sgst_percentage', 0.0))
+                igst_percentage = float(item_data.get('igst_percentage', 0.0))
 
                 line_total = quantity * unit_price
-                tax_amount = (line_total * tax_percentage) / 100
+                
+                # Calculate individual tax amounts
+                cgst_amount = (line_total * cgst_percentage) / 100
+                sgst_amount = (line_total * sgst_percentage) / 100
+                igst_amount = (line_total * igst_percentage) / 100
+                
+                # Total tax for this line
+                tax_amount = cgst_amount + sgst_amount + igst_amount
+                
+                # For backward compatibility, use total tax percentage
+                tax_percentage = cgst_percentage + sgst_percentage + igst_percentage
 
                 line_item = InvoiceLineItem(
                     invoice_id=invoice.id,
@@ -218,6 +232,12 @@ def create_invoice():
                     unit_price=unit_price,
                     tax_percentage=tax_percentage,
                     tax_amount=tax_amount,
+                    cgst_percentage=cgst_percentage,
+                    sgst_percentage=sgst_percentage,
+                    igst_percentage=igst_percentage,
+                    cgst_amount=cgst_amount,
+                    sgst_amount=sgst_amount,
+                    igst_amount=igst_amount,
                     total_amount=line_total + tax_amount,
                     cost_price=float(item_data.get('cost_price', 0)),
                     ai_suggested=item_data.get('ai_suggested', False)
@@ -225,24 +245,21 @@ def create_invoice():
 
                 db.session.add(line_item)
                 subtotal += line_total
-                total_tax += tax_amount
+                total_cgst += cgst_amount
+                total_sgst += sgst_amount
+                total_igst += igst_amount
             db.session.commit()
 
-            # Calculate taxes based on client location
+            # Calculate invoice-level taxes
             client = Client.query.get(client_id)
             company = Company.query.first()
 
-            if client and company and client.state == company.state:
-                invoice.cgst = total_tax / 2
-                invoice.sgst = total_tax / 2
-                invoice.igst = 0
-            else:
-                invoice.igst = total_tax
-                invoice.cgst = 0
-                invoice.sgst = 0
-
+            # Set invoice totals based on what was calculated from line items
+            invoice.cgst = total_cgst
+            invoice.sgst = total_sgst
+            invoice.igst = total_igst
             invoice.subtotal = subtotal
-            invoice.total_amount = subtotal + total_tax
+            invoice.total_amount = subtotal + total_cgst + total_sgst + total_igst
 
             # Generate QR code
             invoice.qr_payment_code = generate_payment_qr_code(invoice)
@@ -297,6 +314,117 @@ def create_invoice():
     return render_template('create_invoice.html',
                            clients=clients,
                            today=datetime.now())
+
+
+@app.route('/invoice/preview', methods=['POST'])
+@login_required
+def preview_invoice():
+    """Preview invoice without saving"""
+    try:
+        # Extract form data (duplicates logic from create_invoice but doesn't save)
+        client_id = request.form.get('client_id')
+        invoice_date_str = request.form.get('invoice_date')
+        due_date_str = request.form.get('due_date')
+        notes = request.form.get('notes', '')
+        terms_conditions = request.form.get('terms_conditions', '')
+        invoice_format = request.form.get("invoice_format", "default")
+
+        # Create ephemeral objects
+        client = Client.query.get(client_id)
+        if not client:
+             return "Client not found", 404
+
+        invoice_date = datetime.strptime(invoice_date_str, '%Y-%m-%d').date() if invoice_date_str else datetime.now().date()
+        
+        # Parse Line Items
+        line_items_data = json.loads(request.form.get('line_items', '[]'))
+        
+        line_items = []
+        subtotal = 0
+        total_cgst = 0
+        total_sgst = 0
+        total_igst = 0
+
+        for i, item_data in enumerate(line_items_data, 1):
+            quantity = float(item_data.get('quantity', 0))
+            unit_price = float(item_data.get('unit_price', 0))
+            
+            cgst_percentage = float(item_data.get('cgst_percentage', 0.0))
+            sgst_percentage = float(item_data.get('sgst_percentage', 0.0))
+            igst_percentage = float(item_data.get('igst_percentage', 0.0))
+
+            line_total = quantity * unit_price
+            
+            cgst_amount = (line_total * cgst_percentage) / 100
+            sgst_amount = (line_total * sgst_percentage) / 100
+            igst_amount = (line_total * igst_percentage) / 100
+            
+            tax_amount = cgst_amount + sgst_amount + igst_amount
+            
+            # Create transient object
+            li = InvoiceLineItem(
+                sr_no=i,
+                hsn_code=item_data.get('hsn_code', ''),
+                description=item_data.get('description', ''),
+                quantity=quantity,
+                unit=item_data.get('unit', 'Nos'),
+                unit_price=unit_price,
+                cgst_percentage=cgst_percentage,
+                sgst_percentage=sgst_percentage,
+                igst_percentage=igst_percentage,
+                cgst_amount=cgst_amount,
+                sgst_amount=sgst_amount,
+                igst_amount=igst_amount,
+                total_amount=line_total + tax_amount
+            )
+            
+            line_items.append(li)
+
+            subtotal += line_total
+            total_cgst += cgst_amount
+            total_sgst += sgst_amount
+            total_igst += igst_amount
+
+        # Create transient invoice
+        invoice = Invoice(
+            invoice_number="PREVIEW",
+            invoice_date=invoice_date,
+            client=client,
+            notes=notes,
+            terms_conditions=terms_conditions,
+            subtotal=subtotal,
+            cgst=total_cgst,
+            sgst=total_sgst,
+            igst=total_igst,
+            total_amount=subtotal + total_cgst + total_sgst + total_igst,
+            invoice_format=invoice_format
+        )
+        # Manually attach line items for Jinja loop
+        invoice.line_items = line_items 
+        
+        company = Company.query.first()
+        bank = BankDetails.query.first()
+
+        # Select Template
+        template_map = {
+            "default": "invoice_detail.html",
+            "excel_customer_A": "invoice_excel_customer_A.html"
+        }
+        template_name = template_map.get(invoice_format, "invoice_detail.html")
+
+        return render_template(
+            template_name,
+            invoice=invoice,
+            company=company,
+            bank=bank,
+            blockchain_verification={},
+            ai_insights={},
+            is_preview=True
+        )
+
+    except Exception as e:
+        logging.error(f"Preview failed: {e}")
+        return f"Error creating preview: {str(e)}", 500
 
 
 @app.route('/invoice/<int:id>')
@@ -1461,39 +1589,9 @@ def api_ai_chat():
         return jsonify({'reply': f"Sorry, I encountered an error: {str(e)}"})
 
 
-voice_processor = VoiceCommandProcessor()
+# Voice command routes are now defined above (lines ~1808-1890)
+# Using get_voice_processor() and get_voice_session() functions
 
-@app.route("/api/voice-command", methods=["POST"])
-def handle_voice_command():
-    try:
-        data = request.get_json(force=True)
-
-        voice_text = data.get("text", "").strip()
-        language = data.get("language", "en-IN")
-        user_id = data.get("user_id", 1)  # default for now
-
-        if not voice_text:
-            return jsonify({
-                "success": False,
-                "message": "No voice text received"
-            }), 400
-
-        result = voice_processor.process(voice_text, language=language)
-
-        return jsonify(result)
-
-    except Exception as e:
-        # 🔴 THIS IS THE MOST IMPORTANT PART
-        import traceback
-        traceback.print_exc()
-
-        return jsonify({
-            "success": False,
-            "message": "Internal server error in voice command",
-            "error": str(e)
-        }), 500
-
-    
 
  
 
@@ -1767,6 +1865,91 @@ def dashboard_page():
         recent_invoices=recent_invoices,
         monthly_revenue=monthly_revenue   # ✅ NEW
     )
+
+
+@app.route('/analytics/export/excel')
+@login_required
+def voice_command_api():
+    """
+    Process voice commands using script-based pattern matching
+    No AI/API dependencies - Pure regex matching
+    """
+    try:
+        data = request.get_json()
+        text = data.get('text', '').strip()
+        language = data.get('language', 'en-IN')
+        
+        if not text:
+            return jsonify({
+                'success': False,
+                'message': 'No voice input received',
+                'intent': 'error'
+            }), 400
+        
+        logging.info(f"🎤 Voice command received: '{text}' (Language: {language})")
+        
+        # Get voice processor
+        voice_processor = get_voice_processor()
+        
+        # Process command
+        result = voice_processor.process(text, language)
+        
+        logging.info(f"✅ Voice command processed: {result.get('intent')}")
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logging.error(f"❌ Voice command API error: {e}")
+        return jsonify({
+            'success': False,
+            'message': 'Error processing voice command',
+            'error': str(e),
+            'intent': 'error'
+        }), 500
+
+
+@app.route('/api/voice-session/status', methods=['GET'])
+@login_required
+def voice_session_status():
+    """Get current voice session status"""
+    try:
+        voice_session = get_voice_session()
+        
+        return jsonify({
+            'success': True,
+            'has_active_invoice': voice_session.has_active_invoice(),
+            'client_name': voice_session.active_invoice['client'].name if voice_session.active_invoice['client'] else None,
+            'item_count': len(voice_session.active_invoice['items']),
+            'total_amount': voice_session.get_total()
+        })
+        
+    except Exception as e:
+        logging.error(f"Voice session status error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/voice-session/clear', methods=['POST'])
+@login_required
+def voice_session_clear():
+    """Clear voice session"""
+    try:
+        voice_session = get_voice_session()
+        voice_session.clear()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Voice session cleared'
+        })
+        
+    except Exception as e:
+        logging.error(f"Voice session clear error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 @app.route('/analytics/export/excel')

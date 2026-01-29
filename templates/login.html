@@ -10,7 +10,7 @@
         <div class="col-lg-6 d-none d-lg-flex align-items-center justify-content-center branding-panel">
             <div class="text-center text-white branding-box">
 
-                <i data-feather="zap" size="120" class="mb-4 floating glow"></i>
+                <img src="static/Xen_logo.png" alt="Xen Logo" class="mb-4 floating glow xen-logo"/>
 
                 <!-- MULTI SHINE TEXT -->
                 <h1 class="display-4 fw-bold ultra-shine-text">
@@ -21,6 +21,8 @@
 
                 <!-- FEATURE ICONS -->
                 <div class="row text-center mt-4 feature-icons">
+                <div class="row text-center mt-4 feature-icons greyed-out">
+
                     <div class="col-4">
                         <i data-feather="cpu" size="42" class="ai-icon"></i>
                         <p>AI Assistant</p>
@@ -34,6 +36,7 @@
                         <i data-feather="mic" size="42" class="voice-icon"></i>
                         <p>Voice</p>
                     </div>
+                    </div>
                 </div>
 
             </div>
@@ -44,7 +47,7 @@
             <div class="login-card sparkle particle-zone">
 
                 <div class="text-center mb-4">
-                    <i data-feather="zap" size="48" class="text-primary mb-2 floating"></i>
+                  <img src="static/Xen_logo.png" alt="Logo" class="text-primary mb-2 xen-logo-small" > 
                     <h2 class="fw-bold glossy-text">Welcome Back</h2>
                     <p class="text-muted">Login to your account</p>
                 </div>
@@ -137,6 +140,16 @@
 
 .glow {
     filter: drop-shadow(0 0 15px rgba(255,255,255,0.6));
+}
+
+/* Xen Logo Size */
+.xen-logo {
+    width: 170px;
+    height: auto;        /* keeps aspect ratio */
+}
+.xen-logo-small{
+    width: 60px;
+    height: auto;        /* keeps aspect ratio */
 }
 
 /* ================= ULTRA SHINE TEXT ================= */
@@ -496,7 +509,7 @@ html, body {
 /* ===== FORCE FULL SCREEN NO WHITE SPACE ===== */
 html, body {
     margin: 0 !important;
-    padding: 0 !important;
+    padding: 0!important;
     width: 100%;
     overflow-x: hidden;
     background: #020617; /* fallback dark */
@@ -504,8 +517,10 @@ html, body {
 
 /* Kill Bootstrap container padding */
 .container-fluid {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
+    padding-top: -3px!important;
+    padding-left: 10px!important;
+    padding-right: 10px!important;
+    padding-bottom: 25px!important;
     max-width: 100% !important;
 }
 
@@ -519,6 +534,12 @@ html, body {
 /* Force full width columns */
 .col-lg-6 {
     padding: 0 !important;
+}
+
+.greyed-out{
+    opacity: 0.55;                 /* soft fade */
+    filter: grayscale(60%) blur(1.2px);
+    transition: all 0.3s ease-in-out;
 }
 
 /* ===== REMOVE BROWSER DEFAULT PASSWORD EYE ICON ===== */
