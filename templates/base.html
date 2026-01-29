@@ -139,7 +139,7 @@
 
         <!-- Brand -->
         <a class="navbar-brand fw-bold text-primary mb-4" href="{{ url_for('dashboard_page') }}">
-            <i data-feather="zap" class="me-2"></i>
+            <img src="static/Xen_logo.png" alt="Xen Logo" class="mb xen-logo logo-glow" ;/>
             Revolutionary Invoice
         </a>
 
@@ -255,26 +255,49 @@
     {% endif %}
 
     <!-- Main Content -->
-    <main class="content">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div class="container mt-3">
-            {% for category, message in messages %}
-            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show glass-card"
-                role="alert">
-                <i data-feather="{% if category == 'success' %}check-circle{% elif category == 'error' %}alert-circle{% else %}info{% endif %}"
-                    class="me-2"></i>
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <main class="content d-flex flex-column min-vh-100">
+        <div class="flex-grow-1">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="container mt-3">
+                {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show glass-card"
+                    role="alert">
+                    <i data-feather="{% if category == 'success' %}check-circle{% elif category == 'error' %}alert-circle{% else %}info{% endif %}"
+                        class="me-2"></i>
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endfor %}
             </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-        {% endwith %}
+            {% endif %}
+            {% endwith %}
 
-        {% block content %}{% endblock %}
+            {% block content %}{% endblock %}
+        </div>
+
+        <!-- Footer -->
+        {% if session.user_id %}
+        <footer class="footer bg-light border-top text-center py-3 mt-auto">
+
+            <h5 class="fw-bold text-primary mb-1">
+                ⚡ Revolutionary Invoice System
+            </h5>
+
+            <p class="mb-0 text-muted">
+                © 2025 Revolutionary Invoice Systems. All rights reserved.
+            </p>
+
+            <div class="mt-1">
+                <span class="badge bg-success">AI Enabled</span>
+                <span class="badge bg-primary">Blockchain Secured</span>
+            </div>
+        </footer>
+        {% endif %}
     </main>
 
+<<<<<<< HEAD
+=======
     <!-- Footer -->
     {% if session.user_id %}
     <footer class="footer bg-light border-top text-center py-3">
@@ -293,7 +316,18 @@
         </div>
     </footer>
     {% endif %}
+   
+<!-- logo-glow and  size -->
+<style>
+.logo-glow {
+    width: 40px;height: auto;
 
+    filter:
+        drop-shadow(0 0 1px rgba(255,255,255,0.9))   /* sharp edge */
+        drop-shadow(0 0 4px rgba(255,255,255,0.6));  /* soft glow */
+}
+</style>
+>>>>>>> f8531acae2cfd68a18d75c146afd5d5736bcc277
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -304,6 +338,7 @@
     <!-- Custom JavaScript -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     {% if ai_enabled %}
+    <script src="{{ url_for('static', filename='js/ai-local.js') }}"></script>
     <script src="{{ url_for('static', filename='js/voice-commands.js') }}"></script>
     <script src="{{ url_for('static', filename='js/ai-assistant.js') }}"></script>
     <script src="{{ url_for('static', filename='js/document-scanner.js') }}"></script>

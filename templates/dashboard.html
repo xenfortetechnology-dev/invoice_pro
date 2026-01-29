@@ -10,11 +10,11 @@
             <div class="glass-card p-4">
                 <div class="row align-items-center">
                     <div class="col-md-8">
-                       <h1 class="display-6 welcome-title mb-2">
-    Welcome back, {{ session.username }}
-</h1>
+                        <h1 class="display-6 welcome-title mb-2">
+                            Welcome back, {{ session.username }}
+                        </h1>
                         <p class="lead text-muted mb-0">
-                            {{ today.strftime('%A, %B %d, %Y') }} • 
+                            {{ today.strftime('%A, %B %d, %Y') }} •
                             {% if ai_enabled %}AI-Powered Dashboard{% endif %}
                             {% if blockchain_enabled %} • Blockchain Secured{% endif %}
                         </p>
@@ -33,7 +33,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Key Metrics -->
     <div class="row mb-4 g-3 align-items-stretch">
         <div class="col-md-3">
@@ -45,8 +45,8 @@
                     <div>
                         <p class="text-muted mb-1 small">Total Revenue</p>
                         <h3 class="fw-bold mb-0">
-    ₹{{ "%.2f"|format(monthly_revenue_total or 0) }}
-</h3>
+                            ₹{{ "%.2f"|format(monthly_revenue_total or 0) }}
+                        </h3>
 
                         <small class="text-success">
                             <i data-feather="trending-up" size="14"></i> +12.5% this month
@@ -55,27 +55,27 @@
                 </div>
             </div>
         </div>
-     <div class="col-md-3">
-    <a href="#recent-invoices" class="text-decoration-none d-block h-100">
+        <div class="col-md-3">
+            <a href="#recent-invoices" class="text-decoration-none d-block h-100">
 
-        <div class="glass-card p-4 metric-card card-red h-100 d-flex flex-column justify-content-center">
+                <div class="glass-card p-4 metric-card card-red h-100 d-flex flex-column justify-content-center">
 
-            <div>
-                <p class="text-muted mb-1 small">Outstanding Amount</p>
+                    <div>
+                        <p class="text-muted mb-1 small">Outstanding Amount</p>
 
-                <h3 class="fw-bold mb-0 text-dark">
-                    ₹{{ "%.2f"|format(outstanding_amount or 0) }}
-                </h3>
-            </div>
+                        <h3 class="fw-bold mb-0 text-dark">
+                            ₹{{ "%.2f"|format(outstanding_amount or 0) }}
+                        </h3>
+                    </div>
 
+                </div>
+
+            </a>
         </div>
 
-    </a>
-</div>
 
 
 
-        
         <div class="col-md-3">
             <div class="glass-card p-4 metric-card card-orange h-100 d-flex flex-column justify-content-center">
                 <div class="d-flex align-items-center">
@@ -92,7 +92,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="col-md-3">
             <div class="glass-card p-4 metric-card card-red h-100 d-flex flex-column justify-content-center">
                 <div class="d-flex align-items-center">
@@ -110,398 +110,399 @@
             </div>
         </div>
     </div>
-    
-   <!-- Charts and Analytics -->
-<div class="row mb-4 align-items-stretch">
-    <!-- Revenue Chart (Left Column) -->
-    <div class="col-lg-8">
-        <div class="glass-card p-4 mb-4" style="max-height: 900px; overflow-y: auto;">
 
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="fw-bold mb-0">Revenue Trends</h5>
-                <div class="btn-group" role="group">
-                    <input type="radio" class="btn-check" name="revenueRange" id="revenue6m" value="6m" checked>
-                    <label class="btn btn-outline-primary btn-sm" for="revenue6m">6M</label>
+    <!-- Charts and Analytics -->
+    <div class="row mb-4 align-items-stretch">
+        <!-- Revenue Chart (Left Column) -->
+        <div class="col-lg-8">
+            <div class="glass-card p-4 mb-4" style="max-height: 900px; overflow-y: auto;">
 
-                    <input type="radio" class="btn-check" name="revenueRange" id="revenue12m" value="12m">
-                    <label class="btn btn-outline-primary btn-sm" for="revenue12m">12M</label>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0">Revenue Trends</h5>
+                    <div class="btn-group" role="group">
+                        <input type="radio" class="btn-check" name="revenueRange" id="revenue6m" value="6m" checked>
+                        <label class="btn btn-outline-primary btn-sm" for="revenue6m">6M</label>
+
+                        <input type="radio" class="btn-check" name="revenueRange" id="revenue12m" value="12m">
+                        <label class="btn btn-outline-primary btn-sm" for="revenue12m">12M</label>
+                    </div>
+                </div>
+                <!-- Chart Canvas with fixed height -->
+                <div style="height: 500px;">
+                    <canvas id="revenueChart" height="400"></canvas>
                 </div>
             </div>
-            <!-- Chart Canvas with fixed height -->
-            <div style="height: 500px;">
-                <canvas id="revenueChart" height="400"></canvas>
-            </div>
         </div>
-    </div>
 
-   <!-- Quick Actions (Right Column) -->
-<div class="col-lg-4 d-flex">
-    <div class="glass-card p-4 mb-4 flex-fill" style="max-height: 895px; overflow-y: auto;">
-        <h5 class="fw-bold mb-3">Quick Actions</h5>
+        <!-- Quick Actions (Right Column) -->
+        <div class="col-lg-4 d-flex">
+            <div class="glass-card p-4 mb-4 flex-fill" style="max-height: 895px; overflow-y: auto;">
+                <h5 class="fw-bold mb-3">Quick Actions</h5>
 
-        <div class="d-grid gap-3">
+                <div class="d-grid gap-3">
 
-            <!-- Create New Invoice -->
-            <a href="{{ url_for('create_invoice') }}"
-               class="btn btn-outline-primary glass-btn text-start">
-                <i data-feather="file-plus" class="me-2"></i> Create New Invoice
-            </a>
-
-            {% if ai_enabled %}
-            <!-- Voice Create Invoice -->
-          
-         <button class="btn btn-outline-success glass-btn text-start"
-        id="voiceInvoiceBtn"
-        disabled>
-    <i data-feather="mic" class="me-2"></i> Voice Create Invoice
-    </button>
-
-        
-            
-           <!--Scan Document-->   
-           <button class="btn btn-outline-info glass-btn text-start"
-            data-bs-toggle="modal"
-            data-bs-target="#documentScannerModal"
-            disabled>
-            <i data-feather="camera" class="me-2"></i> Scan Document
-            </button>
-
-            {% endif %}
-        
-            <!-- View Analytics -->
-            <a href="{{ url_for('analytics') }}"
-               class="btn btn-outline-warning glass-btn text-start">
-                <i data-feather="trending-up" class="me-2"></i> View Analytics
-            </a>
-
-            {% if blockchain_enabled %}
-            <!-- Blockchain Status -->
-            <button class="btn btn-outline-dark glass-btn text-start" id="blockchainStatsBtn">
-                <i data-feather="shield" class="me-2"></i> Blockchain Status
-            </button>
-            {% endif %}
-
-        </div>
-    </div>
-</div>
-
-        
-        <div class="col-12">
-    <div class="glass-card p-4">
-        <h5 class="fw-bold mb-3">
-            {% if ai_enabled %}
-                <i data-feather="cpu" class="me-2 text-primary"></i> AI Insights
-            {% else %}
-                <i data-feather="alert-circle" class="me-2 text-warning"></i> Upcoming Payments
-            {% endif %}
-        </h5>
-
-        {% if ai_enabled and ai_insights %}
-<!-- ✅ AI-powered insights -->
-<div class="ai-insights">
-
-    {% if ai_insights.cash_flow %}
-    <div class="insight-card glass-card-sm p-3 mb-3">
-        <h6 class="text-primary mb-2">Cash Flow Prediction</h6>
-        <p class="small mb-1">
-            Expected revenue next month:
-            <strong>₹{{ ai_insights.cash_flow.summary.total_predicted_revenue or 0 }}</strong>
-        </p>
-        <p class="small text-muted mb-0">
-            Trend: {{ ai_insights.cash_flow.summary.cash_flow_trend or 'Stable' }}
-        </p>
-    </div>
-    {% endif %}
-
-    {% if ai_insights.payment_patterns %}
-    <div class="insight-card glass-card-sm p-3 mb-3">
-        <h6 class="text-success mb-2">Payment Analysis</h6>
-        <p class="small mb-1">
-            Collection health:
-            <strong>{{ ai_insights.payment_patterns.insights.overall_collection_health or 'Good' }}</strong>
-        </p>
-
-        {% if ai_insights.payment_patterns.insights.at_risk_clients %}
-        <p class="small text-warning mb-0">
-            <i data-feather="alert-triangle" size="14"></i>
-            {{ ai_insights.payment_patterns.insights.at_risk_clients|length }} clients need attention
-        </p>
-        {% endif %}
-
-    </div>
-    {% endif %}
-
-</div>
-{% else %}
-<!-- ✅ Upcoming payments fallback -->
-
-{% if upcoming_payments %}
-<div class="list-group list-group-flush">
-
-    {% for payment in upcoming_payments %}
-    <div class="list-group-item border-0 px-0">
-        <div class="d-flex justify-content-between align-items-center">
-
-            <div>
-                <h6 class="mb-1">{{ payment.client.name }}</h6>
-                <small class="text-muted">{{ payment.invoice_number }}</small>
-            </div>
-
-            <div class="text-end">
-                <strong>₹{{ "%.2f"|format(payment.total_amount) }}</strong>
-            </div>
-
-        </div>
-    </div>
-    {% endfor %}
-
-</div>
-{% else %}
-<p class="text-muted">No upcoming payments.</p>
-{% endif %}
-{% endif %}
-  
-
-
-  <!-- ================= RECENT INVOICES ================= -->
-<div id="recent-invoices" class="row mb-4">
-    <div class="col-12">
-
-        <div class="glass-card p-4">
-
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="fw-bold mb-0">Recent Invoices</h5>
-
-                <a href="{{ url_for('invoice_management') }}"
-                   class="btn btn-sm btn-outline-primary">
-                    View All
-                </a>
-            </div>
-
-           {% if recent_invoices %}
-<div class="table-responsive" style="overflow-x:auto;">
-    <table class="table table-hover align-middle w-100 table-fixed">
-
-        <thead class="table-light">
-            <tr>
-                <th style="width: 140px;">Invoice #</th>
-                <th style="width: 120px;">Client</th>
-                <th style="width: 90px;">Total</th>
-                <th style="width: 90px;">Paid</th>
-                <th style="width: 100px;">Balance</th>
-                <th style="width: 80px;">Status</th>
-            </tr>
-        </thead>
-
-        <tbody>
-            {% for invoice in recent_invoices %}
-            <tr>
-
-                <!-- Invoice Number -->
-                <td style="max-width:140px; word-break:break-word;">
-                    <a href="{{ url_for('invoice_detail', id=invoice.id) }}"
-                       class="text-decoration-none fw-semibold">
-                        {{ invoice.invoice_number }}
+                    <!-- Create New Invoice -->
+                    <a href="{{ url_for('create_invoice') }}" class="btn btn-outline-primary glass-btn text-start">
+                        <i data-feather="file-plus" class="me-2"></i> Create New Invoice
                     </a>
-                </td>
 
-                <td style=" max-width:120px; white-space: normal; word-break: break-word; overflow-wrap: break-word;">
-                    {{ invoice.client.name }}
-                </td>
+                    {% if ai_enabled %}
+                    <!-- Voice Create Invoice -->
 
-                <td>₹{{ "%.2f"|format(invoice.total_amount) }}</td>
-                <td>₹{{ "%.2f"|format(invoice.amount_paid or 0) }}</td>
+                    <button class="btn btn-outline-success glass-btn text-start" id="voiceInvoiceBtn" disabled>
+                        <i data-feather="mic" class="me-2"></i> Voice Create Invoice
+                    </button>
 
-                <td>
-                    ₹{{ "%.2f"|format(invoice.total_amount - (invoice.amount_paid or 0)) }}
-                </td>
 
-                <td>
-                    {% if invoice.payment_status == 'Paid' %}
-                        <span class="badge bg-success">Paid</span>
-                    {% elif invoice.payment_status == 'Partially Paid' %}
-                        <span class="badge bg-warning text-dark">Partial</span>
-                    {% else %}
-                        <span class="badge bg-danger">Unpaid</span>
+
+                    <!--Scan Document-->
+                    <button class="btn btn-outline-info glass-btn text-start" data-bs-toggle="modal"
+                        data-bs-target="#documentScannerModal" disabled>
+                        <i data-feather="camera" class="me-2"></i> Scan Document
+                    </button>
+
                     {% endif %}
-                </td>
 
-            </tr>
-            {% endfor %}
-        </tbody>
+                    <!-- View Analytics -->
+                    <a href="{{ url_for('analytics') }}" class="btn btn-outline-warning glass-btn text-start">
+                        <i data-feather="trending-up" class="me-2"></i> View Analytics
+                    </a>
 
-    </table>
-</div>
-{% else %}
-<div class="text-center py-4">
-    <p class="text-muted">No invoices found.</p>
-</div>
-{% endif %}
+                    {% if blockchain_enabled %}
+                    <!-- Blockchain Status -->
+                    <button class="btn btn-outline-dark glass-btn text-start" id="blockchainStatsBtn" disabled>
+                        <i data-feather="shield" class="me-2"></i> Blockchain Status
+                    </button>
+                    {% endif %}
 
-
+                </div>
+            </div>
         </div>
-    </div>
-</div>
 
-    <!-- Blockchain Status (if enabled) -->
-    {% if blockchain_enabled and blockchain_stats %}
-    <div class="row mb-4">
+
         <div class="col-12">
             <div class="glass-card p-4">
                 <h5 class="fw-bold mb-3">
-                    <i data-feather="shield" class="me-2 text-info"></i>
-                    Blockchain Status
+                    {% if ai_enabled %}
+                    <i data-feather="cpu" class="me-2 text-primary"></i> AI Insights
+                    {% else %}
+                    <i data-feather="alert-circle" class="me-2 text-warning"></i> Upcoming Payments
+                    {% endif %}
                 </h5>
-                <div class="row">
-                    <div class="col-md-3">
-                        <div class="text-center">
-                            <h4 class="text-info">{{ blockchain_stats.total_blocks or 0 }}</h4>
-                            <small class="text-muted">Total Blocks</small>
+
+                {% if ai_enabled and ai_insights %}
+                <!-- ✅ AI-powered insights -->
+                <div class="ai-insights">
+
+                    {% if ai_insights.cash_flow %}
+                    <div class="insight-card glass-card-sm p-3 mb-3">
+                        <h6 class="text-primary mb-2">Cash Flow Prediction</h6>
+                        <p class="small mb-1">
+                            Expected revenue next month:
+                            <strong>₹{{ ai_insights.cash_flow.summary.total_predicted_revenue or 0 }}</strong>
+                        </p>
+                        <p class="small text-muted mb-0">
+                            Trend: {{ ai_insights.cash_flow.summary.cash_flow_trend or 'Stable' }}
+                        </p>
+                    </div>
+                    {% endif %}
+
+                    {% if ai_insights.payment_patterns %}
+                    <div class="insight-card glass-card-sm p-3 mb-3">
+                        <h6 class="text-success mb-2">Payment Analysis</h6>
+                        <p class="small mb-1">
+                            Collection health:
+                            <strong>{{ ai_insights.payment_patterns.insights.overall_collection_health or 'Good'
+                                }}</strong>
+                        </p>
+
+                        {% if ai_insights.payment_patterns.insights.at_risk_clients %}
+                        <p class="small text-warning mb-0">
+                            <i data-feather="alert-triangle" size="14"></i>
+                            {{ ai_insights.payment_patterns.insights.at_risk_clients|length }} clients need attention
+                        </p>
+                        {% endif %}
+
+                    </div>
+                    {% endif %}
+
+                </div>
+                {% else %}
+                <!-- ✅ Upcoming payments fallback -->
+
+                {% if upcoming_payments %}
+                <div class="list-group list-group-flush">
+
+                    {% for payment in upcoming_payments %}
+                    <div class="list-group-item border-0 px-0">
+                        <div class="d-flex justify-content-between align-items-center">
+
+                            <div>
+                                <h6 class="mb-1">{{ payment.client.name }}</h6>
+                                <small class="text-muted">{{ payment.invoice_number }}</small>
+                            </div>
+
+                            <div class="text-end">
+                                <strong>₹{{ "%.2f"|format(payment.total_amount) }}</strong>
+                            </div>
+
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="text-center">
-                            <h4 class="text-success">{{ blockchain_stats.verified_invoices or 0 }}</h4>
-                            <small class="text-muted">Verified Invoices</small>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="text-center">
-                            <h4 class="text-primary">{{ blockchain_stats.total_transactions or 0 }}</h4>
-                            <small class="text-muted">Transactions</small>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="text-center">
-                            <span class="badge bg-{{ 'success' if blockchain_stats.chain_integrity else 'danger' }} p-2">
-                                <i data-feather="{{ 'check' if blockchain_stats.chain_integrity else 'x' }}" size="16"></i>
-                                {{ 'Secure' if blockchain_stats.chain_integrity else 'Error' }}
-                            </span>
-                            <br><small class="text-muted">Chain Integrity</small>
+                    {% endfor %}
+
+                </div>
+                {% else %}
+                <p class="text-muted">No upcoming payments.</p>
+                {% endif %}
+                {% endif %}
+
+
+
+                <!-- ================= RECENT INVOICES ================= -->
+                <div id="recent-invoices" class="row mb-4">
+                    <div class="col-12">
+
+                        <div class="glass-card p-4">
+
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="fw-bold mb-0">Recent Invoices</h5>
+
+                                <a href="{{ url_for('invoice_management') }}" class="btn btn-sm btn-outline-primary">
+                                    View All
+                                </a>
+                            </div>
+
+                            {% if recent_invoices %}
+                            <div class="table-responsive" style="overflow-x:auto;">
+                                <table class="table table-hover align-middle w-100 table-fixed">
+
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 140px;">Invoice #</th>
+                                            <th style="width: 120px;">Client</th>
+                                            <th style="width: 90px;">Total</th>
+                                            <th style="width: 90px;">Paid</th>
+                                            <th style="width: 100px;">Balance</th>
+                                            <th style="width: 80px;">Status</th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody>
+                                        {% for invoice in recent_invoices %}
+                                        <tr>
+
+                                            <!-- Invoice Number -->
+                                            <td style="max-width:140px; word-break:break-word;">
+                                                <a href="{{ url_for('invoice_detail', id=invoice.id) }}"
+                                                    class="text-decoration-none fw-semibold">
+                                                    {{ invoice.invoice_number }}
+                                                </a>
+                                            </td>
+
+                                            <td
+                                                style=" max-width:120px; white-space: normal; word-break: break-word; overflow-wrap: break-word;">
+                                                {{ invoice.client.name }}
+                                            </td>
+
+                                            <td>₹{{ "%.2f"|format(invoice.total_amount) }}</td>
+                                            <td>₹{{ "%.2f"|format(invoice.amount_paid or 0) }}</td>
+
+                                            <td>
+                                                ₹{{ "%.2f"|format(invoice.total_amount - (invoice.amount_paid or 0)) }}
+                                            </td>
+
+                                            <td>
+                                                {% if invoice.payment_status == 'Paid' %}
+                                                <span class="badge bg-success">Paid</span>
+                                                {% elif invoice.payment_status == 'Partially Paid' %}
+                                                <span class="badge bg-warning text-dark">Partial</span>
+                                                {% else %}
+                                                <span class="badge bg-danger">Unpaid</span>
+                                                {% endif %}
+                                            </td>
+
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="text-center py-4">
+                                <p class="text-muted">No invoices found.</p>
+                            </div>
+                            {% endif %}
+
+
                         </div>
                     </div>
                 </div>
+
+                <!-- Blockchain Status (if enabled) -->
+                {% if blockchain_enabled and blockchain_stats %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="glass-card p-4">
+                            <h5 class="fw-bold mb-3">
+                                <i data-feather="shield" class="me-2 text-info"></i>
+                                Blockchain Status
+                            </h5>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <h4 class="text-info">{{ blockchain_stats.total_blocks or 0 }}</h4>
+                                        <small class="text-muted">Total Blocks</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <h4 class="text-success">{{ blockchain_stats.verified_invoices or 0 }}</h4>
+                                        <small class="text-muted">Verified Invoices</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <h4 class="text-primary">{{ blockchain_stats.total_transactions or 0 }}</h4>
+                                        <small class="text-muted">Transactions</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <span
+                                            class="badge bg-{{ 'success' if blockchain_stats.chain_integrity else 'danger' }} p-2">
+                                            <i data-feather="{{ 'check' if blockchain_stats.chain_integrity else 'x' }}"
+                                                size="16"></i>
+                                            {{ 'Secure' if blockchain_stats.chain_integrity else 'Error' }}
+                                        </span>
+                                        <br><small class="text-muted">Chain Integrity</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
             </div>
-        </div>
-    </div>
-    {% endif %}
-</div>
-{% endblock %}
 
-{% block scripts %}
-<script>
-let revenueChart;
+            <!-- Hidden data for JS -->
+            <div id="revenue-data" data-revenue='{{ monthly_revenue | tojson }}' style="display: none;"></div>
 
-// Safe backend data
-const revenueData = {{ monthly_revenue | tojson }};
+            {% endblock %}
 
-// Convert YYYY-MM → "Jan 2026"
-function formatMonth(label) {
-    const [year, month] = label.split("-");
-    const date = new Date(year, month - 1);
-    return date.toLocaleString("default", { month: "short", year: "numeric" });
-}
+            {% block scripts %}
+            <script>
+                let revenueChart;
 
-// Build calendar months dynamically
-function buildMonthSeries(monthCount) {
-    const today = new Date();
-    const result = [];
-    const currentYear = today.getFullYear();
+                // Safe backend data
+                const revenueData = JSON.parse(document.getElementById('revenue-data').dataset.revenue);
 
-    // ✅ 12M → Full current year Jan → Dec
-    if (monthCount === 12) {
-        for (let m = 0; m < 12; m++) {
-            const d = new Date(currentYear, m, 1);
-            const key = `${currentYear}-${String(m + 1).padStart(2, "0")}`;
-            const match = revenueData.find(r => r.month === key);
-
-            result.push({
-                month: key,
-                revenue: match ? match.revenue : 0
-            });
-        }
-        return result;
-    }
-
-    // ✅ 6M → Last 6 months from current month
-    for (let i = 5; i >= 0; i--) {
-        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-        const match = revenueData.find(r => r.month === key);
-
-        result.push({
-            month: key,
-            revenue: match ? match.revenue : 0
-        });
-    }
-
-    return result;
-}
-
-// Calculate max revenue for Y-axis scaling
-function getMaxRevenue(data) {
-    return Math.max(...data.map(d => d.revenue), 1000);
-}
-
-// Render chart
-function renderChart(monthCount) {
-    const filtered = buildMonthSeries(monthCount);
-
-    const labels = filtered.map(d => formatMonth(d.month));
-    const values = filtered.map(d => d.revenue);
-    const maxRevenue = getMaxRevenue(filtered);
-
-    const ctx = document.getElementById("revenueChart").getContext("2d");
-
-    if (revenueChart) {
-        revenueChart.destroy();
-    }
-
-    revenueChart = new Chart(ctx, {
-        type: "line",
-        data: {
-            labels,
-            datasets: [{
-                label: "Revenue",
-                data: values,
-                borderWidth: 3,
-                fill: true,
-                tension: 0.4,
-                pointRadius: 5
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                   suggestedMax: Math.max(maxRevenue, 5000),   // 👈 force visible scale,
-                    ticks: {
-    stepSize: 1000,               // 👈 fixed interval
-    callback: value => "₹" + value.toLocaleString()
-}
-
+                // Convert YYYY-MM → "Jan 2026"
+                function formatMonth(label) {
+                    const [year, month] = label.split("-");
+                    const date = new Date(year, month - 1);
+                    return date.toLocaleString("default", { month: "short", year: "numeric" });
                 }
-            }
-        }
-    });
-}
 
-// ================= INIT =================
-document.addEventListener("DOMContentLoaded", () => {
+                // Build calendar months dynamically
+                function buildMonthSeries(monthCount) {
+                    const today = new Date();
+                    const result = [];
+                    const currentYear = today.getFullYear();
 
-    // Default → Current 6 months
-    renderChart(6);
+                    // ✅ 12M → Full current year Jan → Dec
+                    if (monthCount === 12) {
+                        for (let m = 0; m < 12; m++) {
+                            const d = new Date(currentYear, m, 1);
+                            const key = `${currentYear}-${String(m + 1).padStart(2, "0")}`;
+                            const match = revenueData.find(r => r.month === key);
 
-    document.getElementById("revenue6m")
-        .addEventListener("change", () => renderChart(6));
+                            result.push({
+                                month: key,
+                                revenue: match ? match.revenue : 0
+                            });
+                        }
+                        return result;
+                    }
 
-    document.getElementById("revenue12m")
-        .addEventListener("change", () => renderChart(12));
-});
-</script>
-{% endblock %}
+                    // ✅ 6M → Last 6 months from current month
+                    for (let i = 5; i >= 0; i--) {
+                        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+                        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+                        const match = revenueData.find(r => r.month === key);
+
+                        result.push({
+                            month: key,
+                            revenue: match ? match.revenue : 0
+                        });
+                    }
+
+                    return result;
+                }
+
+                // Calculate max revenue for Y-axis scaling
+                function getMaxRevenue(data) {
+                    return Math.max(...data.map(d => d.revenue), 1000);
+                }
+
+                // Render chart
+                function renderChart(monthCount) {
+                    const filtered = buildMonthSeries(monthCount);
+
+                    const labels = filtered.map(d => formatMonth(d.month));
+                    const values = filtered.map(d => d.revenue);
+                    const maxRevenue = getMaxRevenue(filtered);
+
+                    const ctx = document.getElementById("revenueChart").getContext("2d");
+
+                    if (revenueChart) {
+                        revenueChart.destroy();
+                    }
+
+                    revenueChart = new Chart(ctx, {
+                        type: "line",
+                        data: {
+                            labels,
+                            datasets: [{
+                                label: "Revenue",
+                                data: values,
+                                borderWidth: 3,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 5
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    suggestedMax: Math.max(maxRevenue, 5000),   // 👈 force visible scale,
+                                    ticks: {
+                                        stepSize: 1000,               // 👈 fixed interval
+                                        callback: value => "₹" + value.toLocaleString()
+                                    }
+
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // ================= INIT =================
+                document.addEventListener("DOMContentLoaded", () => {
+
+                    // Default → Current 6 months
+                    renderChart(6);
+
+                    document.getElementById("revenue6m")
+                        .addEventListener("change", () => renderChart(6));
+
+                    document.getElementById("revenue12m")
+                        .addEventListener("change", () => renderChart(12));
+                });
+            </script>
+            {% endblock %}

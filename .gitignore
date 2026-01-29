@@ -22,7 +22,7 @@ myenv/
 # --------------------
 # Database files (local only)
 # --------------------
-instance/
+
 *.db
 *.sqlite3
 

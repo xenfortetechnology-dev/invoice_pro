@@ -126,6 +126,14 @@ class InvoiceLineItem(db.Model):
     total_amount = db.Column(db.Float, default=0.0)
     cost_price = db.Column(db.Float, default=0.0)
     
+    # Individual Tax Fields
+    cgst_percentage = db.Column(db.Float, default=0.0)
+    sgst_percentage = db.Column(db.Float, default=0.0)
+    igst_percentage = db.Column(db.Float, default=0.0)
+    cgst_amount = db.Column(db.Float, default=0.0)
+    sgst_amount = db.Column(db.Float, default=0.0)
+    igst_amount = db.Column(db.Float, default=0.0)
+    
     # AI-Enhanced Line Item Features
     ai_suggested = db.Column(db.Boolean, default=False)  # AI suggested this item
     ai_confidence_score = db.Column(db.Float, default=0.0)  # AI confidence in suggestion

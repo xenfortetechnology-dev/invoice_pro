@@ -15,18 +15,16 @@ from pdf_generator import generate_invoice_pdf, generate_challan_pdf, AnalyticsR
 from ai_services import ai_assistant, predictive_analytics, inventory_ai
 from blockchain_service import blockchain_service, smart_contract_manager
 from ocr_service import ocr_processor, receipt_processor
-from voice_service import voice_processor, voice_invoice_builder
+from voice_service import get_voice_processor, get_voice_session
 from analytics_engine import AnalyticsEngine
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 import io
 import csv
-from flask import Response, request
+from flask import Response, request, render_template_string
 
 from datetime import datetime
 from sqlalchemy import func
-
-from voice_service import VoiceCommandProcessor, VoiceInvoiceBuilder
 
 from pdf_generator import generate_quotation_pdf
 from flask import send_file
@@ -198,15 +196,31 @@ def create_invoice():
 
             line_items_data = json.loads(request.form.get('line_items', '[]'))
             subtotal = 0
-            total_tax = 0
+            total_cgst = 0
+            total_sgst = 0
+            total_igst = 0
 
             for i, item_data in enumerate(line_items_data, 1):
                 quantity = float(item_data['quantity'])
                 unit_price = float(item_data['unit_price'])
-                tax_percentage = float(item_data.get('tax_percentage', 18.0))
+                
+                # Get individual tax percentages
+                cgst_percentage = float(item_data.get('cgst_percentage', 0.0))
+                sgst_percentage = float(item_data.get('sgst_percentage', 0.0))
+                igst_percentage = float(item_data.get('igst_percentage', 0.0))
 
                 line_total = quantity * unit_price
-                tax_amount = (line_total * tax_percentage) / 100
+                
+                # Calculate individual tax amounts
+                cgst_amount = (line_total * cgst_percentage) / 100
+                sgst_amount = (line_total * sgst_percentage) / 100
+                igst_amount = (line_total * igst_percentage) / 100
+                
+                # Total tax for this line
+                tax_amount = cgst_amount + sgst_amount + igst_amount
+                
+                # For backward compatibility, use total tax percentage
+                tax_percentage = cgst_percentage + sgst_percentage + igst_percentage
 
                 line_item = InvoiceLineItem(
                     invoice_id=invoice.id,
@@ -218,6 +232,12 @@ def create_invoice():
                     unit_price=unit_price,
                     tax_percentage=tax_percentage,
                     tax_amount=tax_amount,
+                    cgst_percentage=cgst_percentage,
+                    sgst_percentage=sgst_percentage,
+                    igst_percentage=igst_percentage,
+                    cgst_amount=cgst_amount,
+                    sgst_amount=sgst_amount,
+                    igst_amount=igst_amount,
                     total_amount=line_total + tax_amount,
                     cost_price=float(item_data.get('cost_price', 0)),
                     ai_suggested=item_data.get('ai_suggested', False)
@@ -225,24 +245,21 @@ def create_invoice():
 
                 db.session.add(line_item)
                 subtotal += line_total
-                total_tax += tax_amount
+                total_cgst += cgst_amount
+                total_sgst += sgst_amount
+                total_igst += igst_amount
             db.session.commit()
 
-            # Calculate taxes based on client location
+            # Calculate invoice-level taxes
             client = Client.query.get(client_id)
             company = Company.query.first()
 
-            if client and company and client.state == company.state:
-                invoice.cgst = total_tax / 2
-                invoice.sgst = total_tax / 2
-                invoice.igst = 0
-            else:
-                invoice.igst = total_tax
-                invoice.cgst = 0
-                invoice.sgst = 0
-
+            # Set invoice totals based on what was calculated from line items
+            invoice.cgst = total_cgst
+            invoice.sgst = total_sgst
+            invoice.igst = total_igst
             invoice.subtotal = subtotal
-            invoice.total_amount = subtotal + total_tax
+            invoice.total_amount = subtotal + total_cgst + total_sgst + total_igst
 
             # Generate QR code
             invoice.qr_payment_code = generate_payment_qr_code(invoice)
@@ -297,6 +314,117 @@ def create_invoice():
     return render_template('create_invoice.html',
                            clients=clients,
                            today=datetime.now())
+
+
+@app.route('/invoice/preview', methods=['POST'])
+@login_required
+def preview_invoice():
+    """Preview invoice without saving"""
+    try:
+        # Extract form data (duplicates logic from create_invoice but doesn't save)
+        client_id = request.form.get('client_id')
+        invoice_date_str = request.form.get('invoice_date')
+        due_date_str = request.form.get('due_date')
+        notes = request.form.get('notes', '')
+        terms_conditions = request.form.get('terms_conditions', '')
+        invoice_format = request.form.get("invoice_format", "default")
+
+        # Create ephemeral objects
+        client = Client.query.get(client_id)
+        if not client:
+             return "Client not found", 404
+
+        invoice_date = datetime.strptime(invoice_date_str, '%Y-%m-%d').date() if invoice_date_str else datetime.now().date()
+        
+        # Parse Line Items
+        line_items_data = json.loads(request.form.get('line_items', '[]'))
+        
+        line_items = []
+        subtotal = 0
+        total_cgst = 0
+        total_sgst = 0
+        total_igst = 0
+
+        for i, item_data in enumerate(line_items_data, 1):
+            quantity = float(item_data.get('quantity', 0))
+            unit_price = float(item_data.get('unit_price', 0))
+            
+            cgst_percentage = float(item_data.get('cgst_percentage', 0.0))
+            sgst_percentage = float(item_data.get('sgst_percentage', 0.0))
+            igst_percentage = float(item_data.get('igst_percentage', 0.0))
+
+            line_total = quantity * unit_price
+            
+            cgst_amount = (line_total * cgst_percentage) / 100
+            sgst_amount = (line_total * sgst_percentage) / 100
+            igst_amount = (line_total * igst_percentage) / 100
+            
+            tax_amount = cgst_amount + sgst_amount + igst_amount
+            
+            # Create transient object
+            li = InvoiceLineItem(
+                sr_no=i,
+                hsn_code=item_data.get('hsn_code', ''),
+                description=item_data.get('description', ''),
+                quantity=quantity,
+                unit=item_data.get('unit', 'Nos'),
+                unit_price=unit_price,
+                cgst_percentage=cgst_percentage,
+                sgst_percentage=sgst_percentage,
+                igst_percentage=igst_percentage,
+                cgst_amount=cgst_amount,
+                sgst_amount=sgst_amount,
+                igst_amount=igst_amount,
+                total_amount=line_total + tax_amount
+            )
+            
+            line_items.append(li)
+
+            subtotal += line_total
+            total_cgst += cgst_amount
+            total_sgst += sgst_amount
+            total_igst += igst_amount
+
+        # Create transient invoice
+        invoice = Invoice(
+            invoice_number="PREVIEW",
+            invoice_date=invoice_date,
+            client=client,
+            notes=notes,
+            terms_conditions=terms_conditions,
+            subtotal=subtotal,
+            cgst=total_cgst,
+            sgst=total_sgst,
+            igst=total_igst,
+            total_amount=subtotal + total_cgst + total_sgst + total_igst,
+            invoice_format=invoice_format
+        )
+        # Manually attach line items for Jinja loop
+        invoice.line_items = line_items 
+        
+        company = Company.query.first()
+        bank = BankDetails.query.first()
+
+        # Select Template
+        template_map = {
+            "default": "invoice_detail.html",
+            "excel_customer_A": "invoice_excel_customer_A.html"
+        }
+        template_name = template_map.get(invoice_format, "invoice_detail.html")
+
+        return render_template(
+            template_name,
+            invoice=invoice,
+            company=company,
+            bank=bank,
+            blockchain_verification={},
+            ai_insights={},
+            is_preview=True
+        )
+
+    except Exception as e:
+        logging.error(f"Preview failed: {e}")
+        return f"Error creating preview: {str(e)}", 500
 
 
 @app.route('/invoice/<int:id>')
@@ -1132,77 +1260,401 @@ def inject_globals():
     }
       
 
-@app.route('/analytics/export/pdf')
+
+
+
+
+# ===== API ENDPOINTS FOR CLIENT-SIDE AI (REAL DATA) =====
+
+@app.route('/api/data/clients', methods=['GET'])
 @login_required
-def export_analytics_pdf():
+def api_get_clients_data():
+    """Get real client data for client-side AI processing"""
     try:
-        analytics_data = _get_analytics_data_dict()
-        pdf_file = report_generator.generate_pdf_report(analytics_data)
+        clients = Client.query.all()
         
-        return send_file(
-            pdf_file,
-            as_attachment=True,
-            download_name=f"analytics_report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-            mimetype="application/pdf"
-        )
+        clients_data = {
+            'total': len(clients),
+            'active': len([c for c in clients if c.total_business and c.total_business > 0]),
+            'inactive': len([c for c in clients if not c.total_business or c.total_business == 0]),
+            'clients': [{
+                'id': c.id,
+                'name': c.name,
+                'email': c.email,
+                'phone': c.phone,
+                'total_business': float(c.total_business) if c.total_business else 0,
+                'created_at': c.created_at.strftime('%Y-%m-%d') if c.created_at else None,
+                'gstin': c.gstin,
+                'pan': c.pan
+            } for c in clients]
+        }
+        
+        return jsonify(clients_data)
     except Exception as e:
-        logging.error(f"PDF export failed: {e}")
-        flash(f"Failed to export PDF: {e}", "error")
-        return redirect(url_for('analytics'))
+        logging.error(f"Error fetching clients data: {e}")
+        return jsonify({'error': str(e)}), 500
 
-@app.route('/analytics/export/excel', endpoint="analytics_export_excel")
+@app.route('/api/data/invoices', methods=['GET'])
 @login_required
-def export_analytics_excel():
+def api_get_invoices_data():
+    """Get real invoice data for client-side AI processing"""
     try:
-        analytics_data = _get_analytics_data_dict()
-        excel_file = report_generator.generate_excel_report(analytics_data)
+        invoices = Invoice.query.all()
         
-        return send_file(
-            excel_file,
-            as_attachment=True,
-            download_name=f"analytics_report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        invoices_data = {
+            'total': len(invoices),
+            'paid': len([i for i in invoices if i.payment_status == 'Paid']),
+            'unpaid': len([i for i in invoices if i.payment_status == 'Unpaid']),
+            'partial': len([i for i in invoices if i.payment_status == 'Partially Paid']),
+            'invoices': [{
+                'id': i.id,
+                'invoice_number': i.invoice_number,
+                'client_name': i.client.name if i.client else 'Unknown',
+                'total_amount': float(i.total_amount) if i.total_amount else 0,
+                'amount_paid': float(i.amount_paid) if i.amount_paid else 0,
+                'payment_status': i.payment_status,
+                'invoice_date': i.invoice_date.strftime('%Y-%m-%d') if i.invoice_date else None,
+                'due_date': i.due_date.strftime('%Y-%m-%d') if i.due_date else None
+            } for i in invoices]
+        }
+        
+        return jsonify(invoices_data)
     except Exception as e:
-        logging.error(f"Excel export failed: {e}")
-        flash(f"Failed to export Excel: {e}", "error")
-        return redirect(url_for('analytics'))
+        logging.error(f"Error fetching invoices data: {e}")
+        return jsonify({'error': str(e)}), 500
 
-
-
-voice_processor = VoiceCommandProcessor()
-
-@app.route("/api/voice-command", methods=["POST"])
-def handle_voice_command():
+@app.route('/api/data/stats', methods=['GET'])
+@login_required
+def api_get_stats_data():
+    """Get real statistics for client-side AI processing"""
     try:
-        data = request.get_json(force=True)
+        from datetime import date, timedelta
+        from sqlalchemy import func
+        
+        today = date.today()
+        start_of_month = date(today.year, today.month, 1)
+        start_of_week = today - timedelta(days=today.weekday())
+        
+        # Today's revenue
+        today_revenue = db.session.query(func.sum(Invoice.total_amount)).filter(
+            Invoice.payment_status == 'Paid',
+            Invoice.invoice_date == today
+        ).scalar() or 0
+        
+        # Week's revenue
+        week_revenue = db.session.query(func.sum(Invoice.total_amount)).filter(
+            Invoice.payment_status == 'Paid',
+            Invoice.invoice_date >= start_of_week,
+            Invoice.invoice_date <= today
+        ).scalar() or 0
+        
+        # Month's revenue
+        month_revenue = db.session.query(func.sum(Invoice.total_amount)).filter(
+            Invoice.payment_status == 'Paid',
+            Invoice.invoice_date >= start_of_month,
+            Invoice.invoice_date <= today
+        ).scalar() or 0
+        
+        # Outstanding amount
+        outstanding = db.session.query(
+            func.sum(Invoice.total_amount - Invoice.amount_paid)
+        ).filter(
+            Invoice.payment_status.in_(['Unpaid', 'Partially Paid'])
+        ).scalar() or 0
+        
+        stats_data = {
+            'revenue': {
+                'today': float(today_revenue),
+                'week': float(week_revenue),
+                'month': float(month_revenue)
+            },
+            'outstanding': float(outstanding)
+        }
+        
+        return jsonify(stats_data)
+    except Exception as e:
+        logging.error(f"Error fetching stats data: {e}")
+        return jsonify({'error': str(e)}), 500
 
-        voice_text = data.get("text", "").strip()
-        language = data.get("language", "en-IN")
-        user_id = data.get("user_id", 1)  # default for now
-
-        if not voice_text:
+@app.route('/api/ai/chat', methods=['POST'])
+@login_required
+def api_ai_chat():
+    """AI chat endpoint that uses real database data"""
+    try:
+        data = request.get_json()
+        message = data.get('message', '').lower().strip()
+        
+        # Fetch real data from database
+        clients = Client.query.all()
+        invoices = Invoice.query.all()
+        
+        # Determine active/inactive clients based on invoice activity
+        client_ids_with_invoices = set([i.client_id for i in invoices])
+        active_clients = [c for c in clients if c.id in client_ids_with_invoices]
+        inactive_clients = [c for c in clients if c.id not in client_ids_with_invoices]
+        
+        paid_invoices = [i for i in invoices if i.payment_status == 'Paid']
+        unpaid_invoices = [i for i in invoices if i.payment_status != 'Paid']
+        
+        # Calculate revenue stats
+        from datetime import date, timedelta
+        today = date.today()
+        week_ago = today - timedelta(days=7)
+        month_start = today.replace(day=1)
+        
+        today_revenue = db.session.query(func.sum(Invoice.total_amount)).filter(
+            Invoice.payment_status == 'Paid',
+            Invoice.invoice_date == today
+        ).scalar() or 0
+        
+        week_revenue = db.session.query(func.sum(Invoice.total_amount)).filter(
+            Invoice.payment_status == 'Paid',
+            Invoice.invoice_date >= week_ago
+        ).scalar() or 0
+        
+        month_revenue = db.session.query(func.sum(Invoice.total_amount)).filter(
+            Invoice.payment_status == 'Paid',
+            Invoice.invoice_date >= month_start
+        ).scalar() or 0
+        
+        outstanding = db.session.query(func.sum(Invoice.total_amount)).filter(
+            Invoice.payment_status != 'Paid'
+        ).scalar() or 0
+        
+        # ===== GREETING AND HELP PATTERNS =====
+        
+        # Follow-up queries (check FIRST before greetings to avoid conflicts)
+        if ('follow' in message and ('up' in message or 'client' in message or 'need' in message)) or ('which' in message and 'client' in message and 'need' in message):
+            if len(unpaid_invoices) > 0:
+                client_ids = set([i.client_id for i in unpaid_invoices])
+                clients_needing_followup = [c.name for c in clients if c.id in client_ids][:5]
+                return jsonify({'reply': f"📋 Clients needing follow-up: {', '.join(clients_needing_followup)}"})
+            else:
+                return jsonify({'reply': "🎉 No clients currently need follow-up for delayed payments."})
+        
+        # Greetings
+        if any(word in message for word in ['hi', 'hello', 'hey', 'hai', 'good morning', 'good afternoon', 'good evening']):
+            return jsonify({'reply': """👋 Hello! I'm your AI-powered business assistant. I can help you with:
+            <br>• Creating invoices through voice commands
+            <br>• Analyzing business performance and trends
+            <br>• Predicting client payment behavior
+            <br>• Generating insights and recommendations
+            <br>• Automating routine tasks
+            <br><br>How can I assist you today? 😊"""})
+        
+        # Help or capabilities
+        if 'help' in message or 'what can you do' in message or 'capabilities' in message:
+            return jsonify({'reply': """🤖 Here's what I can assist you with:
+            <br><br>📊 Analytics & Insights:
+            <br>• Revenue forecasting and trend analysis
+            <br>• Client payment behavior predictions
+            <br>• Business performance metrics
+            <br><br>📄 Invoice Management:
+            <br>• Create invoices via voice or text
+            <br>• Smart item suggestions based on client history
+            <br>• Automated pricing optimization
+            <br><br>👥 Client Management:
+            <br>• Risk assessment and scoring
+            <br>• Follow-up recommendations
+            <br>• Communication insights
+            <br><br>Just ask me anything about your business!"""})
+        
+        # Thank you
+        if 'thank' in message:
+            return jsonify({'reply': "🙏 You're welcome! If you need anything else, just ask."})
+        
+        # Goodbye
+        if any(word in message for word in ['bye', 'goodbye', 'exit', 'quit']):
+            return jsonify({'reply': "👋 Goodbye! Have a productive day ahead."})
+        
+        # ===== NAVIGATION PATTERNS =====
+        
+        # Analytics Dashboard
+        if ('analytics' in message or 'dashboard' in message) and ('show' in message or 'open' in message or 'go' in message or 'analytics' in message):
             return jsonify({
-                "success": False,
-                "message": "No voice text received"
-            }), 400
-
-        result = voice_processor.process(voice_text, language=language)
-
-        return jsonify(result)
-
+                'reply': "📊 Opening Analytics Dashboard... You'll see detailed insights about your business performance, revenue trends, and client analytics.",
+                'action': 'navigate',
+                'url': '/analytics'
+            })
+        
+        # Create Invoice
+        if ('create' in message or 'new' in message or 'make' in message) and 'invoice' in message:
+            return jsonify({
+                'reply': "📄 Opening Invoice Creation... You can create a new invoice for your clients.",
+                'action': 'navigate',
+                'url': '/create_invoice'
+            })
+        
+        # Client Management
+        if ('client' in message and 'management' in message) or ('show' in message and 'client' in message and 'management' in message):
+            return jsonify({
+                'reply': "👥 Opening Client Management... You can view and manage all your clients here.",
+                'action': 'navigate',
+                'url': '/clients'
+            })
+        
+        # ===== NEW CONVERSATION PATTERNS =====
+        
+        # 1. Business Health Check
+        if 'business health' in message or 'health check' in message or 'how is business' in message:
+            health = '🟢 Healthy' if month_revenue > 0 else '🟡 Needs Attention'
+            return jsonify({'reply': f"""❤️ <strong>Business Health Report:</strong>
+            <br><br>• Status: {health}
+            <br>• Active Clients: {len(active_clients)}
+            <br>• Monthly Revenue: ₹{float(month_revenue):,.2f}
+            <br>• Outstanding: ₹{float(outstanding):,.2f}
+            <br>• Unpaid Invoices: {len(unpaid_invoices)}
+            <br><br>💡 <em>Tip: Focus on following up with clients who have unpaid invoices to improve cash flow.</em>"""})
+        
+        # 2. Payment Predictions
+        if 'predict' in message or 'forecast' in message:
+            if 'revenue' in message or 'income' in message:
+                projected = float(month_revenue) * 1.15
+                return jsonify({'reply': f"""📈 <strong>Revenue Forecast:</strong>
+                <br><br>• Current Month: ₹{float(month_revenue):,.2f}
+                <br>• Projected Next Month: ₹{projected:,.2f}
+                <br>• Growth Estimate: +15%
+                <br><br>💡 Based on current trends and historical patterns."""})
+            else:
+                return jsonify({'reply': """🔮 <strong>Payment Predictions:</strong>
+                <br><br>Based on historical data:
+                <br>• Most clients pay within 7-14 days
+                <br>• Early payers: Usually within 3-5 days
+                <br>• Late payers: May take 20-30 days
+                <br><br>💡 For specific client predictions, ask "When will [Client Name] pay?\""""})
+        
+        # 3. Comparative Analysis
+        if 'compare' in message or 'comparison' in message or 'vs' in message or 'versus' in message:
+            return jsonify({'reply': f"""📊 <strong>Comparative Analysis:</strong>
+            <br><br><strong>This Week vs Last Week:</strong>
+            <br>• Revenue: ₹{float(week_revenue):,.2f}
+            <br><br><strong>This Month Performance:</strong>
+            <br>• Total Revenue: ₹{float(month_revenue):,.2f}
+            <br>• Active Clients: {len(active_clients)}
+            <br>• Invoices Created: {len(invoices)}
+            <br><br>💡 Visit the Analytics Dashboard for detailed comparisons."""})
+        
+        # 4. Top Clients Query
+        if 'top client' in message or 'best client' in message or 'biggest client' in message:
+            top_clients = clients[:5]
+            client_list = '<br>'.join([f"{i+1}. {c.name}" for i, c in enumerate(top_clients)])
+            return jsonify({'reply': f"""🌟 <strong>Top Clients:</strong>
+            <br><br>{client_list}
+            <br><br>💡 These are your most active clients. Consider offering them loyalty benefits!"""})
+        
+        # 5. Outstanding Payments
+        if 'outstanding' in message or ('pending' in message and 'payment' in message) or 'due' in message:
+            return jsonify({'reply': f"""💳 <strong>Outstanding Payments:</strong>
+            <br><br>• Total Outstanding: ₹{float(outstanding):,.2f}
+            <br>• Unpaid Invoices: {len(unpaid_invoices)}
+            <br><br>💡 <strong>Recommendation:</strong> Send payment reminders to clients with overdue invoices to improve cash flow."""})
+        
+        # 6. Reminder and Notification Queries
+        if 'reminder' in message or 'notification' in message or 'alert' in message:
+            return jsonify({'reply': f"""🔔 <strong>Active Reminders:</strong>
+            <br><br>• {len(unpaid_invoices)} unpaid invoices need follow-up
+            <br>• Outstanding amount: ₹{float(outstanding):,.2f}
+            <br><br>💡 I recommend sending payment reminders to clients with overdue invoices."""})
+        
+        # 7. Recent Activity
+        if 'recent' in message or 'latest' in message or 'last' in message:
+            if 'payment' in message:
+                return jsonify({'reply': f"""💰 <strong>Recent Payment Activity:</strong>
+                <br><br>• Paid Invoices: {len(paid_invoices)}
+                <br>• Pending Payments: {len(unpaid_invoices)}
+                <br>• Today's Revenue: ₹{float(today_revenue):,.2f}
+                <br><br>💡 Check the Analytics page for detailed payment trends."""})
+            else:
+                return jsonify({'reply': """📅 I can show you recent invoices, payments, or client activity. What would you like to see?"""})
+        
+        # 8. Export Data Requests
+        if 'export' in message or 'download' in message:
+            if 'invoice' in message:
+                return jsonify({'reply': """📥 To export invoices:
+                <br>1. Go to Invoice Management
+                <br>2. Select the invoices you want to export
+                <br>3. Click the "Export" button
+                <br><br>You can export to PDF, Excel, or CSV formats."""})
+            elif 'client' in message:
+                return jsonify({'reply': """📥 To export client data:
+                <br>1. Navigate to Client Management
+                <br>2. Use the "Export Clients" option
+                <br>3. Choose your preferred format (Excel/CSV)
+                <br><br>All client information will be included in the export."""})
+            else:
+                return jsonify({'reply': """📥 You can export invoices, client data, and reports. What would you like to export?"""})
+        
+        # 9. How-to Guides
+        if 'how to' in message or 'how do i' in message or 'how can i' in message:
+            if 'create' in message and 'invoice' in message:
+                return jsonify({'reply': """📝 <strong>How to Create an Invoice:</strong>
+                <br><br>1. Click "Create Invoice" or say "Create new invoice"
+                <br>2. Select the client
+                <br>3. Add items/services
+                <br>4. Set quantities and prices
+                <br>5. Review and save
+                <br><br>💡 You can also use voice commands to create invoices!"""})
+            elif 'add' in message and 'client' in message:
+                return jsonify({'reply': """👤 <strong>How to Add a Client:</strong>
+                <br><br>1. Go to Client Management
+                <br>2. Click "Add New Client"
+                <br>3. Fill in client details (name, email, phone, address)
+                <br>4. Save the client
+                <br><br>💡 You can also import clients from a CSV file!"""})
+            else:
+                return jsonify({'reply': """🤔 I can guide you through various tasks. What would you like to learn how to do?"""})
+        
+        # ===== EXISTING PATTERNS =====
+        
+        # Client queries
+        if 'client' in message:
+            if 'how many' in message or 'total' in message or 'count' in message:
+                return jsonify({'reply': f"👥 You have {len(clients)} clients in total."})
+            elif 'active' in message:
+                return jsonify({'reply': f"✅ Currently, you have {len(active_clients)} active clients."})
+            elif 'inactive' in message:
+                return jsonify({'reply': f"⚠️ You have {len(inactive_clients)} inactive clients."})
+            elif 'list' in message or 'name' in message:
+                client_names = ', '.join([c.name for c in clients[:10]])
+                more = '...' if len(clients) > 10 else ''
+                return jsonify({'reply': f"👥 Here are your clients: {client_names}{more}"})
+        
+        # Invoice queries
+        if 'invoice' in message:
+            if 'how many' in message or 'total' in message or 'count' in message:
+                return jsonify({'reply': f"📄 You have {len(invoices)} invoices in total."})
+            elif 'paid' in message:
+                return jsonify({'reply': f"✅ {len(paid_invoices)} invoices have been paid."})
+            elif 'unpaid' in message or 'pending' in message:
+                return jsonify({'reply': f"⏳ There are {len(unpaid_invoices)} unpaid invoices."})
+        
+        # Revenue queries
+        if 'revenue' in message or 'income' in message:
+            if 'today' in message:
+                return jsonify({'reply': f"💵 Today's revenue is ₹{float(today_revenue):,.2f}"})
+            elif 'week' in message:
+                return jsonify({'reply': f"📅 This week's revenue is ₹{float(week_revenue):,.2f}"})
+            elif 'month' in message:
+                return jsonify({'reply': f"📈 This month's revenue is ₹{float(month_revenue):,.2f}"})
+        
+        # Default fallback
+        return jsonify({'reply': """I can help you with:
+        <br>• Business health checks
+        <br>• Revenue forecasts and predictions
+        <br>• Client and invoice information
+        <br>• Outstanding payments
+        <br>• Recent activity
+        <br>• How-to guides
+        <br><br>Try asking "Show business health" or "Forecast revenue"!"""})
+            
     except Exception as e:
-        # 🔴 THIS IS THE MOST IMPORTANT PART
-        import traceback
-        traceback.print_exc()
+        logging.error(f"AI chat error: {e}")
+        return jsonify({'reply': f"Sorry, I encountered an error: {str(e)}"})
 
-        return jsonify({
-            "success": False,
-            "message": "Internal server error in voice command",
-            "error": str(e)
-        }), 500
 
-    
+# Voice command routes are now defined above (lines ~1808-1890)
+# Using get_voice_processor() and get_voice_session() functions
+
 
  
 
@@ -1348,6 +1800,7 @@ def cancel_quotation(qid):
     q = Quotation.query.get_or_404(qid)
     q.status = "Cancelled"
     db.session.commit()
+    flash("Quotation has been cancelled.", "warning")
     return redirect(url_for("quotation_preview", qid=q.id))
 
 
@@ -1475,8 +1928,205 @@ def dashboard_page():
         recent_invoices=recent_invoices,
         monthly_revenue=monthly_revenue   # ✅ NEW
     )
-    
 
+
+@app.route('/analytics/export/excel')
+@login_required
+def voice_command_api():
+    """
+    Process voice commands using script-based pattern matching
+    No AI/API dependencies - Pure regex matching
+    """
+    try:
+        data = request.get_json()
+        text = data.get('text', '').strip()
+        language = data.get('language', 'en-IN')
+        
+        if not text:
+            return jsonify({
+                'success': False,
+                'message': 'No voice input received',
+                'intent': 'error'
+            }), 400
+        
+        logging.info(f"🎤 Voice command received: '{text}' (Language: {language})")
+        
+        # Get voice processor
+        voice_processor = get_voice_processor()
+        
+        # Process command
+        result = voice_processor.process(text, language)
+        
+        logging.info(f"✅ Voice command processed: {result.get('intent')}")
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logging.error(f"❌ Voice command API error: {e}")
+        return jsonify({
+            'success': False,
+            'message': 'Error processing voice command',
+            'error': str(e),
+            'intent': 'error'
+        }), 500
+
+
+@app.route('/api/voice-session/status', methods=['GET'])
+@login_required
+def voice_session_status():
+    """Get current voice session status"""
+    try:
+        voice_session = get_voice_session()
+        
+        return jsonify({
+            'success': True,
+            'has_active_invoice': voice_session.has_active_invoice(),
+            'client_name': voice_session.active_invoice['client'].name if voice_session.active_invoice['client'] else None,
+            'item_count': len(voice_session.active_invoice['items']),
+            'total_amount': voice_session.get_total()
+        })
+        
+    except Exception as e:
+        logging.error(f"Voice session status error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/voice-session/clear', methods=['POST'])
+@login_required
+def voice_session_clear():
+    """Clear voice session"""
+    try:
+        voice_session = get_voice_session()
+        voice_session.clear()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Voice session cleared'
+        })
+        
+    except Exception as e:
+        logging.error(f"Voice session clear error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/analytics/export/excel')
+@login_required
+def export_analytics_excel():
+    """Export analytics to Excel (Saves to Downloads)"""
+    try:
+        import pandas as pd
+        time_range = request.args.get('range', '12m')
+        analytics_data = _get_analytics_data_dict(time_range)
+
+        # Generate filename and path
+        filename = f'Analytics_Report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        downloads_path = os.path.join(os.path.expanduser("~"), "Downloads")
+        file_path = os.path.join(downloads_path, filename)
+
+        with pd.ExcelWriter(file_path, engine='xlsxwriter') as writer:
+            # Sheet 1: Revenue Trends
+            if analytics_data.get('revenue_trends') and analytics_data['revenue_trends'].get('monthly_data'):
+                df_rev = pd.DataFrame(analytics_data['revenue_trends']['monthly_data'])
+                df_rev.to_excel(writer, sheet_name='Revenue', index=False)
+
+            # Sheet 2: Client Performance
+            if analytics_data.get('client_performance') and analytics_data['client_performance'].get('top_clients'):
+                # Flatten client object to dict
+                client_data = []
+                for client in analytics_data['client_performance']['top_clients']:
+                    client_data.append({
+                        'Name': client.name,
+                        'Revenue': client.total_revenue,
+                        'Invoices': client.invoice_count,
+                        'Avg Value': client.avg_invoice_value
+                    })
+                df_clients = pd.DataFrame(client_data)
+                df_clients.to_excel(writer, sheet_name='Clients', index=False)
+
+            # Sheet 3: Payment Status
+            if analytics_data.get('payment_analytics') and analytics_data['payment_analytics'].get('payment_status_distribution'):
+                df_payment = pd.DataFrame(analytics_data['payment_analytics']['payment_status_distribution'])
+                df_payment.to_excel(writer, sheet_name='Payments', index=False)
+
+        # Open file automatically
+        try:
+            os.startfile(file_path)
+        except Exception:
+            pass
+
+        return jsonify({"success": True, "message": f"Excel report saved to {file_path}", "path": file_path})
+
+    except Exception as e:
+        logging.error(f"Excel export failed: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/analytics/export/pdf')
+@login_required
+def export_analytics_pdf():
+    """Export analytics to PDF (Saves to Downloads)"""
+    try:
+        time_range = request.args.get('range', '12m')
+        analytics_data = _get_analytics_data_dict(time_range)
+
+        # Generate filename and path
+        filename = f'Analytics_Report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf'
+        downloads_path = os.path.join(os.path.expanduser("~"), "Downloads")
+        file_path = os.path.join(downloads_path, filename)
+
+        c = canvas.Canvas(file_path, pagesize=letter)
+        width, height = letter
+
+        # Header
+        c.setFont("Helvetica-Bold", 20)
+        c.drawString(50, height - 50, "Business Analytics Report")
+        c.setFont("Helvetica", 12)
+        c.drawString(50, height - 70, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+
+        y = height - 120
+
+        # Revenue Summary
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(50, y, "Revenue Summary")
+        y -= 20
+        c.setFont("Helvetica", 12)
+        if analytics_data.get('revenue_trends') and analytics_data['revenue_trends'].get('summary'):
+            summary = analytics_data['revenue_trends']['summary']
+            c.drawString(50, y, f"Total Revenue: {summary.get('total_revenue', 0)}")
+        else:
+            c.drawString(50, y, "No revenue data available.")
+        y -= 40
+
+        # Top Clients
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(50, y, "Top Clients")
+        y -= 25
+        c.setFont("Helvetica", 10)
+        if analytics_data.get('client_performance') and analytics_data['client_performance'].get('top_clients'):
+            for i, client in enumerate(analytics_data['client_performance']['top_clients'][:5]):
+                c.drawString(50, y, f"{i+1}. {client.name} - Revenue: {client.total_revenue}")
+                y -= 15
+        else:
+             c.drawString(50, y, "No client data available.")
+
+        c.save()
+
+        # Open file automatically
+        try:
+            os.startfile(file_path)
+        except Exception:
+            pass
+            
+        return jsonify({"success": True, "message": f"PDF report saved to {file_path}", "path": file_path})
+
+    except Exception as e:
+        logging.error(f"PDF export failed: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
 
 
 

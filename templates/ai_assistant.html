@@ -18,9 +18,6 @@
                     </div>
                     <div class="col-md-4 text-end">
                         <div class="d-flex gap-2 justify-content-end">
-                            <button class="btn btn-success glass-btn" id="startVoiceChat">
-                                <i data-feather="mic" class="me-1"></i> Voice Chat
-                            </button>
                             <button class="btn btn-outline-primary glass-btn" id="clearChat">
                                 <i data-feather="refresh-cw" class="me-1"></i> Clear Chat
                             </button>
@@ -30,7 +27,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- AI Assistant Interface -->
     <div class="row">
         <!-- Chat Interface -->
@@ -63,7 +60,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Chat Messages -->
                 <div class="chat-messages" id="chatMessages">
                     <!-- Welcome Message -->
@@ -73,7 +70,8 @@
                         </div>
                         <div class="message-content">
                             <div class="message-bubble ai-bubble">
-                                <p class="mb-2">👋 Hello! I'm your AI-powered business assistant. I can help you with:</p>
+                                <p class="mb-2">👋 Hello! I'm your AI-powered business assistant. I can help you with:
+                                </p>
                                 <ul class="mb-0">
                                     <li>Creating invoices through voice commands</li>
                                     <li>Analyzing business performance and trends</li>
@@ -86,41 +84,50 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Chat Input -->
                 <div class="chat-input p-3 border-top">
                     <div class="input-group">
                         <button class="btn btn-outline-secondary" id="voiceInputBtn" title="Voice Input">
                             <i data-feather="mic" size="16"></i>
                         </button>
-                        <input type="text" class="form-control glass-input" id="messageInput" 
-                               placeholder="Ask me anything about your business..." 
-                               autocomplete="off">
+                        <input type="text" class="form-control glass-input" id="messageInput"
+                            placeholder="Ask me anything about your business..." autocomplete="off">
                         <button class="btn btn-primary" id="sendMessageBtn">
                             <i data-feather="send" size="16"></i>
                         </button>
                     </div>
-                    
+
                     <!-- Quick Actions -->
                     <div class="quick-actions mt-2">
                         <small class="text-muted me-2">Quick actions:</small>
-                        <button class="btn btn-sm btn-outline-primary me-1" onclick="sendQuickMessage('Show me today\'s revenue')">
-                            📊 Today's Revenue
+                        <button class="btn btn-sm btn-primary me-1"
+                            onclick="sendQuickMessage('Show analytics dashboard')">
+                            📊 Analytics Dashboard
                         </button>
-                        <button class="btn btn-sm btn-outline-primary me-1" onclick="sendQuickMessage('Create an invoice for my top client')">
+                        <button class="btn btn-sm btn-success me-1" onclick="sendQuickMessage('Create a new invoice')">
                             📄 Create Invoice
                         </button>
-                        <button class="btn btn-sm btn-outline-primary me-1" onclick="sendQuickMessage('Which clients need follow-up?')">
-                            👥 Client Follow-up
+                        <button class="btn btn-sm btn-info me-1" onclick="sendQuickMessage('Show client management')">
+                            👥 Client Management
                         </button>
-                        <!-- <button class="btn btn-sm btn-outline-primary" onclick="sendQuickMessage('Analyze my payment trends')">
-                            💰 Payment Analysis
-                        </button> -->
+                        <button class="btn btn-sm btn-outline-primary me-1"
+                            onclick="sendQuickMessage('Show me today\'s revenue')">
+                            💰 Today's Revenue
+                        </button>
+                        <button class="btn btn-sm btn-outline-warning me-1"
+                            onclick="sendQuickMessage('Which clients need follow-up?')">
+                            🔔 Follow-ups
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary me-1"
+                            onclick="sendQuickMessage('Show business health')">
+                            ❤️ Business Health
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
-        
+
         <!-- AI Capabilities Panel -->
         <div class="col-lg-4">
             <!-- AI Features -->
@@ -129,7 +136,7 @@
                     <i data-feather="zap" class="me-2 text-warning"></i>
                     AI Capabilities
                 </h6>
-                
+
                 <div class="capability-list">
                     <div class="capability-item mb-3">
                         <div class="d-flex align-items-center">
@@ -142,7 +149,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="capability-item mb-3">
                         <div class="d-flex align-items-center">
                             <div class="capability-icon bg-primary bg-opacity-10 text-primary me-3">
@@ -154,7 +161,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="capability-item mb-3">
                         <div class="d-flex align-items-center">
                             <div class="capability-icon bg-info bg-opacity-10 text-info me-3">
@@ -166,7 +173,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="capability-item mb-3">
                         <div class="d-flex align-items-center">
                             <div class="capability-icon bg-warning bg-opacity-10 text-warning me-3">
@@ -180,57 +187,14 @@
                     </div>
                 </div>
             </div>
-            
-            <!-- Recent AI Insights -->
-            <div class="glass-card p-4 mb-4">
-                <h6 class="fw-bold mb-3">
-                    <i data-feather="lightbulb" class="me-2 text-info"></i>
-                    Recent Insights
-                </h6>
-                
-                <div class="insight-list">
-                    <div class="insight-item mb-3 p-2 glass-card-sm">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <small class="text-primary fw-medium">Payment Prediction</small>
-                                <p class="mb-1 small">Client "ABC Corp" is likely to pay 3 days early based on historical patterns.</p>
-                                <small class="text-muted">2 hours ago</small>
-                            </div>
-                            <i data-feather="trending-up" size="16" class="text-success"></i>
-                        </div>
-                    </div>
-                    
-                    <div class="insight-item mb-3 p-2 glass-card-sm">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <small class="text-success fw-medium">Revenue Forecast</small>
-                                <p class="mb-1 small">Next month's revenue projected to increase by 15% based on current trends.</p>
-                                <small class="text-muted">1 day ago</small>
-                            </div>
-                            <i data-feather="dollar-sign" size="16" class="text-primary"></i>
-                        </div>
-                    </div>
-                    
-                    <div class="insight-item mb-3 p-2 glass-card-sm">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <small class="text-warning fw-medium">Client Alert</small>
-                                <p class="mb-1 small">High-value client "XYZ Ltd" hasn't placed an order in 30 days.</p>
-                                <small class="text-muted">2 days ago</small>
-                            </div>
-                            <i data-feather="alert-triangle" size="16" class="text-warning"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
+
             <!-- AI Learning Progress -->
             <div class="glass-card p-4">
                 <h6 class="fw-bold mb-3">
                     <i data-feather="activity" class="me-2 text-success"></i>
                     AI Learning Progress
                 </h6>
-                
+
                 <div class="learning-metrics">
                     <div class="metric-item mb-3">
                         <div class="d-flex justify-content-between align-items-center mb-1">
@@ -241,7 +205,7 @@
                             <div class="progress-bar bg-success" style="width: 98%"></div>
                         </div>
                     </div>
-                    
+
                     <div class="metric-item mb-3">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <small class="text-muted">Pattern Recognition</small>
@@ -251,7 +215,7 @@
                             <div class="progress-bar bg-primary" style="width: 85%"></div>
                         </div>
                     </div>
-                    
+
                     <div class="metric-item mb-3">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <small class="text-muted">Prediction Accuracy</small>
@@ -261,7 +225,7 @@
                             <div class="progress-bar bg-info" style="width: 92%"></div>
                         </div>
                     </div>
-                    
+
                     <div class="metric-item">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <small class="text-muted">Voice Recognition</small>
@@ -272,7 +236,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="ai-stats mt-3 pt-3 border-top">
                     <div class="row text-center">
                         <div class="col-6">
@@ -323,90 +287,90 @@
 
 {% block scripts %}
 <script>
-let isRecording = false;
-let recognition = null;
-let chatMessages = [];
+    let isRecording = false;
+    let recognition = null;
+    let chatMessages = [];
 
-document.addEventListener('DOMContentLoaded', function() {
-    initializeAIAssistant();
-    setupEventListeners();
-    
-    // Initialize speech recognition if available
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-        initializeSpeechRecognition();
-    }
-});
+    document.addEventListener('DOMContentLoaded', function () {
+        initializeAIAssistant();
+        setupEventListeners();
 
-function initializeAIAssistant() {
-    // Add welcome message to chat history
-    chatMessages.push({
-        type: 'ai',
-        content: 'Hello! I\'m your AI assistant. How can I help you today?',
-        timestamp: new Date()
-    });
-    
-    // Auto-scroll to bottom
-    scrollChatToBottom();
-}
-
-function setupEventListeners() {
-    // Send message on Enter key
-    document.getElementById('messageInput').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            sendMessage();
+        // Initialize speech recognition if available
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            initializeSpeechRecognition();
         }
     });
-    
-    // Send button click
-    document.getElementById('sendMessageBtn').addEventListener('click', sendMessage);
-    
-    // Voice input button
-    document.getElementById('voiceInputBtn').addEventListener('click', startVoiceInput);
-    
-    // Start voice chat button
-    document.getElementById('startVoiceChat').addEventListener('click', startVoiceChat);
-    
-    // Clear chat button
-    document.getElementById('clearChat').addEventListener('click', clearChat);
-}
 
-function sendMessage() {
-    const input = document.getElementById('messageInput');
-    const message = input.value.trim();
-    
-    if (message) {
-        // Add user message
-        addMessage('user', message);
-        input.value = '';
-        
-        // Show typing indicator
-        showTypingIndicator();
-        
-        // Simulate AI processing and response
-        setTimeout(() => {
-            hideTypingIndicator();
-            processAIResponse(message);
-        }, 1500);
+    function initializeAIAssistant() {
+        // Add welcome message to chat history
+        chatMessages.push({
+            type: 'ai',
+            content: 'Hello! I\'m your AI assistant. How can I help you today?',
+            timestamp: new Date()
+        });
+
+        // Auto-scroll to bottom
+        scrollChatToBottom();
     }
-}
 
-function sendQuickMessage(message) {
-    document.getElementById('messageInput').value = message;
-    sendMessage();
-}
+    function setupEventListeners() {
+        // Send message on Enter key
+        document.getElementById('messageInput').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
 
-function addMessage(type, content, timestamp = new Date()) {
-    const messagesContainer = document.getElementById('chatMessages');
-    const messageElement = document.createElement('div');
-    messageElement.className = `message ${type}-message`;
-    
-    const avatar = type === 'ai' ? 
-        '<div class="message-avatar"><i data-feather="cpu" size="20" class="text-primary"></i></div>' :
-        '<div class="message-avatar user-avatar">U</div>';
-    
-    const bubbleClass = type === 'ai' ? 'ai-bubble' : 'user-bubble';
-    
-    messageElement.innerHTML = `
+        // Send button click
+        document.getElementById('sendMessageBtn').addEventListener('click', sendMessage);
+
+        // Voice input button
+        document.getElementById('voiceInputBtn').addEventListener('click', startVoiceInput);
+
+        // Start voice chat button
+        document.getElementById('startVoiceChat').addEventListener('click', startVoiceChat);
+
+        // Clear chat button
+        document.getElementById('clearChat').addEventListener('click', clearChat);
+    }
+
+    function sendMessage() {
+        const input = document.getElementById('messageInput');
+        const message = input.value.trim();
+
+        if (message) {
+            // Add user message
+            addMessage('user', message);
+            input.value = '';
+
+            // Show typing indicator
+            showTypingIndicator();
+
+            // Simulate AI processing and response
+            setTimeout(() => {
+                hideTypingIndicator();
+                processAIResponse(message);
+            }, 1500);
+        }
+    }
+
+    function sendQuickMessage(message) {
+        document.getElementById('messageInput').value = message;
+        sendMessage();
+    }
+
+    function addMessage(type, content, timestamp = new Date()) {
+        const messagesContainer = document.getElementById('chatMessages');
+        const messageElement = document.createElement('div');
+        messageElement.className = `message ${type}-message`;
+
+        const avatar = type === 'ai' ?
+            '<div class="message-avatar"><i data-feather="cpu" size="20" class="text-primary"></i></div>' :
+            '<div class="message-avatar user-avatar">U</div>';
+
+        const bubbleClass = type === 'ai' ? 'ai-bubble' : 'user-bubble';
+
+        messageElement.innerHTML = `
         ${avatar}
         <div class="message-content">
             <div class="message-bubble ${bubbleClass}">
@@ -415,26 +379,26 @@ function addMessage(type, content, timestamp = new Date()) {
             <small class="text-muted">${formatTime(timestamp)}</small>
         </div>
     `;
-    
-    messagesContainer.appendChild(messageElement);
-    
-    // Replace feather icons
-    feather.replace();
-    
-    // Scroll to bottom
-    scrollChatToBottom();
-    
-    // Store in chat history
-    chatMessages.push({ type, content, timestamp });
-}
 
-function showTypingIndicator() {
-    const messagesContainer = document.getElementById('chatMessages');
-    const typingElement = document.createElement('div');
-    typingElement.className = 'message ai-message typing-indicator';
-    typingElement.id = 'typingIndicator';
-    
-    typingElement.innerHTML = `
+        messagesContainer.appendChild(messageElement);
+
+        // Replace feather icons
+        feather.replace();
+
+        // Scroll to bottom
+        scrollChatToBottom();
+
+        // Store in chat history
+        chatMessages.push({ type, content, timestamp });
+    }
+
+    function showTypingIndicator() {
+        const messagesContainer = document.getElementById('chatMessages');
+        const typingElement = document.createElement('div');
+        typingElement.className = 'message ai-message typing-indicator';
+        typingElement.id = 'typingIndicator';
+
+        typingElement.innerHTML = `
         <div class="message-avatar">
             <i data-feather="cpu" size="20" class="text-primary"></i>
         </div>
@@ -448,147 +412,157 @@ function showTypingIndicator() {
             </div>
         </div>
     `;
-    
-    messagesContainer.appendChild(typingElement);
-    feather.replace();
-    scrollChatToBottom();
-}
 
-function hideTypingIndicator() {
-    const typingIndicator = document.getElementById('typingIndicator');
-    if (typingIndicator) {
-        typingIndicator.remove();
+        messagesContainer.appendChild(typingElement);
+        feather.replace();
+        scrollChatToBottom();
     }
-}
 
-function processAIResponse(message) {
-    fetch("/api/ai/chat", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ message })
-    })
-    .then(res => res.json())
-    .then(data => {
-        // ✅ AI replied successfully
-        if (data.reply) {
-            addMessage("ai", data.reply);
-            return;
+    function hideTypingIndicator() {
+        const typingIndicator = document.getElementById('typingIndicator');
+        if (typingIndicator) {
+            typingIndicator.remove();
         }
+    }
 
-        // ⚠️ AI unavailable → fallback
-        console.warn("AI unavailable, using local logic", data);
-        const fallback = generateAIResponse(message);
-        addMessage("ai", fallback);
-    })
-    .catch(err => {
-        console.error("AI server error", err);
-        const fallback = generateAIResponse(message);
-        addMessage("ai", fallback);
-    });
-}
+    function processAIResponse(message) {
+        fetch("/api/ai/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message })
+        })
+            .then(res => res.json())
+            .then(data => {
+                // ✅ AI replied successfully
+                if (data.reply) {
+                    addMessage("ai", data.reply);
+
+                    // Handle navigation action
+                    if (data.action === 'navigate' && data.url) {
+                        setTimeout(() => {
+                            window.location.href = data.url;
+                        }, 1000);
+                    }
+                    return;
+                }
+
+                // ⚠️ AI unavailable → fallback
+                console.warn("AI unavailable, using local logic", data);
+                const fallback = generateAIResponse(message);
+                addMessage("ai", fallback);
+            })
+            .catch(err => {
+                console.error("AI server error", err);
+                const fallback = generateAIResponse(message);
+                addMessage("ai", fallback);
+            });
+    }
 
 
-// const demoData = {
-//     clients: {
-//         total: 52,
-//         active: 41,
-//         inactive: 11,
-//         activeNames: [
-//             "ABC Corp", "Tech Solutions", "Innovate Ltd", "Green Energy",
-//             "FutureWorks", "Blue Ocean", "Bright Minds", "Starline Co", "NextGen"
-//         ],
-//         inactiveNames: ["XYZ Ltd", "OldTown Inc", "Legacy Systems"],
-//         details: {
-//             "ABC Corp": {
-//                 status: "Active",
-//                 lastInvoice: "2025-12-01",
-//                 outstandingAmount: "₹15,000",
-//                 lastPaymentDate: "2025-11-28"
-//             },
-//             "Tech Solutions": {
-//                 status: "Active",
-//                 lastInvoice: "2025-12-05",
-//                 outstandingAmount: "₹0",
-//                 lastPaymentDate: "2025-12-02"
-//             },
-//             "XYZ Ltd": {
-//                 status: "Inactive",
-//                 lastInvoice: "2025-09-15",
-//                 outstandingAmount: "₹45,000",
-//                 lastPaymentDate: "2025-09-10"
-//             }
-//         }
-        
-//     },
-//     invoices: {
-//         total: 182,
-//         paid: 146,
-//         unpaid: 26,
-//         overdue: 10,
-//         byClient: {
-//             "ABC Corp": 12,
-//             "Tech Solutions": 8,
-//             "XYZ Ltd": 5,
-//             "Innovate Ltd": 10,
-//             "Green Energy": 7,
-//             "OldTown Inc": 4,
-//             "FutureWorks": 9,
-//             "Legacy Systems": 2,
-//             "Blue Ocean": 6,
-//             "Bright Minds": 9,
-//             "Starline Co": 5,
-//             "NextGen": 5
-//         }
-//     },
-//     payments: {
-//         delayedClients: ["XYZ Ltd", "OldTown Inc"],
-//         earlyPayers: ["ABC Corp", "Bright Minds"],
-//         averageDelayDays: 8.5,
-//         successRate: 94.2
-//     },
-//     finance: {
-//     incomeToday: 32000,
-//     incomeWeek: 150000,      
-//     incomeMonth: 425000,
-//     incomeYear: 5100000,
-//     revenueToday: 36000,
-//     revenueWeek: 170000,      
-//     revenueMonth: 468000,
-//     revenueYear: 5600000,
-//     profitMonth: 283000,
-//     expensesMonth: 185000,
-//     growth: "15%"
-// }
+    // const demoData = {
+    //     clients: {
+    //         total: 52,
+    //         active: 41,
+    //         inactive: 11,
+    //         activeNames: [
+    //             "ABC Corp", "Tech Solutions", "Innovate Ltd", "Green Energy",
+    //             "FutureWorks", "Blue Ocean", "Bright Minds", "Starline Co", "NextGen"
+    //         ],
+    //         inactiveNames: ["XYZ Ltd", "OldTown Inc", "Legacy Systems"],
+    //         details: {
+    //             "ABC Corp": {
+    //                 status: "Active",
+    //                 lastInvoice: "2025-12-01",
+    //                 outstandingAmount: "₹15,000",
+    //                 lastPaymentDate: "2025-11-28"
+    //             },
+    //             "Tech Solutions": {
+    //                 status: "Active",
+    //                 lastInvoice: "2025-12-05",
+    //                 outstandingAmount: "₹0",
+    //                 lastPaymentDate: "2025-12-02"
+    //             },
+    //             "XYZ Ltd": {
+    //                 status: "Inactive",
+    //                 lastInvoice: "2025-09-15",
+    //                 outstandingAmount: "₹45,000",
+    //                 lastPaymentDate: "2025-09-10"
+    //             }
+    //         }
 
-// };
+    //     },
+    //     invoices: {
+    //         total: 182,
+    //         paid: 146,
+    //         unpaid: 26,
+    //         overdue: 10,
+    //         byClient: {
+    //             "ABC Corp": 12,
+    //             "Tech Solutions": 8,
+    //             "XYZ Ltd": 5,
+    //             "Innovate Ltd": 10,
+    //             "Green Energy": 7,
+    //             "OldTown Inc": 4,
+    //             "FutureWorks": 9,
+    //             "Legacy Systems": 2,
+    //             "Blue Ocean": 6,
+    //             "Bright Minds": 9,
+    //             "Starline Co": 5,
+    //             "NextGen": 5
+    //         }
+    //     },
+    //     payments: {
+    //         delayedClients: ["XYZ Ltd", "OldTown Inc"],
+    //         earlyPayers: ["ABC Corp", "Bright Minds"],
+    //         averageDelayDays: 8.5,
+    //         successRate: 94.2
+    //     },
+    //     finance: {
+    //     incomeToday: 32000,
+    //     incomeWeek: 150000,      
+    //     incomeMonth: 425000,
+    //     incomeYear: 5100000,
+    //     revenueToday: 36000,
+    //     revenueWeek: 170000,      
+    //     revenueMonth: 468000,
+    //     revenueYear: 5600000,
+    //     profitMonth: 283000,
+    //     expensesMonth: 185000,
+    //     growth: "15%"
+    // }
 
-function generateAIResponse(message) {
-    const msg = message.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+    // };
 
-    // Greeting
-    if (/^(hi|hello|hey|hai|good)/.test(msg)) {
-        return `👋 Hello! I'm your AI-powered business assistant. I can help you with:
+    function generateAIResponse(message) {
+        const msg = message.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+
+        // Use real data from AILocal if available
+        const realData = window.AILocal ? window.AILocal.getRealData() : null;
+
+        // Greeting
+        if (/^(hi|hello|hey|hai|good)/.test(msg)) {
+            return `👋 Hello! I'm your AI-powered business assistant. I can help you with:
         <br>• Creating invoices through voice commands
         <br>• Analyzing business performance and trends
         <br>• Predicting client payment behavior
         <br>• Generating insights and recommendations
         <br>• Automating routine tasks
         <br>How can I assist you today? 😊`;
-    }
+        }
 
-  // Asking assistant's name or role (ONLY bot-related)
-if (
-    (msg.includes('your name') || msg.includes('who are you')) &&
-    !msg.includes('client') &&
-    !msg.includes('company')
-) {
-    return `🤖 I'm your AI-powered business assistant, built to manage clients, invoices, payments, income, and business insights.`;
-}
+        // Asking assistant's name or role (ONLY bot-related)
+        if (
+            (msg.includes('your name') || msg.includes('who are you')) &&
+            !msg.includes('client') &&
+            !msg.includes('company')
+        ) {
+            return `🤖 I'm your AI-powered business assistant, built to manage clients, invoices, payments, income, and business insights.`;
+        }
 
 
-    // Help or capabilities
-    if (msg.includes('help') || msg.includes('what can you do')) {
-        return `🤖 Here's what I can assist you with:
+        // Help or capabilities
+        if (msg.includes('help') || msg.includes('what can you do')) {
+            return `🤖 Here's what I can assist you with:
         <br><br>📊 Analytics & Insights:
         <br>• Revenue forecasting and trend analysis
         <br>• Client payment behavior predictions
@@ -602,544 +576,735 @@ if (
         <br>• Follow-up recommendations
         <br>• Communication insights
         <br><br>Just ask me anything about your business!`;
-    }
+        }
 
-    // Total clients
-    if ((msg.includes('how many') || msg.includes('total') || msg.includes('number')) && (msg.includes('client') || msg.includes('company'))) {
-        return `👥 You have a total of ${demoData.clients.total} clients.`;
-    }
+        // ===== NEW CONVERSATION PATTERNS =====
 
-    // Active clients count
-    if ((msg.includes('active') && (msg.includes('client') || msg.includes('company'))) && !(msg.includes('name'))) {
-        return `✅ Currently, you have ${demoData.clients.active} active clients.`;
-    }
+        // 1. Navigation Commands - Analytics Dashboard
+        if (msg.includes('analytics') || msg.includes('dashboard') || (msg.includes('show') && msg.includes('analytics'))) {
+            setTimeout(() => window.location.href = '/analytics', 500);
+            return `📊 Opening Analytics Dashboard... You'll see detailed insights about your business performance, revenue trends, and client analytics.`;
+        }
 
-    if (
-    (msg.includes('client') || msg.includes('clients') || msg.includes('company') || msg.includes('companies')) &&
-    (msg.includes('details') || msg.includes('name') || msg.includes('names') || msg.includes('list'))
-) {
-    let response = `👥 <strong>Client Details:</strong><br><br>`;
-    response += `✅ <strong>Active Clients (${demoData.clients.active}):</strong><br><ul>`;
-    demoData.clients.activeNames.forEach(name => {
-        response += `<li>${name}</li>`;
-    });
-    response += `</ul><br>⚠️ <strong>Inactive Clients (${demoData.clients.inactive}):</strong><br><ul>`;
-    demoData.clients.inactiveNames.forEach(name => {
-        response += `<li>${name}</li>`;
-    });
-    response += `</ul>`;
-    return response;
-}
+        // 2. Navigation - Create Invoice
+        if ((msg.includes('create') || msg.includes('new') || msg.includes('make')) && msg.includes('invoice')) {
+            setTimeout(() => window.location.href = '/create_invoice', 500);
+            return `📄 Opening Invoice Creation... You can create a new invoice for your clients.`;
+        }
+
+        // 3. Navigation - Client Management
+        if ((msg.includes('client') && msg.includes('management')) || (msg.includes('show') && msg.includes('client'))) {
+            setTimeout(() => window.location.href = '/client_management', 500);
+            return `👥 Opening Client Management... You can view and manage all your clients here.`;
+        }
+
+        // 4. Business Health Check
+        if (msg.includes('business health') || msg.includes('health check') || msg.includes('how is business')) {
+            if (realData && realData.stats) {
+                const health = realData.stats.revenue.month > 0 ? '🟢 Healthy' : '🟡 Needs Attention';
+                return `❤️ <strong>Business Health Report:</strong>
+            <br><br>• Status: ${health}
+            <br>• Active Clients: ${realData.clients.active}
+            <br>• Monthly Revenue: ₹${realData.stats.revenue.month.toLocaleString('en-IN')}
+            <br>• Outstanding: ₹${realData.stats.outstanding.toLocaleString('en-IN')}
+            <br>• Unpaid Invoices: ${realData.invoices.unpaid}
+            <br><br>💡 <em>Tip: Focus on following up with clients who have unpaid invoices to improve cash flow.</em>`;
+            }
+            return `❤️ To check your business health, I need access to your data. Please ensure the system is connected.`;
+        }
+
+        // 5. Export Data Requests
+        if (msg.includes('export') || msg.includes('download')) {
+            if (msg.includes('invoice')) {
+                return `📥 To export invoices:
+            <br>1. Go to Invoice Management
+            <br>2. Select the invoices you want to export
+            <br>3. Click the "Export" button
+            <br><br>You can export to PDF, Excel, or CSV formats.`;
+            }
+            if (msg.includes('client')) {
+                return `📥 To export client data:
+            <br>1. Navigate to Client Management
+            <br>2. Use the "Export Clients" option
+            <br>3. Choose your preferred format (Excel/CSV)
+            <br><br>All client information will be included in the export.`;
+            }
+            return `📥 You can export invoices, client data, and reports. What would you like to export?`;
+        }
+
+        // 6. Reminder and Notification Queries
+        if (msg.includes('reminder') || msg.includes('notification') || msg.includes('alert')) {
+            if (realData && realData.invoices) {
+                return `🔔 <strong>Active Reminders:</strong>
+            <br><br>• ${realData.invoices.unpaid} unpaid invoices need follow-up
+            <br>• Outstanding amount: ₹${realData.stats.outstanding.toLocaleString('en-IN')}
+            <br><br>💡 I recommend sending payment reminders to clients with overdue invoices.`;
+            }
+            return `🔔 I can help you set up reminders for payments, follow-ups, and important dates. What would you like to be reminded about?`;
+        }
+
+        // 7. Payment Predictions
+        if (msg.includes('predict') || msg.includes('forecast') || msg.includes('when will')) {
+            if (msg.includes('payment') || msg.includes('pay')) {
+                return `🔮 <strong>Payment Predictions:</strong>
+            <br><br>Based on historical data:
+            <br>• Most clients pay within 7-14 days
+            <br>• Early payers: Usually within 3-5 days
+            <br>• Late payers: May take 20-30 days
+            <br><br>💡 For specific client predictions, ask "When will [Client Name] pay?"`;
+            }
+            if (msg.includes('revenue') || msg.includes('income')) {
+                if (realData && realData.stats) {
+                    const projected = Math.round(realData.stats.revenue.month * 1.15);
+                    return `📈 <strong>Revenue Forecast:</strong>
+                <br><br>• Current Month: ₹${realData.stats.revenue.month.toLocaleString('en-IN')}
+                <br>• Projected Next Month: ₹${projected.toLocaleString('en-IN')}
+                <br>• Growth Estimate: +15%
+                <br><br>💡 Based on current trends and historical patterns.`;
+                }
+            }
+            return `🔮 I can predict payments, revenue, and client behavior. What would you like to forecast?`;
+        }
+
+        // 8. Comparative Analysis
+        if (msg.includes('compare') || msg.includes('comparison') || msg.includes('vs') || msg.includes('versus')) {
+            if (realData && realData.stats) {
+                return `📊 <strong>Comparative Analysis:</strong>
+            <br><br><strong>This Week vs Last Week:</strong>
+            <br>• Revenue: ₹${realData.stats.revenue.week.toLocaleString('en-IN')}
+            <br><br><strong>This Month Performance:</strong>
+            <br>• Total Revenue: ₹${realData.stats.revenue.month.toLocaleString('en-IN')}
+            <br>• Active Clients: ${realData.clients.active}
+            <br>• Invoices Created: ${realData.invoices.total}
+            <br><br>💡 Visit the Analytics Dashboard for detailed comparisons.`;
+            }
+            return `📊 I can compare revenue, client activity, and performance across different time periods. What would you like to compare?`;
+        }
+
+        // 9. Top Clients Query
+        if (msg.includes('top client') || msg.includes('best client') || msg.includes('biggest client')) {
+            if (realData && realData.clients && realData.clients.clients) {
+                const topClients = realData.clients.clients.slice(0, 5).map(c => c.name);
+                return `🌟 <strong>Top Clients:</strong>
+            <br><br>${topClients.map((name, i) => `${i + 1}. ${name}`).join('<br>')}
+            <br><br>💡 These are your most active clients. Consider offering them loyalty benefits!`;
+            }
+            return `🌟 I can show you your top clients based on revenue and activity. Let me fetch that data for you.`;
+        }
+
+        // 10. Recent Activity
+        if (msg.includes('recent') || msg.includes('latest') || msg.includes('last')) {
+            if (msg.includes('invoice')) {
+                return `📄 <strong>Recent Invoices:</strong>
+            <br><br>To view your latest invoices, visit the Invoice Management page.
+            <br><br>You can filter by:
+            <br>• Date created
+            <br>• Payment status
+            <br>• Client name
+            <br>• Amount`;
+            }
+            if (msg.includes('payment')) {
+                if (realData && realData.invoices) {
+                    return `💰 <strong>Recent Payment Activity:</strong>
+                <br><br>• Paid Invoices: ${realData.invoices.paid}
+                <br>• Pending Payments: ${realData.invoices.unpaid}
+                <br>• Today's Revenue: ₹${realData.stats.revenue.today.toLocaleString('en-IN')}
+                <br><br>💡 Check the Analytics page for detailed payment trends.`;
+                }
+            }
+            return `📅 I can show you recent invoices, payments, or client activity. What would you like to see?`;
+        }
+
+        // 11. Help with Specific Tasks
+        if (msg.includes('how to') || msg.includes('how do i') || msg.includes('how can i')) {
+            if (msg.includes('create') && msg.includes('invoice')) {
+                return `📝 <strong>How to Create an Invoice:</strong>
+            <br><br>1. Click "Create Invoice" or say "Create new invoice"
+            <br>2. Select the client
+            <br>3. Add items/services
+            <br>4. Set quantities and prices
+            <br>5. Review and save
+            <br><br>💡 You can also use voice commands to create invoices!`;
+            }
+            if (msg.includes('add') && msg.includes('client')) {
+                return `👤 <strong>How to Add a Client:</strong>
+            <br><br>1. Go to Client Management
+            <br>2. Click "Add New Client"
+            <br>3. Fill in client details (name, email, phone, address)
+            <br>4. Save the client
+            <br><br>💡 You can also import clients from a CSV file!`;
+            }
+            return `🤔 I can guide you through various tasks. What would you like to learn how to do?`;
+        }
+
+        // 12. Outstanding Payments
+        if (msg.includes('outstanding') || msg.includes('pending') || msg.includes('due')) {
+            if (realData && realData.stats) {
+                return `💳 <strong>Outstanding Payments:</strong>
+            <br><br>• Total Outstanding: ₹${realData.stats.outstanding.toLocaleString('en-IN')}
+            <br>• Unpaid Invoices: ${realData.invoices.unpaid}
+            <br><br>💡 <strong>Recommendation:</strong> Send payment reminders to clients with overdue invoices to improve cash flow.`;
+            }
+            return `💳 I can show you all outstanding payments and help you follow up with clients.`;
+        }
+
+        // ===== EXISTING PATTERNS (with real data integration) =====
+
+        // Total clients
+        if ((msg.includes('how many') || msg.includes('total') || msg.includes('number')) && (msg.includes('client') || msg.includes('company'))) {
+            if (realData && realData.clients) {
+                return `👥 You have a total of ${realData.clients.total} clients.`;
+            }
+            return `👥 Loading client data... Please wait a moment.`;
+        }
+
+        // Active clients count
+        if ((msg.includes('active') && (msg.includes('client') || msg.includes('company'))) && !(msg.includes('name'))) {
+            return `✅ Currently, you have ${demoData.clients.active} active clients.`;
+        }
+
+        if (
+            (msg.includes('client') || msg.includes('clients') || msg.includes('company') || msg.includes('companies')) &&
+            (msg.includes('details') || msg.includes('name') || msg.includes('names') || msg.includes('list'))
+        ) {
+            let response = `👥 <strong>Client Details:</strong><br><br>`;
+            response += `✅ <strong>Active Clients (${demoData.clients.active}):</strong><br><ul>`;
+            demoData.clients.activeNames.forEach(name => {
+                response += `<li>${name}</li>`;
+            });
+            response += `</ul><br>⚠️ <strong>Inactive Clients (${demoData.clients.inactive}):</strong><br><ul>`;
+            demoData.clients.inactiveNames.forEach(name => {
+                response += `<li>${name}</li>`;
+            });
+            response += `</ul>`;
+            return response;
+        }
 
 
-    for (const companyName in demoData.clients.details) {
-        if (msg.includes(companyName.toLowerCase())) {
-            const details = demoData.clients.details[companyName];
-            return `🏢 Details for <strong>${companyName}</strong>:
+        for (const companyName in demoData.clients.details) {
+            if (msg.includes(companyName.toLowerCase())) {
+                const details = demoData.clients.details[companyName];
+                return `🏢 Details for <strong>${companyName}</strong>:
             <br>• Status: ${details.status}
             <br>• Last Invoice Date: ${details.lastInvoice}
             <br>• Outstanding Amount: ${details.outstandingAmount}
             <br>• Last Payment Date: ${details.lastPaymentDate}`;
-        }
-    }
-
-    // Inactive clients count
-   if (
-    (msg.includes('inactive')) &&
-    (msg.includes('client') || msg.includes('company')) &&
-    (msg.includes('name') || msg.includes('names'))
-) {
-    return `⚠️ <strong>Inactive Client Names (${demoData.clients.inactive}):</strong>
-    <br><ul>
-    ${demoData.clients.inactiveNames.map(n => `<li>${n}</li>`).join('')}
-    </ul>`;
-}
-
-if (
- (msg.includes('how many') || msg.includes('total') || msg.includes('number')) &&
- (msg.includes('client') || msg.includes('company'))
-) {
-   return `👥 You have a total of ${demoData.clients.total} clients.`;
-}
-
-    // Active clients names
-    if (msg.includes('active') && msg.includes('name') && (msg.includes('client') || msg.includes('company'))) {
-        return `✅ Active clients are: ${demoData.clients.activeNames.join(', ')}`;
-    }
-
-    // Inactive clients names
-    if (msg.includes('inactive') && msg.includes('name') && (msg.includes('client') || msg.includes('company'))) {
-        return `⚠️ Inactive clients are: ${demoData.clients.inactiveNames.join(', ')}`;
-    }
-
-    // All clients names
-    if ((msg.includes('all') || msg.includes('list')) && msg.includes('name') && (msg.includes('client') || msg.includes('company'))) {
-        const allClients = demoData.clients.activeNames.concat(demoData.clients.inactiveNames);
-        return `👥 All your clients are: ${allClients.join(', ')}`;
-    }
-
-    // Invoices related queries
-    if (msg.includes('invoice')) {
-        if (msg.includes('how many') || msg.includes('total') || msg.includes('count')) {
-            return `📄 You have a total of ${demoData.invoices.total} invoices.`;
-        }
-        if (msg.includes('paid')) {
-            return `✅ ${demoData.invoices.paid} invoices have been paid.`;
-        }
-        if (msg.includes('unpaid') || msg.includes('pending')) {
-            return `⏳ There are ${demoData.invoices.unpaid} unpaid invoices.`;
-        }
-        if (msg.includes('overdue') || msg.includes('late')) {
-            return `⚠️ You have ${demoData.invoices.overdue} overdue invoices that need attention.`;
-        }
-
-        // Ask invoice count per client
-        for (const client of demoData.clients.activeNames.concat(demoData.clients.inactiveNames)) {
-            if (msg.includes(client.toLowerCase())) {
-                const count = demoData.invoices.byClient[client] || 0;
-                return `📄 ${client} has ${count} invoice(s) in the system.`;
             }
         }
 
-        return `📄 How can I assist with your invoices? You can ask about total invoices, paid/unpaid counts, overdue invoices, or invoice counts by client name.`;
-    }
+        // Inactive clients count
+        if (
+            (msg.includes('inactive')) &&
+            (msg.includes('client') || msg.includes('company')) &&
+            (msg.includes('name') || msg.includes('names'))
+        ) {
+            return `⚠️ <strong>Inactive Client Names (${demoData.clients.inactive}):</strong>
+    <br><ul>
+    ${demoData.clients.inactiveNames.map(n => `<li>${n}</li>`).join('')}
+    </ul>`;
+        }
 
-    if (msg.includes('followup') || (msg.includes('need') && msg.includes('followup')) || msg.includes('follow up')) {
-    // Using delayedClients array as clients needing follow-up
-    if (demoData.payments.delayedClients.length > 0) {
-        return `📋 Clients needing follow-up for delayed payments are: ${demoData.payments.delayedClients.join(', ')}.`;
-    } else {
-        return `🎉 No clients currently need follow-up for delayed payments.`;
-    }
-}
-    // Payment related queries
-if (
-  msg.includes('payment') ||
-  msg.includes('paying') ||
-  msg.includes('payer') ||
-  msg.includes('paid')
-) {
-  if (msg.includes('early')) {
-    return `🌟 Early paying clients are: ${demoData.payments.earlyPayers.join(', ')}.`;
-  }
+        if (
+            (msg.includes('how many') || msg.includes('total') || msg.includes('number')) &&
+            (msg.includes('client') || msg.includes('company'))
+        ) {
+            return `👥 You have a total of ${demoData.clients.total} clients.`;
+        }
 
-  if (msg.includes('delay') || msg.includes('late')) {
-    return `⏳ Clients with delayed payments: ${demoData.payments.delayedClients.join(', ')}.`;
-  }
+        // Active clients names
+        if (msg.includes('active') && msg.includes('name') && (msg.includes('client') || msg.includes('company'))) {
+            return `✅ Active clients are: ${demoData.clients.activeNames.join(', ')}`;
+        }
 
-  if (msg.includes('success')) {
-    return `✅ Payment success rate is ${demoData.payments.successRate}%.`;
-  }
-}
-    // Income or Revenue queries
-if (msg.includes('income') || msg.includes('revenue')) {
+        // Inactive clients names
+        if (msg.includes('inactive') && msg.includes('name') && (msg.includes('client') || msg.includes('company'))) {
+            return `⚠️ Inactive clients are: ${demoData.clients.inactiveNames.join(', ')}`;
+        }
 
-    const wantsTotal = !(msg.includes('today') || msg.includes('month') || msg.includes('year') || msg.includes('week'));
+        // All clients names
+        if ((msg.includes('all') || msg.includes('list')) && msg.includes('name') && (msg.includes('client') || msg.includes('company'))) {
+            const allClients = demoData.clients.activeNames.concat(demoData.clients.inactiveNames);
+            return `👥 All your clients are: ${allClients.join(', ')}`;
+        }
 
-    if (wantsTotal) {
-        const totalIncome = demoData.finance.incomeToday + demoData.finance.incomeWeek + demoData.finance.incomeMonth + demoData.finance.incomeYear;
-        return `💰 Your total income across available periods (today, week, month, year) is ₹${totalIncome.toLocaleString()}. 
+        // Invoices related queries
+        if (msg.includes('invoice')) {
+            if (msg.includes('how many') || msg.includes('total') || msg.includes('count')) {
+                return `📄 You have a total of ${demoData.invoices.total} invoices.`;
+            }
+            if (msg.includes('paid')) {
+                return `✅ ${demoData.invoices.paid} invoices have been paid.`;
+            }
+            if (msg.includes('unpaid') || msg.includes('pending')) {
+                return `⏳ There are ${demoData.invoices.unpaid} unpaid invoices.`;
+            }
+            if (msg.includes('overdue') || msg.includes('late')) {
+                return `⚠️ You have ${demoData.invoices.overdue} overdue invoices that need attention.`;
+            }
+
+            // Ask invoice count per client
+            for (const client of demoData.clients.activeNames.concat(demoData.clients.inactiveNames)) {
+                if (msg.includes(client.toLowerCase())) {
+                    const count = demoData.invoices.byClient[client] || 0;
+                    return `📄 ${client} has ${count} invoice(s) in the system.`;
+                }
+            }
+
+            return `📄 How can I assist with your invoices? You can ask about total invoices, paid/unpaid counts, overdue invoices, or invoice counts by client name.`;
+        }
+
+        if (msg.includes('followup') || (msg.includes('need') && msg.includes('followup')) || msg.includes('follow up')) {
+            // Using delayedClients array as clients needing follow-up
+            if (demoData.payments.delayedClients.length > 0) {
+                return `📋 Clients needing follow-up for delayed payments are: ${demoData.payments.delayedClients.join(', ')}.`;
+            } else {
+                return `🎉 No clients currently need follow-up for delayed payments.`;
+            }
+        }
+        // Payment related queries
+        if (
+            msg.includes('payment') ||
+            msg.includes('paying') ||
+            msg.includes('payer') ||
+            msg.includes('paid')
+        ) {
+            if (msg.includes('early')) {
+                return `🌟 Early paying clients are: ${demoData.payments.earlyPayers.join(', ')}.`;
+            }
+
+            if (msg.includes('delay') || msg.includes('late')) {
+                return `⏳ Clients with delayed payments: ${demoData.payments.delayedClients.join(', ')}.`;
+            }
+
+            if (msg.includes('success')) {
+                return `✅ Payment success rate is ${demoData.payments.successRate}%.`;
+            }
+        }
+        // Income or Revenue queries
+        if (msg.includes('income') || msg.includes('revenue')) {
+
+            const wantsTotal = !(msg.includes('today') || msg.includes('month') || msg.includes('year') || msg.includes('week'));
+
+            if (wantsTotal) {
+                const totalIncome = demoData.finance.incomeToday + demoData.finance.incomeWeek + demoData.finance.incomeMonth + demoData.finance.incomeYear;
+                return `💰 Your total income across available periods (today, week, month, year) is ₹${totalIncome.toLocaleString()}. 
         <br>You can also ask for income or revenue by day, week, month, or year separately.`;
-    }
+            }
 
-    if (msg.includes('today')) {
-        return `💵 Today's income is ₹${demoData.finance.incomeToday.toLocaleString()}. Revenue today is ₹${demoData.finance.revenueToday.toLocaleString()}.`;
-    }
-    if (msg.includes('week')) {
-        return `📅 This week's income is ₹${demoData.finance.incomeWeek.toLocaleString()}. Revenue this week is ₹${demoData.finance.revenueWeek.toLocaleString()}.`;
-    }
-    if (msg.includes('month')) {
-        return `📈 This month's income is ₹${demoData.finance.incomeMonth.toLocaleString()}. Revenue for this month is ₹${demoData.finance.revenueMonth.toLocaleString()}. Profit is ₹${demoData.finance.profitMonth.toLocaleString()}. Expenses are ₹${demoData.finance.expensesMonth.toLocaleString()}. Growth is ${demoData.finance.growth}.`;
-    }
-    if (msg.includes('year')) {
-        return `📊 Year to date income is ₹${demoData.finance.incomeYear.toLocaleString()}. Revenue is ₹${demoData.finance.revenueYear.toLocaleString()}.`;
-    }
+            if (msg.includes('today')) {
+                return `💵 Today's income is ₹${demoData.finance.incomeToday.toLocaleString()}. Revenue today is ₹${demoData.finance.revenueToday.toLocaleString()}.`;
+            }
+            if (msg.includes('week')) {
+                return `📅 This week's income is ₹${demoData.finance.incomeWeek.toLocaleString()}. Revenue this week is ₹${demoData.finance.revenueWeek.toLocaleString()}.`;
+            }
+            if (msg.includes('month')) {
+                return `📈 This month's income is ₹${demoData.finance.incomeMonth.toLocaleString()}. Revenue for this month is ₹${demoData.finance.revenueMonth.toLocaleString()}. Profit is ₹${demoData.finance.profitMonth.toLocaleString()}. Expenses are ₹${demoData.finance.expensesMonth.toLocaleString()}. Growth is ${demoData.finance.growth}.`;
+            }
+            if (msg.includes('year')) {
+                return `📊 Year to date income is ₹${demoData.finance.incomeYear.toLocaleString()}. Revenue is ₹${demoData.finance.revenueYear.toLocaleString()}.`;
+            }
 
-    return `💰 You can ask for income or revenue details for today, week, this month, or this year.`;
-}
+            return `💰 You can ask for income or revenue details for today, week, this month, or this year.`;
+        }
 
 
 
-    // Greetings for thanks or bye
-    if (msg.includes('thank')) {
-        return `🙏 You're welcome! If you need anything else, just ask.`;
-    }
+        // Greetings for thanks or bye
+        if (msg.includes('thank')) {
+            return `🙏 You're welcome! If you need anything else, just ask.`;
+        }
 
-    if (msg.includes('bye') || msg.includes('exit') || msg.includes('quit')) {
-        return `👋 Goodbye! Have a productive day ahead.`;
-    }
+        if (msg.includes('bye') || msg.includes('exit') || msg.includes('quit')) {
+            return `👋 Goodbye! Have a productive day ahead.`;
+        }
 
-    // If user asks for client details but message is unclear
-    if (msg.includes('client') || msg.includes('company')) {
-        return `🤔 I understand you want client info. Please be specific.
+        // If user asks for client details but message is unclear
+        if (msg.includes('client') || msg.includes('company')) {
+            return `🤔 I understand you want client info. Please be specific.
         <br>Example questions:
         <br>• "List active clients"
         <br>• "Show inactive client names"
         <br>• "How many clients do I have?"
         <br>• "Invoices for ABC Corp"
         <br>• "Payment status of XYZ Ltd"`;
-    }
+        }
 
-    // If no match found
-    return `🤔 Sorry, I couldn't understand your request clearly.
+        // If no match found
+        return `🤔 Sorry, I couldn't understand your request clearly.
     <br>Please try asking differently or be more specific.
     <br>Try examples like:
     <br>• "Show monthly revenue"
     <br>• "Create invoice for ABC Corp"
     <br>• "Analyze payment delays"
     <br>• "List active clients"`;
-}
+    }
 
 
-function initializeSpeechRecognition() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    if (SpeechRecognition) {
-        recognition = new SpeechRecognition();
-        recognition.continuous = false;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-        
-        recognition.onstart = function() {
-            isRecording = true;
-            document.getElementById('voiceStatus').textContent = 'Listening... Speak now';
-        };
-        
-        recognition.onresult = function(event) {
-            let finalTranscript = '';
-            
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                if (event.results[i].isFinal) {
-                    finalTranscript += event.results[i][0].transcript;
+    function initializeSpeechRecognition() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+
+            recognition.onstart = function () {
+                isRecording = true;
+                document.getElementById('voiceStatus').textContent = 'Listening... Speak now';
+            };
+
+            recognition.onresult = function (event) {
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    }
                 }
-            }
-            
-            if (finalTranscript) {
-                document.getElementById('messageInput').value = finalTranscript;
-                document.getElementById('voiceStatus').textContent = 'Voice input captured successfully!';
-            }
-        };
-        
-        recognition.onerror = function(event) {
-            console.error('Speech recognition error:', event.error);
-            document.getElementById('voiceStatus').textContent = 'Voice recognition failed. Please try again.';
-        };
-        
-        recognition.onend = function() {
-            isRecording = false;
-            hideVoiceModal();
-        };
+
+                if (finalTranscript) {
+                    document.getElementById('messageInput').value = finalTranscript;
+                    document.getElementById('voiceStatus').textContent = 'Voice input captured successfully!';
+                }
+            };
+
+            recognition.onerror = function (event) {
+                console.error('Speech recognition error:', event.error);
+                document.getElementById('voiceStatus').textContent = 'Voice recognition failed. Please try again.';
+            };
+
+            recognition.onend = function () {
+                isRecording = false;
+                hideVoiceModal();
+            };
+        }
     }
-}
 
-function startVoiceInput() {
-    if (recognition && !isRecording) {
-        showVoiceModal();
-        recognition.start();
-    } else {
-        alert('Voice recognition is not supported in this browser.');
+    function startVoiceInput() {
+        if (recognition && !isRecording) {
+            showVoiceModal();
+            recognition.start();
+        } else {
+            alert('Voice recognition is not supported in this browser.');
+        }
     }
-}
 
-function startVoiceChat() {
-    if (recognition) {
-        addMessage('ai', '🎤 Voice chat mode activated! You can now speak your commands and I\'ll respond. Try saying "Show me today\'s revenue" or "Create invoice for ABC Corp".');
-        startVoiceInput();
-    } else {
-        alert('Voice features are not supported in this browser.');
+    function startVoiceChat() {
+        if (recognition) {
+            addMessage('ai', '🎤 Voice chat mode activated! You can now speak your commands and I\'ll respond. Try saying "Show me today\'s revenue" or "Create invoice for ABC Corp".');
+            startVoiceInput();
+        } else {
+            alert('Voice features are not supported in this browser.');
+        }
     }
-}
 
-function showVoiceModal() {
-    const modal = new bootstrap.Modal(document.getElementById('voiceRecordingModal'));
-    modal.show();
-}
-
-function hideVoiceModal() {
-    const modal = bootstrap.Modal.getInstance(document.getElementById('voiceRecordingModal'));
-    if (modal) {
-        modal.hide();
+    function showVoiceModal() {
+        const modal = new bootstrap.Modal(document.getElementById('voiceRecordingModal'));
+        modal.show();
     }
-}
 
-function clearChat() {
-    if (confirm('Are you sure you want to clear the chat history?')) {
+    function hideVoiceModal() {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('voiceRecordingModal'));
+        if (modal) {
+            modal.hide();
+        }
+    }
+
+    function clearChat() {
+        if (confirm('Are you sure you want to clear the chat history?')) {
+            const messagesContainer = document.getElementById('chatMessages');
+            messagesContainer.innerHTML = '';
+            chatMessages = [];
+
+            // Add welcome message back
+            setTimeout(() => {
+                addMessage('ai', '👋 Chat cleared! How can I assist you today?');
+            }, 300);
+        }
+    }
+
+    function scrollChatToBottom() {
         const messagesContainer = document.getElementById('chatMessages');
-        messagesContainer.innerHTML = '';
-        chatMessages = [];
-        
-        // Add welcome message back
-        setTimeout(() => {
-            addMessage('ai', '👋 Chat cleared! How can I assist you today?');
-        }, 300);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
-}
 
-function scrollChatToBottom() {
-    const messagesContainer = document.getElementById('chatMessages');
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-}
-
-function formatTime(date) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-// Voice recording modal event listeners
-document.getElementById('stopRecording')?.addEventListener('click', function() {
-    if (recognition && isRecording) {
-        recognition.stop();
+    function formatTime(date) {
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
-});
 
-document.getElementById('pauseRecording')?.addEventListener('click', function() {
-    if (recognition && isRecording) {
-        recognition.stop();
-    }
-});
+    // Voice recording modal event listeners
+    document.getElementById('stopRecording')?.addEventListener('click', function () {
+        if (recognition && isRecording) {
+            recognition.stop();
+        }
+    });
+
+    document.getElementById('pauseRecording')?.addEventListener('click', function () {
+        if (recognition && isRecording) {
+            recognition.stop();
+        }
+    });
 </script>
 
 <style>
-.chat-container {
-    height: 600px;
-    display: flex;
-    flex-direction: column;
-}
-
-.chat-header {
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-}
-
-.ai-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: rgba(59, 130, 246, 0.1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.status-indicator {
-    width: 8px;
-    height: 8px;
-    background: #10b981;
-    border-radius: 50%;
-    display: inline-block;
-    margin-right: 5px;
-    animation: pulse 2s infinite;
-}
-
-.ai-status-indicators {
-    display: flex;
-    gap: 8px;
-}
-
-.indicator {
-    padding: 4px;
-    border-radius: 4px;
-    background: rgba(0, 0, 0, 0.05);
-}
-
-.indicator.active {
-    color: #10b981;
-}
-
-.chat-messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 20px;
-    background: rgba(255, 255, 255, 0.02);
-}
-
-.message {
-    display: flex;
-    margin-bottom: 20px;
-    align-items: flex-start;
-}
-
-.user-message {
-    flex-direction: row-reverse;
-}
-
-.message-avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 12px;
-    flex-shrink: 0;
-}
-
-.user-avatar {
-    background: rgba(59, 130, 246, 0.1);
-    color: #3b82f6;
-    font-weight: bold;
-}
-
-.message-content {
-    max-width: 70%;
-}
-
-.user-message .message-content {
-    text-align: right;
-}
-
-.message-bubble {
-    padding: 12px 16px;
-    border-radius: 18px;
-    margin-bottom: 4px;
-    word-wrap: break-word;
-}
-
-.ai-bubble {
-    background: rgba(59, 130, 246, 0.1);
-    border: 1px solid rgba(59, 130, 246, 0.2);
-    color: #1f2937;
-}
-
-.user-bubble {
-    background: #3b82f6;
-    color: white;
-}
-
-.typing-indicator .typing-dots {
-    display: flex;
-    gap: 4px;
-}
-
-.typing-dots span {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #6b7280;
-    animation: typing 1.4s infinite;
-}
-
-.typing-dots span:nth-child(2) {
-    animation-delay: 0.2s;
-}
-
-.typing-dots span:nth-child(3) {
-    animation-delay: 0.4s;
-}
-
-.quick-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-    align-items: center;
-}
-
-.capability-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.insight-item {
-    transition: transform 0.2s ease;
-}
-
-.insight-item:hover {
-    transform: translateX(5px);
-}
-
-.progress {
-    height: 6px;
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 3px;
-}
-
-.voice-animation {
-    position: relative;
-    width: 120px;
-    height: 120px;
-    margin: 0 auto;
-}
-
-.pulse-rings {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-}
-
-.pulse-ring {
-    position: absolute;
-    border: 2px solid #3b82f6;
-    border-radius: 50%;
-    animation: pulse-ring 2s infinite;
-}
-
-.pulse-ring:nth-child(1) {
-    animation-delay: 0s;
-}
-
-.pulse-ring:nth-child(2) {
-    animation-delay: 0.6s;
-}
-
-.pulse-ring:nth-child(3) {
-    animation-delay: 1.2s;
-}
-
-.voice-icon {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 60px;
-    height: 60px;
-    background: rgba(59, 130, 246, 0.1);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-}
-
-@keyframes typing {
-    0%, 60%, 100% { transform: translateY(0); }
-    30% { transform: translateY(-10px); }
-}
-
-@keyframes pulse-ring {
-    0% {
-        transform: scale(0.8);
-        opacity: 1;
+    .chat-container {
+        height: 600px;
+        display: flex;
+        flex-direction: column;
     }
-    100% {
-        transform: scale(2);
-        opacity: 0;
+
+    .chat-header {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
     }
-}
 
-/* Scrollbar styling */
-.chat-messages::-webkit-scrollbar {
-    width: 6px;
-}
+    .ai-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: rgba(59, 130, 246, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
 
-.chat-messages::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 3px;
-}
+    .status-indicator {
+        width: 8px;
+        height: 8px;
+        background: #10b981;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 5px;
+        animation: pulse 2s infinite;
+    }
 
-.chat-messages::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 3px;
-}
+    .ai-status-indicators {
+        display: flex;
+        gap: 8px;
+    }
 
-.chat-messages::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.5);
-}
+    .indicator {
+        padding: 4px;
+        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.05);
+    }
+
+    .indicator.active {
+        color: #10b981;
+    }
+
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        background: rgba(255, 255, 255, 0.02);
+    }
+
+    .message {
+        display: flex;
+        margin-bottom: 20px;
+        align-items: flex-start;
+    }
+
+    .user-message {
+        flex-direction: row-reverse;
+    }
+
+    .message-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 12px;
+        flex-shrink: 0;
+    }
+
+    .user-avatar {
+        background: rgba(59, 130, 246, 0.1);
+        color: #3b82f6;
+        font-weight: bold;
+    }
+
+    .message-content {
+        max-width: 70%;
+    }
+
+    .user-message .message-content {
+        text-align: right;
+    }
+
+    .message-bubble {
+        padding: 12px 16px;
+        border-radius: 18px;
+        margin-bottom: 4px;
+        word-wrap: break-word;
+    }
+
+    .ai-bubble {
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        color: #1f2937;
+    }
+
+    .user-bubble {
+        background: #3b82f6;
+        color: white;
+    }
+
+    .typing-indicator .typing-dots {
+        display: flex;
+        gap: 4px;
+    }
+
+    .typing-dots span {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #6b7280;
+        animation: typing 1.4s infinite;
+    }
+
+    .typing-dots span:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+
+    .typing-dots span:nth-child(3) {
+        animation-delay: 0.4s;
+    }
+
+    .quick-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        align-items: center;
+    }
+
+    .capability-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .insight-item {
+        transition: transform 0.2s ease;
+    }
+
+    .insight-item:hover {
+        transform: translateX(5px);
+    }
+
+    .progress {
+        height: 6px;
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 3px;
+    }
+
+    .voice-animation {
+        position: relative;
+        width: 120px;
+        height: 120px;
+        margin: 0 auto;
+    }
+
+    .pulse-rings {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+    }
+
+    .pulse-ring {
+        position: absolute;
+        border: 2px solid #3b82f6;
+        border-radius: 50%;
+        animation: pulse-ring 2s infinite;
+    }
+
+    .pulse-ring:nth-child(1) {
+        animation-delay: 0s;
+    }
+
+    .pulse-ring:nth-child(2) {
+        animation-delay: 0.6s;
+    }
+
+    .pulse-ring:nth-child(3) {
+        animation-delay: 1.2s;
+    }
+
+    .voice-icon {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 60px;
+        height: 60px;
+        background: rgba(59, 130, 246, 0.1);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    @keyframes pulse {
+
+        0%,
+        100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.5;
+        }
+    }
+
+    @keyframes typing {
+
+        0%,
+        60%,
+        100% {
+            transform: translateY(0);
+        }
+
+        30% {
+            transform: translateY(-10px);
+        }
+    }
+
+    @keyframes pulse-ring {
+        0% {
+            transform: scale(0.8);
+            opacity: 1;
+        }
+
+        100% {
+            transform: scale(2);
+            opacity: 0;
+        }
+    }
+
+    /* Scrollbar styling */
+    .chat-messages::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .chat-messages::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 3px;
+    }
+
+    .chat-messages::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 3px;
+    }
+
+    .chat-messages::-webkit-scrollbar-thumb:hover {
+        background: rgba(0, 0, 0, 0.5);
+    }
 </style>
 {% endblock %}

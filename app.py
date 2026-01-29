@@ -67,6 +67,12 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # --------------------------------------------------
+# Template Configuration (Auto-reload for development)
+# --------------------------------------------------
+app.config["TEMPLATES_AUTO_RELOAD"] = True
+
+
+# --------------------------------------------------
 # Feature Flags & Settings
 # --------------------------------------------------
 app.config["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
