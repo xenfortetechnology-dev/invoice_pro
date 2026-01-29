@@ -714,7 +714,7 @@ Subject to local jurisdiction only.</textarea>
         openInvoiceFormatModal();
     });
 
-    // Preview button - validate and open in new tab without saving
+    // Preview button - submit to preview endpoint
     document.getElementById("previewBtn").addEventListener("click", function () {
         const clientId = document.getElementById('client_id').value;
         const rows = document.querySelectorAll('.item-row');
@@ -735,7 +735,44 @@ Subject to local jurisdiction only.</textarea>
             return;
         }
 
-        alert('Preview functionality: This would show a preview without saving.\nFor now, please use Save Invoice to create and view the invoice.');
+        // Prepare line items JSON
+        const lineItems = [];
+        rows.forEach(row => {
+            const description = row.querySelector('[name="description"]').value.trim();
+            if (description) {
+                const quantity = parseFloat(row.querySelector('[name="quantity"]').value) || 0;
+                const unitPrice = parseFloat(row.querySelector('[name="unit_price"]').value) || 0;
+                const cgstPercent = parseFloat(row.querySelector('[name="cgst_percentage"]').value) || 0;
+                const sgstPercent = parseFloat(row.querySelector('[name="sgst_percentage"]').value) || 0;
+                const igstPercent = parseFloat(row.querySelector('[name="igst_percentage"]').value) || 0;
+
+                lineItems.push({
+                    hsn_code: row.querySelector('[name="hsn_code"]').value,
+                    description: description,
+                    quantity: quantity,
+                    unit: row.querySelector('[name="unit"]').value,
+                    unit_price: unitPrice,
+                    cgst_percentage: cgstPercent,
+                    sgst_percentage: sgstPercent,
+                    igst_percentage: igstPercent
+                });
+            }
+        });
+        document.getElementById('line_items').value = JSON.stringify(lineItems);
+
+        // Change form action to preview and submit
+        const form = document.getElementById('invoiceForm');
+        const originalAction = form.action;
+        const originalTarget = form.target;
+
+        form.action = "{{ url_for('preview_invoice') }}";
+        form.target = "_blank"; // Always open preview in new tab
+        form.submit();
+
+        // Restore form
+        setTimeout(() => {
+            form.action = originalAction;
+        }, 100);
     });
 
 

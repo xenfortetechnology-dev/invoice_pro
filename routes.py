@@ -21,7 +21,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 import io
 import csv
-from flask import Response, request
+from flask import Response, request, render_template_string
 
 from datetime import datetime
 from sqlalchemy import func
@@ -314,6 +314,117 @@ def create_invoice():
     return render_template('create_invoice.html',
                            clients=clients,
                            today=datetime.now())
+
+
+@app.route('/invoice/preview', methods=['POST'])
+@login_required
+def preview_invoice():
+    """Preview invoice without saving"""
+    try:
+        # Extract form data (duplicates logic from create_invoice but doesn't save)
+        client_id = request.form.get('client_id')
+        invoice_date_str = request.form.get('invoice_date')
+        due_date_str = request.form.get('due_date')
+        notes = request.form.get('notes', '')
+        terms_conditions = request.form.get('terms_conditions', '')
+        invoice_format = request.form.get("invoice_format", "default")
+
+        # Create ephemeral objects
+        client = Client.query.get(client_id)
+        if not client:
+             return "Client not found", 404
+
+        invoice_date = datetime.strptime(invoice_date_str, '%Y-%m-%d').date() if invoice_date_str else datetime.now().date()
+        
+        # Parse Line Items
+        line_items_data = json.loads(request.form.get('line_items', '[]'))
+        
+        line_items = []
+        subtotal = 0
+        total_cgst = 0
+        total_sgst = 0
+        total_igst = 0
+
+        for i, item_data in enumerate(line_items_data, 1):
+            quantity = float(item_data.get('quantity', 0))
+            unit_price = float(item_data.get('unit_price', 0))
+            
+            cgst_percentage = float(item_data.get('cgst_percentage', 0.0))
+            sgst_percentage = float(item_data.get('sgst_percentage', 0.0))
+            igst_percentage = float(item_data.get('igst_percentage', 0.0))
+
+            line_total = quantity * unit_price
+            
+            cgst_amount = (line_total * cgst_percentage) / 100
+            sgst_amount = (line_total * sgst_percentage) / 100
+            igst_amount = (line_total * igst_percentage) / 100
+            
+            tax_amount = cgst_amount + sgst_amount + igst_amount
+            
+            # Create transient object
+            li = InvoiceLineItem(
+                sr_no=i,
+                hsn_code=item_data.get('hsn_code', ''),
+                description=item_data.get('description', ''),
+                quantity=quantity,
+                unit=item_data.get('unit', 'Nos'),
+                unit_price=unit_price,
+                cgst_percentage=cgst_percentage,
+                sgst_percentage=sgst_percentage,
+                igst_percentage=igst_percentage,
+                cgst_amount=cgst_amount,
+                sgst_amount=sgst_amount,
+                igst_amount=igst_amount,
+                total_amount=line_total + tax_amount
+            )
+            
+            line_items.append(li)
+
+            subtotal += line_total
+            total_cgst += cgst_amount
+            total_sgst += sgst_amount
+            total_igst += igst_amount
+
+        # Create transient invoice
+        invoice = Invoice(
+            invoice_number="PREVIEW",
+            invoice_date=invoice_date,
+            client=client,
+            notes=notes,
+            terms_conditions=terms_conditions,
+            subtotal=subtotal,
+            cgst=total_cgst,
+            sgst=total_sgst,
+            igst=total_igst,
+            total_amount=subtotal + total_cgst + total_sgst + total_igst,
+            invoice_format=invoice_format
+        )
+        # Manually attach line items for Jinja loop
+        invoice.line_items = line_items 
+        
+        company = Company.query.first()
+        bank = BankDetails.query.first()
+
+        # Select Template
+        template_map = {
+            "default": "invoice_detail.html",
+            "excel_customer_A": "invoice_excel_customer_A.html"
+        }
+        template_name = template_map.get(invoice_format, "invoice_detail.html")
+
+        return render_template(
+            template_name,
+            invoice=invoice,
+            company=company,
+            bank=bank,
+            blockchain_verification={},
+            ai_insights={},
+            is_preview=True
+        )
+
+    except Exception as e:
+        logging.error(f"Preview failed: {e}")
+        return f"Error creating preview: {str(e)}", 500
 
 
 @app.route('/invoice/<int:id>')

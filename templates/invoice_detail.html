@@ -156,9 +156,9 @@
                 <td style="white-space: pre-line;">{{ item.description | replace('\n', '<br>') | safe }}</td>
                 <td style="text-align: center;">{{ item.quantity }}</td>
                 <td style="text-align: right;">₹{{ "{:,.2f}".format(item.unit_price) }}</td>
-                <td style="text-align: right;">₹{{ "{:,.2f}".format(item.cgst) }}</td>
-                <td style="text-align: right;">₹{{ "{:,.2f}".format(item.sgst) }}</td>
-                <td style="text-align: right;">₹{{ "{:,.2f}".format(item.igst) }}</td>
+                <td style="text-align: right;">₹{{ "{:,.2f}".format(item.cgst_amount) }}</td>
+                <td style="text-align: right;">₹{{ "{:,.2f}".format(item.sgst_amount) }}</td>
+                <td style="text-align: right;">₹{{ "{:,.2f}".format(item.igst_amount) }}</td>
                 <td style="text-align: right;">₹{{ "{:,.2f}".format(item.total_amount) }}</td>
             </tr>
             {% endfor %}
