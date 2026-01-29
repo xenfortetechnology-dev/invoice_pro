@@ -4,79 +4,103 @@
 
 <div class="container py-4">
 
-<div class="d-flex justify-content-between mb-3">
-    <h3>Quotation Preview</h3>
-    <div class="d-flex gap-2">
-        <a href="{{ url_for('quotation_form') }}" class="btn btn-secondary">New Quotation</a>
-        <a href="{{ url_for('duplicate_quotation', qid=q.id) }}" class="btn btn-warning">Duplicate</a>
-        <a href="{{ url_for('cancel_quotation', qid=q.id) }}" class="btn btn-danger">Cancel</a>
+    <div class="d-flex justify-content-between mb-3">
+        <h3>Quotation Preview</h3>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('quotation_list') }}" class="btn btn-outline-secondary">← Back to List</a>
+            <a href="{{ url_for('quotation_form') }}" class="btn btn-secondary">New Quotation</a>
+            <a href="{{ url_for('duplicate_quotation', qid=q.id) }}" class="btn btn-warning">Duplicate</a>
+            <a href="{{ url_for('cancel_quotation', qid=q.id) }}" class="btn btn-danger"
+                onclick="return confirm('Are you sure you want to cancel this quotation?')">Cancel</a>
+        </div>
     </div>
-</div>
 
-<div class="card shadow">
-<div class="card-body">
+    <div class="card shadow">
+        <div class="card-body">
 
-<h5 class="fw-bold">Quotation Details</h5>
-<hr>
+            <h5 class="fw-bold">Quotation Details</h5>
+            <hr>
 
-<div class="row mb-2">
-    <div class="col-md-4"><b>No:</b> {{ q.quotation_number }}</div>
-    <div class="col-md-4"><b>Date:</b> {{ q.quotation_date }}</div>
-    <div class="col-md-4"><b>Status:</b> {{ q.status }}</div>
-</div>
+            <div class="row mb-2">
+                <div class="col-md-4"><b>No:</b> {{ q.quotation_number }}</div>
+                <div class="col-md-4"><b>Date:</b> {{ q.quotation_date }}</div>
+                <div class="col-md-4"><b>Status:</b> {{ q.status }}</div>
+            </div>
 
-<div class="row mb-2">
-    <div class="col-md-4"><b>Validity:</b> {{ q.validity_days }} days</div>
-    <div class="col-md-4"><b>Expiry:</b> {{ q.expiry_date }}</div>
-    <div class="col-md-4"><b>Sales:</b> {{ q.sales_person }}</div>
-</div>
+            <div class="row mb-2">
+                <div class="col-md-4"><b>Validity:</b> {{ q.validity_days }} days</div>
+                <div class="col-md-4"><b>Expiry:</b> {{ q.expiry_date }}</div>
+                <div class="col-md-4"><b>Sales:</b> {{ q.sales_person }}</div>
+            </div>
 
-<div class="row mb-2">
-    <div class="col-md-6"><b>Reference:</b> {{ q.reference_id }}</div>
-</div>
+            <div class="row mb-2">
+                <div class="col-md-6"><b>Reference:</b> {{ q.reference_id }}</div>
+            </div>
 
-<hr>
+            <hr>
 
-<h5 class="fw-bold">Pricing Summary</h5>
-<table class="table table-bordered">
-<tr><td>Subtotal</td><td>{{ q.subtotal }}</td></tr>
-<tr><td>Discount</td><td>{{ q.discount }}</td></tr>
-<tr><td>Taxable</td><td>{{ q.taxable_value }}</td></tr>
-<tr><td>CGST</td><td>{{ q.cgst }}</td></tr>
-<tr><td>SGST</td><td>{{ q.sgst }}</td></tr>
-<tr><td>IGST</td><td>{{ q.igst }}</td></tr>
-<tr><td>Shipping</td><td>{{ q.shipping }}</td></tr>
-<tr><td>Rounding</td><td>{{ q.rounding }}</td></tr>
-<tr class="fw-bold"><td>Grand Total</td><td>{{ q.grand_total }}</td></tr>
-</table>
+            <h5 class="fw-bold">Pricing Summary</h5>
+            <table class="table table-bordered">
+                <tr>
+                    <td>Subtotal</td>
+                    <td>{{ q.subtotal }}</td>
+                </tr>
+                <tr>
+                    <td>Discount</td>
+                    <td>{{ q.discount }}</td>
+                </tr>
+                <tr>
+                    <td>Taxable</td>
+                    <td>{{ q.taxable_value }}</td>
+                </tr>
+                <tr>
+                    <td>CGST</td>
+                    <td>{{ q.cgst }}</td>
+                </tr>
+                <tr>
+                    <td>SGST</td>
+                    <td>{{ q.sgst }}</td>
+                </tr>
+                <tr>
+                    <td>IGST</td>
+                    <td>{{ q.igst }}</td>
+                </tr>
+                <tr>
+                    <td>Shipping</td>
+                    <td>{{ q.shipping }}</td>
+                </tr>
+                <tr>
+                    <td>Rounding</td>
+                    <td>{{ q.rounding }}</td>
+                </tr>
+                <tr class="fw-bold">
+                    <td>Grand Total</td>
+                    <td>{{ q.grand_total }}</td>
+                </tr>
+            </table>
 
-<hr>
+            <hr>
 
-<h5 class="fw-bold">Delivery / Project Terms</h5>
-<p><b>Timeline:</b> {{ q.delivery_timeline }}</p>
-<p><b>Project Scope:</b> {{ q.project_scope }}</p>
-<p><b>Milestones:</b> {{ q.milestones }}</p>
-<p><b>Warranty:</b> {{ q.warranty }}</p>
-<p><b>Revision Policy:</b> {{ q.revision_policy }}</p>
-<p><b>Dependencies:</b> {{ q.dependencies }}</p>
+            <h5 class="fw-bold">Delivery / Project Terms</h5>
+            <p><b>Timeline:</b> {{ q.delivery_timeline }}</p>
+            <p><b>Project Scope:</b> {{ q.project_scope }}</p>
+            <p><b>Milestones:</b> {{ q.milestones }}</p>
+            <p><b>Warranty:</b> {{ q.warranty }}</p>
+            <p><b>Revision Policy:</b> {{ q.revision_policy }}</p>
+            <p><b>Dependencies:</b> {{ q.dependencies }}</p>
 
-<hr>
+            <hr>
 
-<h5 class="fw-bold">Terms & Conditions</h5>
-<p>{{ q.terms }}</p>
+            <h5 class="fw-bold">Terms & Conditions</h5>
+            <p>{{ q.terms }}</p>
 
-</div>
-</div>
+        </div>
+    </div>
 
 </div>
 <hr>
 
 <div class="d-flex flex-wrap gap-2 mt-3">
-    <!-- Preview -->
-    <a href="/quotations/preview/{{ q.id }}" class="btn btn-info">
-        👁 Preview
-    </a>
-
     <!-- Download PDF -->
     <a href="/quotations/{{ q.id }}/pdf" class="btn btn-primary">
         📄 Download PDF
