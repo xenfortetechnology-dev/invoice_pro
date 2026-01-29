@@ -128,13 +128,15 @@
                     <input type="checkbox" class="form-check-input me-2" id="selectAll">
                     <label for="selectAll" class="form-check-label">Select All</label>
                     <div class="bulk-actions ms-3" style="display: none;">
-                        <button class="btn btn-outline-danger btn-sm" onclick="bulkDelete()">
-                            <i data-feather="trash-2" size="14"></i> Delete Selected
-                        </button>
-                        <button class="btn btn-outline-primary btn-sm" onclick="bulkExport()">
-                            <i data-feather="download" size="14"></i> Export Selected
-                        </button>
-                    </div>
+                    <button class="btn btn-outline-danger btn-sm me-2" onclick="bulkDelete()">
+                        <i data-feather="trash-2" size="14"></i> Delete Selected
+                    </button>
+
+                    <button class="btn btn-outline-primary btn-sm" onclick="bulkExport()">
+                        <i data-feather="download" size="14"></i> Export Selected
+                    </button>
+                </div>
+
                 </div>
                 <div class="text-muted small">
                     Showing {{ invoices.items|length }} of {{ invoices.total }} invoices
@@ -147,7 +149,7 @@
                     <thead class="table-light">
                         <tr>
                             <th width="40">
-                                <input type="checkbox" class="form-check-input" id="selectHeader">
+                                
                             </th>
                             <th>Invoice #</th>
                             <th>Client</th>
@@ -254,19 +256,13 @@
                                     </a>
 
                                     <!-- Download PDF -->
-                                    <a href="{{ url_for('invoice_pdf', id=invoice.id) }}"
+                                    <a href="#" onclick="downloadInvoice('{{ invoice.id }}'); return false;"
                                         class="btn btn-outline-secondary btn-sm" title="Download PDF">
                                         <i data-feather="download" size="14"></i>
                                     </a>
 
                                     <!-- Blockchain Verify -->
-                                    {% if blockchain_enabled %}
-                                    <button class="btn btn-outline-info btn-sm blockchain-verify-btn"
-                                        onclick="verifyInvoiceOnBlockchain('{{ invoice.id }}')"
-                                        title="Verify on Blockchain">
-                                        <i data-feather="shield" size="14"></i>
-                                    </button>
-                                    {% endif %}
+                                   
 
                                     <!-- Edit -->
                                     <button class="btn btn-outline-warning btn-sm"
@@ -483,16 +479,28 @@
 
 
     function sendInvoice(invoiceId) {
-        fetch(`/invoice/${invoiceId}/send`, { method: 'POST' })
+        console.log('Sending invoice:', invoiceId);
+        
+        fetch(`/invoice/${invoiceId}/send`, { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
                     alert(data.message);
+                    console.log('Invoice sent:', data.message);
                 } else {
-                    alert("Error: " + data.message);
+                    alert('❌ Error: ' + data.message);
+                    console.error('Send failed:', data.message);
                 }
             })
-            .catch(err => alert("Unexpected error: " + err));
+            .catch(err => {
+                console.error('Send error:', err);
+                alert('❌ Failed to send invoice: ' + err.message);
+            });
     }
 
     function verifyInvoiceOnBlockchain(invoiceId) {
@@ -546,6 +554,26 @@
             .catch(err => {
                 console.error(err);
                 alert('Failed to export invoices');
+            });
+    }
+
+    // Download invoice PDF - direct save to Downloads folder for desktop app
+    function downloadInvoice(invoiceId) {
+        console.log('Downloading invoice:', invoiceId);
+        
+        fetch(`/invoice/${invoiceId}/download-pdf`, { method: 'GET' })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ PDF downloaded successfully!\n\nSaved to Downloads folder');
+                    console.log('PDF saved to:', data.filepath);
+                } else {
+                    alert('❌ Error: ' + data.error);
+                }
+            })
+            .catch(err => {
+                console.error('Download failed:', err);
+                alert('❌ Failed to download PDF: ' + err.message);
             });
     }
 

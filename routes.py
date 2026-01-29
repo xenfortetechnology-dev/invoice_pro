@@ -351,21 +351,70 @@ def invoice_detail(id):
 )
 
 
+@app.route('/invoice/<int:id>/download-pdf')
+@login_required
+def download_invoice_pdf(id):
+    """Download PDF directly to user's Downloads folder"""
+    try:
+        invoice = Invoice.query.get_or_404(id)
+        logging.info(f"Generating PDF for invoice {id}: {invoice.invoice_number}")
+        
+        pdf_buffer = generate_invoice_pdf(invoice)
+        pdf_buffer.seek(0)
+        
+        # Get Downloads folder path
+        from pathlib import Path
+        downloads_folder = Path.home() / 'Downloads'
+        downloads_folder.mkdir(exist_ok=True)
+        
+        # Create filename and save
+        filename = f'Invoice_{invoice.invoice_number}.pdf'
+        filepath = downloads_folder / filename
+        
+        # Write PDF to file
+        with open(filepath, 'wb') as f:
+            f.write(pdf_buffer.getvalue())
+        
+        logging.info(f"PDF saved to: {filepath}")
+        return jsonify({'success': True, 'message': f'PDF saved to Downloads: {filename}', 'filepath': str(filepath)})
+        
+    except Exception as e:
+        logging.error(f"PDF download failed: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': f'Failed to save PDF: {str(e)}'}), 500
+
+
 @app.route('/invoice/<int:id>/pdf')
 @login_required
 def invoice_pdf(id):
-    """Generate PDF for invoice"""
-    invoice = Invoice.query.get_or_404(id)
+    """Generate PDF for invoice - works with both web and desktop (PyWebView)"""
     try:
+        invoice = Invoice.query.get_or_404(id)
+        logging.info(f"Generating PDF for invoice {id}: {invoice.invoice_number}")
+        
         pdf_buffer = generate_invoice_pdf(invoice)
-        return send_file(pdf_buffer,
-                        as_attachment=True,
-                        download_name=f'Invoice_{invoice.invoice_number}.pdf',
-                        mimetype='application/pdf')
+        pdf_buffer.seek(0)
+        
+        buffer_size = len(pdf_buffer.getvalue())
+        logging.info(f"PDF buffer size: {buffer_size} bytes")
+        
+        filename = f'Invoice_{invoice.invoice_number}.pdf'
+        
+        response = Response(
+            pdf_buffer.getvalue(),
+            mimetype='application/pdf',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Type': 'application/pdf',
+                'Content-Length': buffer_size
+            }
+        )
+        
+        logging.info(f"PDF response headers: {dict(response.headers)}")
+        return response
+        
     except Exception as e:
-        logging.error(f"PDF generation failed: {e}")
-        flash('Error generating PDF', 'error')
-        return redirect(url_for('invoice_detail', id=id))
+        logging.error(f"PDF generation failed: {e}", exc_info=True)
+        return jsonify({'error': f'PDF generation failed: {str(e)}'}), 500
     
 @app.route('/invoice/<int:id>/delete', methods=['POST'])
 @login_required
@@ -435,7 +484,7 @@ def edit_invoice(id):
         db.session.commit()
         
         # Always return a response after POST
-        return redirect(url_for('invoice_detail', id=invoice.id))
+        return redirect(url_for('invoice_management'))
 
     # GET request — show edit form
     clients = Client.query.order_by(Client.name).all()
@@ -472,17 +521,31 @@ def duplicate_invoice(id):
 @app.route('/invoice/<int:id>/send', methods=['POST'])
 @login_required
 def send_invoice(id):
-    invoice = Invoice.query.get_or_404(id)
-    recipient_email = invoice.client.email
-
-    if not recipient_email:
-        return {"success": False, "message": "Client has no email set."}, 400
-
+    """Send invoice via email to client"""
     try:
+        invoice = Invoice.query.get_or_404(id)
+        recipient_email = invoice.client.email
+
+        if not recipient_email:
+            return jsonify({"success": False, "message": "❌ Client has no email address set."}), 400
+
+        # Send the email
         send_invoice_email(invoice, recipient_email)
-        return {"success": True, "message": f"Invoice sent to {recipient_email} successfully!"}
+        
+        # Log the activity
+        logging.info(f"Invoice {invoice.invoice_number} sent to {recipient_email}")
+        
+        return jsonify({
+            "success": True, 
+            "message": f"✅ Invoice sent successfully to {recipient_email}!"
+        })
+        
     except Exception as e:
-        return {"success": False, "message": f"Failed to send invoice: {str(e)}"}, 500
+        logging.error(f"Failed to send invoice: {e}", exc_info=True)
+        return jsonify({
+            "success": False, 
+            "message": f"❌ Failed to send invoice: {str(e)}"
+        }), 500
 
 
 

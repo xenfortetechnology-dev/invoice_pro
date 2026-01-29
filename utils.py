@@ -3,6 +3,8 @@ import hashlib
 import qrcode
 import io
 import base64
+import smtplib
+from email.message import EmailMessage
 from datetime import datetime, timedelta
 from collections import defaultdict
 from sqlalchemy import func, extract
@@ -12,6 +14,8 @@ from werkzeug.security import check_password_hash as werkzeug_check_password_has
 
 from app import db
 from models import Invoice, Client, InvoiceLineItem, Company
+import config
+import logging
 
 def safe_dict(value):
         return value if isinstance(value, dict) else {}
@@ -116,43 +120,114 @@ from email.message import EmailMessage
 import config
 
 def send_invoice_email(invoice, recipient_email):
+    """Send invoice via email with PDF attachment"""
     from pdf_generator import generate_invoice_pdf
     
     # Check if email credentials are configured
     if not config.MAIL_USERNAME or not config.MAIL_PASSWORD:
-        raise Exception("Email credentials not configured. Set MAIL_USERNAME and MAIL_PASSWORD environment variables.")
+        raise Exception("❌ Email credentials not configured. Set MAIL_USERNAME and MAIL_PASSWORD in .env file")
     
-    # Build your email message
-    msg = EmailMessage()
-    msg['Subject'] = f"Invoice #{invoice.invoice_number}"
-    msg['From'] = config.MAIL_DEFAULT_SENDER
-    msg['To'] = recipient_email
-    msg.set_content(f"Dear {invoice.client.name},\n\nPlease find attached Invoice #{invoice.invoice_number}.\n\nThanks!")
-
-    # Generate PDF in-memory and attach
+    if not recipient_email:
+        raise Exception("❌ Client email address not set")
+    
     try:
-        pdf_buffer = generate_invoice_pdf(invoice)
-        pdf_buffer.seek(0)
-        pdf_data = pdf_buffer.read()
-        msg.add_attachment(pdf_data, maintype='application', subtype='pdf', filename=f"Invoice_{invoice.invoice_number}.pdf")
+        # Build email message with HTML content
+        msg = EmailMessage()
+        msg['Subject'] = f"Invoice #{invoice.invoice_number}"
+        msg['From'] = config.MAIL_DEFAULT_SENDER
+        msg['To'] = recipient_email
+        
+        # HTML email body
+        html_content = f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <h2 style="color: #2563eb;">Invoice #{invoice.invoice_number}</h2>
+                    
+                    <p>Dear <strong>{invoice.client.name}</strong>,</p>
+                    
+                    <p>Please find attached your invoice for the services/products provided.</p>
+                    
+                    <div style="background-color: #f3f4f6; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                        <p><strong>Invoice Details:</strong></p>
+                        <p>Invoice Number: {invoice.invoice_number}<br>
+                        Date: {invoice.invoice_date.strftime('%d-%m-%Y')}<br>
+                        Amount: ₹{invoice.total_amount:,.2f}<br>
+                        {f"Due Date: {invoice.due_date.strftime('%d-%m-%Y')}" if invoice.due_date else ""}</p>
+                    </div>
+                    
+                    <p>If you have any questions regarding this invoice, please don't hesitate to contact us.</p>
+                    
+                    <p>Thank you for your business!</p>
+                    
+                    <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+                    <p style="font-size: 12px; color: #666;">
+                        <strong>{config.COMPANY_NAME}</strong><br>
+                        {config.COMPANY_ADDRESS}<br>
+                        {config.COMPANY_CITY}, {config.COMPANY_STATE} - {config.COMPANY_PINCODE}<br>
+                        Phone: {config.COMPANY_PHONE}<br>
+                        Email: {config.COMPANY_EMAIL}
+                    </p>
+                </div>
+            </body>
+        </html>
+        """
+        
+        msg.set_content("Invoice attached. Please view in HTML-compatible email client.")
+        msg.add_alternative(html_content, subtype='html')
+        
+        # Generate PDF and attach
+        try:
+            logging.info(f"Generating PDF for invoice {invoice.id}")
+            pdf_buffer = generate_invoice_pdf(invoice)
+            pdf_buffer.seek(0)
+            pdf_data = pdf_buffer.read()
+            msg.add_attachment(
+                pdf_data, 
+                maintype='application', 
+                subtype='pdf', 
+                filename=f"Invoice_{invoice.invoice_number}.pdf"
+            )
+            logging.info(f"PDF attached to email: {len(pdf_data)} bytes")
+        except Exception as e:
+            logging.error(f"PDF generation failed: {e}")
+            raise Exception(f"Failed to generate PDF attachment: {str(e)}")
+        
+        # Send email via SMTP
+        logging.info(f"Sending email to {recipient_email} via {config.MAIL_SERVER}:{config.MAIL_PORT}")
+        
+        try:
+            if config.MAIL_USE_TLS:
+                # Use TLS on standard port (usually 587)
+                with smtplib.SMTP(config.MAIL_SERVER, config.MAIL_PORT, timeout=10) as smtp:
+                    smtp.starttls()
+                    smtp.login(config.MAIL_USERNAME, config.MAIL_PASSWORD)
+                    smtp.send_message(msg)
+            else:
+                # Use SSL on port 465
+                with smtplib.SMTP_SSL(config.MAIL_SERVER, config.MAIL_PORT, timeout=10) as smtp:
+                    smtp.login(config.MAIL_USERNAME, config.MAIL_PASSWORD)
+                    smtp.send_message(msg)
+            
+            logging.info(f"✅ Email sent successfully to {recipient_email}")
+            return True
+            
+        except smtplib.SMTPAuthenticationError as e:
+            error_msg = "❌ SMTP Authentication failed. Check MAIL_USERNAME and MAIL_PASSWORD"
+            logging.error(f"{error_msg}: {e}")
+            raise Exception(error_msg)
+        except smtplib.SMTPException as e:
+            error_msg = f"❌ SMTP error: {str(e)}"
+            logging.error(error_msg)
+            raise Exception(error_msg)
+        except Exception as e:
+            error_msg = f"❌ Failed to send email: {str(e)}"
+            logging.error(error_msg)
+            raise Exception(error_msg)
+    
     except Exception as e:
-        print(f"Warning: PDF generation failed ({e}), sending email without attachment.")
-
-    # Send email via SMTP
-    try:
-        if config.MAIL_USE_TLS:
-            # Use TLS on standard port (usually 587)
-            with smtplib.SMTP(config.MAIL_SERVER, config.MAIL_PORT) as smtp:
-                smtp.starttls()
-                smtp.login(config.MAIL_USERNAME, config.MAIL_PASSWORD)
-                smtp.send_message(msg)
-        else:
-            # Use SSL on port 465
-            with smtplib.SMTP_SSL(config.MAIL_SERVER, config.MAIL_PORT) as smtp:
-                smtp.login(config.MAIL_USERNAME, config.MAIL_PASSWORD)
-                smtp.send_message(msg)
-    except Exception as e:
-        raise Exception(f"SMTP failed: {e}")
+        logging.error(f"Email sending failed: {e}")
+        raise
 
 
 def generate_challan_number():
