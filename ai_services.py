@@ -108,10 +108,7 @@ class AIInvoiceAssistant:
                 .order_by(Invoice.invoice_date.desc())\
                 .limit(10).all()
             
-            # Get inventory items
-            inventory_items = InventoryItem.query.all()
-            
-            # Prepare context for AI
+            # Context builder
             client_history = []
             for invoice in recent_invoices:
                 for item in invoice.line_items:
@@ -122,46 +119,73 @@ class AIInvoiceAssistant:
                         "date": invoice.invoice_date.strftime("%Y-%m-%d")
                     })
             
-            inventory_context = [{"name": item.name, "description": item.description, 
-                                "price": item.selling_price, "stock": item.current_stock}
-                               for item in inventory_items if item.current_stock > 0]
-            
-            if not ai_client.AI_AVAILABLE:
-                return []
-            
-            prompt = f"""
-            Based on the client history and available inventory, suggest relevant invoice items:
-            
-            Client: {db_client.name}
-            Context: {context}
-            Client Purchase History: {json.dumps(client_history[-20:], indent=2)}
-            Available Inventory: {json.dumps(inventory_context[:50], indent=2)}
-            
-            Suggest 5-10 relevant items in JSON format:
-            {{
-                "suggestions": [
+            # --- AI PATH ---
+            if ai_client.AI_AVAILABLE:
+                try:
+                    inventory_items = InventoryItem.query.all()
+                    inventory_context = [{"name": item.name, "description": item.description, 
+                                        "price": item.selling_price, "stock": item.current_stock}
+                                       for item in inventory_items if item.current_stock > 0]
+
+                    prompt = f"""
+                    Based on the client history and available inventory, suggest relevant invoice items:
+                    
+                    Client: {db_client.name}
+                    Context: {context}
+                    Client Purchase History: {json.dumps(client_history[-20:], indent=2)}
+                    Available Inventory: {json.dumps(inventory_context[:50], indent=2)}
+                    
+                    Suggest 5-10 relevant items in JSON format:
                     {{
-                        "description": "item description",
-                        "quantity": float,
-                        "unit_price": float,
-                        "reasoning": "why this item is suggested",
-                        "confidence": float between 0-1
+                        "suggestions": [
+                            {{
+                                "description": "item description",
+                                "quantity": float,
+                                "unit_price": float,
+                                "reasoning": "why this item is suggested",
+                                "confidence": float between 0-1
+                            }}
+                        ]
                     }}
-                ]
-            }}
-            """
+                    """
+                    
+                    response = ai_client.client.chat.completions.create(
+                        model=ai_client.MODEL,
+                        messages=[{"role": "user", "content": prompt}],
+                        response_format={"type": "json_object"}
+                    )
+                    
+                    suggestions = json.loads(response.choices[0].message.content)
+                    return suggestions.get("suggestions", [])
+                except Exception as e:
+                    logging.error(f"AI suggestion failed, falling back to history: {e}")
+                    
+            # --- FALLBACK: HISTORICAL ITEMS ---
+            # If AI is offline or fails, return top purchased items
+            from collections import Counter
+            item_counts = Counter(item['description'] for item in client_history)
             
-            response = ai_client.client.chat.completions.create(
-                model=ai_client.MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"}
-            )
+            # Get unique items with their last price/qty
+            fallback_suggestions = []
+            seen_items = set()
             
-            suggestions = json.loads(response.choices[0].message.content)
-            return suggestions.get("suggestions", [])
+            for item in reversed(client_history):
+                if item['description'] not in seen_items:
+                    fallback_suggestions.append({
+                        "description": item['description'],
+                        "quantity": item['quantity'],
+                        "unit_price": item['price'],
+                        "reasoning": "Based on previous purchase",
+                        "confidence": 1.0
+                    })
+                    seen_items.add(item['description'])
+                if len(fallback_suggestions) >= 5:
+                    break
+            
+            return fallback_suggestions
             
         except Exception as e:
-            logging.error(f"AI item suggestions failed: {e}")
+            logging.error(f"Item suggestion process failed: {e}")
             return []
     
     def optimize_pricing(self, items: List[Dict], client_id: int) -> List[Dict]:
@@ -221,10 +245,16 @@ class PredictiveAnalytics:
     """Advanced predictive analytics for business insights"""
     
     def __init__(self):
-        pass
+        self._cache = {}
     
     def predict_cash_flow(self, months_ahead: int = 6) -> Dict[str, Any]:
         """Predict cash flow for upcoming months"""
+        # Check cache (valid for 60 min)
+        if "predict_cash_flow" in self._cache:
+             cached = self._cache["predict_cash_flow"]
+             if (datetime.now() - cached["timestamp"]).total_seconds() < 3600:
+                 return cached["data"]
+
         try:
             # Get historical data
             current_date = datetime.now()
@@ -286,13 +316,57 @@ class PredictiveAnalytics:
             }}
             """
             
-            response = ai_client.client.chat.completions.create(
-                model=ai_client.MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"}
-            )
+            if ai_client.AI_AVAILABLE:
+                try:
+                    response = ai_client.client.chat.completions.create(
+                        model=ai_client.MODEL,
+                        messages=[{"role": "user", "content": prompt}],
+                        response_format={"type": "json_object"}
+                    )
+                    
+                    prediction = json.loads(response.choices[0].message.content)
+                    
+                    # Cache the result
+                    self._cache["predict_cash_flow"] = {
+                        "data": prediction,
+                        "timestamp": datetime.now()
+                    }
+                    
+                    return prediction
+                except Exception as e:
+                    logging.error(f"AI Prediction failed, using fallback: {e}")
+
+            # --- FALLBACK: SIMPLE PROJECTION ---
+            logging.info("Using statistical fallback for cash flow")
             
-            prediction = json.loads(response.choices[0].message.content)
+            avg_revenue = sum(d["revenue"] for d in historical_data) / len(historical_data) if historical_data else 0
+            monthly_predictions = []
+            
+            for i in range(months_ahead):
+                future_date = datetime.now() + timedelta(days=30*(i+1))
+                monthly_predictions.append({
+                    "month": future_date.strftime("%Y-%m"),
+                    "predicted_revenue": avg_revenue,
+                    "predicted_collections": avg_revenue * 0.9,
+                    "confidence_level": 0.5,
+                    "key_factors": ["Based on historical average"]
+                })
+                
+            prediction = {
+                "monthly_predictions": monthly_predictions,
+                "summary": {
+                    "total_predicted_revenue": avg_revenue * months_ahead,
+                    "cash_flow_trend": "stable",
+                    "risk_factors": ["Limited data for precise prediction"],
+                    "recommendations": ["Maintain current sales velocity"]
+                }
+            }
+            
+            # Cache the fallback too
+            self._cache["predict_cash_flow"] = {
+                "data": prediction,
+                "timestamp": datetime.now()
+            }
             return prediction
             
         except Exception as e:
@@ -301,6 +375,12 @@ class PredictiveAnalytics:
     
     def analyze_client_payment_patterns(self) -> Dict[str, Any]:
         """Analyze payment patterns across all clients"""
+        # Check cache
+        if "analyze_client_payment_patterns" in self._cache:
+             cached = self._cache["analyze_client_payment_patterns"]
+             if (datetime.now() - cached["timestamp"]).total_seconds() < 3600:
+                 return cached["data"]
+
         try:
             # Get payment data
             payment_data = db.session.query(
@@ -323,46 +403,90 @@ class PredictiveAnalytics:
                     "total_business": float(data.total_business)
                 })
             
-            if not ai_client.AI_AVAILABLE:
-                return {"error": "AI unavailable", "reason": ai_client.LAST_AI_ERROR}
-            
-            prompt = f"""
-            Analyze client payment patterns and provide insights:
-            
-            Payment Data: {json.dumps(analysis_data, indent=2)}
-            
-            Provide analysis in JSON format:
-            {{
-                "payment_behavior_segments": [
+            # --- AI PATH ---
+            if ai_client.AI_AVAILABLE:
+                try:
+                    prompt = f"""
+                    Analyze client payment patterns and provide insights:
+                    
+                    Payment Data: {json.dumps(analysis_data[:50], indent=2)}
+                    
+                    Provide analysis in JSON format:
                     {{
-                        "segment_name": "Early Payers/On-time/Late Payers",
-                        "characteristics": "description",
-                        "client_count": int,
-                        "avg_delay_days": float,
-                        "business_impact": "positive/neutral/negative"
+                        "payment_behavior_segments": [
+                            {{
+                                "segment_name": "Early Payers/On-time/Late Payers",
+                                "characteristics": "description",
+                                "client_count": int,
+                                "avg_delay_days": float,
+                                "business_impact": "positive/neutral/negative"
+                            }}
+                        ],
+                        "insights": {{
+                            "best_performing_clients": ["list of client names"],
+                            "at_risk_clients": ["list of client names"],
+                            "overall_collection_health": "excellent/good/fair/poor",
+                            "recommendations": ["list of recommendations"]
+                        }},
+                        "predictions": {{
+                            "clients_likely_to_default": ["list with reasons"],
+                            "improvement_opportunities": ["list of opportunities"]
+                        }}
                     }}
+                    """
+                    
+                    response = ai_client.client.chat.completions.create(
+                        model=ai_client.MODEL,
+                        messages=[{"role": "user", "content": prompt}],
+                        response_format={"type": "json_object"}
+                    )
+                    
+                    analysis = json.loads(response.choices[0].message.content)
+                    return analysis
+                except Exception as e:
+                    logging.error(f"AI Update failure: {e}")
+
+            # --- FALLBACK: STATISTICAL ANALYSIS ---
+            # Segment by delay
+            early = [c for c in analysis_data if c['avg_payment_delay_days'] < 0]
+            on_time = [c for c in analysis_data if 0 <= c['avg_payment_delay_days'] <= 5]
+            late = [c for c in analysis_data if c['avg_payment_delay_days'] > 5]
+            
+            result = {
+                "payment_behavior_segments": [
+                    {
+                        "segment_name": "Early Payers",
+                        "characteristics": "Pays before due date",
+                        "client_count": len(early),
+                        "avg_delay_days": sum(c['avg_payment_delay_days'] for c in early) / len(early) if early else 0,
+                        "business_impact": "positive"
+                    },
+                    {
+                        "segment_name": "Late Payers",
+                        "characteristics": "Pays after 5 days of due date",
+                        "client_count": len(late),
+                        "avg_delay_days": sum(c['avg_payment_delay_days'] for c in late) / len(late) if late else 0,
+                        "business_impact": "negative"
+                    }
                 ],
-                "insights": {{
-                    "best_performing_clients": ["list of client names"],
-                    "at_risk_clients": ["list of client names"],
-                    "overall_collection_health": "excellent/good/fair/poor",
-                    "recommendations": ["list of recommendations"]
-                }},
-                "predictions": {{
-                    "clients_likely_to_default": ["list with reasons"],
-                    "improvement_opportunities": ["list of opportunities"]
-                }}
-            }}
-            """
-            
-            response = ai_client.client.chat.completions.create(
-                model=ai_client.MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"}
-            )
-            
-            analysis = json.loads(response.choices[0].message.content)
-            return analysis
+                "insights": {
+                    "best_performing_clients": [c['client_name'] for c in sorted(early, key=lambda x: x['total_business'], reverse=True)[:3]],
+                    "at_risk_clients": [c['client_name'] for c in sorted(late, key=lambda x: x['avg_payment_delay_days'], reverse=True)[:3]],
+                    "overall_collection_health": "fair" if len(late) < len(early) else "poor",
+                    "recommendations": ["Follow up with late payers", "Offer discounts for early payment"]
+                },
+                "predictions": {
+                    "clients_likely_to_default": [],
+                    "improvement_opportunities": ["Automate reminders"]
+                }
+            }
+
+            # Cache the fallback too
+            self._cache["analyze_client_payment_patterns"] = {
+                "data": result,
+                "timestamp": datetime.now()
+            }
+            return result
             
         except Exception as e:
             logging.error(f"Payment pattern analysis failed: {e}")

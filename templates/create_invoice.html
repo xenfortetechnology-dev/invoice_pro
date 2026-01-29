@@ -22,10 +22,16 @@
                     <div class="col-md-4 text-end">
                         <div class="d-flex gap-2 justify-content-end">
                             {% if ai_enabled %}
-                         <button class="btn btn-success glass-btn" id="voiceCreateBtn">
-  <i data-feather="mic" class="me-1"></i> Voice Assist
-</button>
-                            <button class="btn btn-info glass-btn" data-bs-toggle="modal" data-bs-target="#documentScannerModal">
+                            <select class="form-select form-select-sm glass-input d-inline-block w-auto me-2"
+                                id="voiceLangSelect">
+                                <option value="en-IN">English (India)</option>
+                                <option value="ta-IN">Tamil (India)</option>
+                            </select>
+                            <button class="btn btn-success glass-btn" id="voiceCreateBtn">
+                                <i data-feather="mic" class="me-1"></i> Voice Assist
+                            </button>
+                            <button class="btn btn-info glass-btn" data-bs-toggle="modal"
+                                data-bs-target="#documentScannerModal">
                                 <i data-feather="camera" class="me-1"></i> Scan Document
                             </button>
                             {% endif %}
@@ -38,18 +44,18 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Invoice Form -->
     <form method="POST" id="invoiceForm" target="_blank">
         <div class="row">
             <!-- Left Column - Invoice Details -->
-            <div class="col-lg-8">
+            <div class="col-lg-9">
                 <div class="glass-card p-4 mb-4">
                     <h5 class="fw-bold mb-3">
                         <i data-feather="info" class="me-2 text-primary"></i>
                         Invoice Information
                     </h5>
-                    
+
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
@@ -58,16 +64,15 @@
                                     <select class="form-select glass-input" id="client_id" name="client_id" required>
                                         <option value="">Select a client...</option>
                                         {% for client in clients %}
-                                        <option value="{{ client.id }}" 
-                                                data-email="{{ client.email }}" 
-                                                data-phone="{{ client.phone }}"
-                                                data-address="{{ client.address }}"
-                                                data-gstin="{{ client.gstin }}">
+                                        <option value="{{ client.id }}" data-email="{{ client.email }}"
+                                            data-phone="{{ client.phone }}" data-address="{{ client.address }}"
+                                            data-gstin="{{ client.gstin }}" {% if
+                                            request.args.get('client_id')|int==client.id %}selected{% endif %}>
                                             {{ client.name }}
                                         </option>
                                         {% endfor %}
                                     </select>
-                                    <a href="{{ url_for('create_client') }}" class="btn btn-outline-primary" >
+                                    <a href="{{ url_for('create_client') }}" class="btn btn-outline-primary">
                                         <i data-feather="user-plus" size="16"></i>
                                     </a>
                                 </div>
@@ -78,15 +83,15 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="col-md-3">
                             <div class="mb-3">
                                 <label for="invoice_date" class="form-label">Invoice Date *</label>
-                                <input type="date" class="form-control glass-input" id="invoice_date" name="invoice_date" 
-                                       value="{{ today.strftime('%Y-%m-%d') }}" required>
+                                <input type="date" class="form-control glass-input" id="invoice_date"
+                                    name="invoice_date" value="{{ today.strftime('%Y-%m-%d') }}" required>
                             </div>
                         </div>
-                        
+
                         <div class="col-md-3">
                             <div class="mb-3">
                                 <label for="due_date" class="form-label">Due Date</label>
@@ -94,28 +99,28 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="notes" class="form-label">Notes</label>
-                                <textarea class="form-control glass-input" id="notes" name="notes" rows="3" 
-                                          placeholder="Additional notes for this invoice..."></textarea>
+                                <textarea class="form-control glass-input" id="notes" name="notes" rows="3"
+                                    placeholder="Additional notes for this invoice..."></textarea>
                             </div>
                         </div>
-                        
+
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="terms_conditions" class="form-label">Terms & Conditions</label>
-                                <textarea class="form-control glass-input" id="terms_conditions" name="terms_conditions" rows="3" 
-                                          placeholder="Payment terms and conditions...">Payment due within 30 days of invoice date.
+                                <textarea class="form-control glass-input" id="terms_conditions" name="terms_conditions"
+                                    rows="3" placeholder="Payment terms and conditions...">Payment due within 30 days of invoice date.
 Interest @ 2% per month will be charged on overdue amounts.
 Subject to local jurisdiction only.</textarea>
                             </div>
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Line Items -->
                 <div class="glass-card p-4 mb-4">
                     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -134,7 +139,7 @@ Subject to local jurisdiction only.</textarea>
                             </button>
                         </div>
                     </div>
-                    
+
                     <!-- Items Table -->
                     <div class="table-responsive">
                         <table class="table table-borderless" id="itemsTable">
@@ -146,7 +151,9 @@ Subject to local jurisdiction only.</textarea>
                                     <th width="80">Qty *</th>
                                     <th width="100">Unit</th>
                                     <th width="120">Rate *</th>
-                                    <th width="80">Tax %</th>
+                                    <th width="80">CGST %</th>
+                                    <th width="80">SGST %</th>
+                                    <th width="80">IGST %</th>
                                     <th width="120">Amount</th>
                                     <th width="80">Action</th>
                                 </tr>
@@ -156,7 +163,7 @@ Subject to local jurisdiction only.</textarea>
                             </tbody>
                         </table>
                     </div>
-                    
+
                     <!-- AI Suggestions Panel -->
                     {% if ai_enabled %}
                     <div id="aiSuggestionsPanel" class="ai-suggestions-panel mt-3" style="display: none;">
@@ -175,44 +182,44 @@ Subject to local jurisdiction only.</textarea>
                     {% endif %}
                 </div>
             </div>
-            
+
             <!-- Right Column - Summary and Actions -->
-            <div class="col-lg-4">
+            <div class="col-lg-3">
                 <!-- Invoice Summary -->
                 <div class="glass-card p-4 mb-4 sticky-summary">
                     <h5 class="fw-bold mb-3">
                         <i data-feather="cpu" class="me-2 text-primary"></i>
                         Invoice Summary
                     </h5>
-                    
+
                     <div class="summary-section">
                         <div class="d-flex justify-content-between mb-2">
                             <span>Subtotal:</span>
                             <span id="subtotalAmount">₹0.00</span>
                         </div>
-                        
+
                         <div class="d-flex justify-content-between mb-2">
-                            <span>CGST (9%):</span>
+                            <span>CGST:</span>
                             <span id="cgstAmount">₹0.00</span>
                         </div>
-                        
+
                         <div class="d-flex justify-content-between mb-2">
-                            <span>SGST (9%):</span>
+                            <span>SGST:</span>
                             <span id="sgstAmount">₹0.00</span>
                         </div>
-                        
+
                         <div class="d-flex justify-content-between mb-2">
-                            <span>IGST (18%):</span>
+                            <span>IGST:</span>
                             <span id="igstAmount">₹0.00</span>
                         </div>
-                        
+
                         <hr>
-                        
+
                         <div class="d-flex justify-content-between fw-bold text-primary h5">
                             <span>Total Amount:</span>
                             <span id="totalAmount">₹0.00</span>
                         </div>
-                        
+
                         <div class="mt-3">
                             <small class="text-muted">
                                 <strong>Amount in Words:</strong><br>
@@ -220,31 +227,31 @@ Subject to local jurisdiction only.</textarea>
                             </small>
                         </div>
                     </div>
-                    
+
                     <!-- Quick Actions -->
                     <div class="mt-4">
                         <h6 class="fw-bold mb-2">Quick Actions</h6>
                         <div class="d-grid gap-2">
-                            
+
                             <button type="button" class="btn btn-primary glass-btn-primary" id="saveInvoiceBtn">
 
                                 <i data-feather="save" class="me-1"></i> Save Invoice
                             </button>
-                            
+
                             <button type="button" class="btn btn-outline-secondary glass-btn" id="previewBtn">
                                 <i data-feather="eye" class="me-1"></i> Preview
                             </button>
-                            
+
                             {% if ai_enabled %}
-                            <button type="button" class="btn btn-outline-info glass-btn" id="aiAnalyzeBtn">
+                            <!--button type="button" class="btn btn-outline-info glass-btn" id="aiAnalyzeBtn">
                                 <i data-feather="cpu" class="me-1"></i> AI Analysis
-                            </button>
+                            </button-->
                             {% endif %}
                         </div>
                     </div>
-                    
+
                     <!-- Invoice Options -->
-                    <div class="mt-4">
+                    <!--div class="mt-4">
                         <h6 class="fw-bold mb-2">Options</h6>
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="enableQRCode" checked>
@@ -252,7 +259,7 @@ Subject to local jurisdiction only.</textarea>
                                 Generate QR Code for payments
                             </label>
                         </div>
-                        
+
                         {% if blockchain_enabled %}
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="blockchainVerify" checked>
@@ -261,7 +268,7 @@ Subject to local jurisdiction only.</textarea>
                             </label>
                         </div>
                         {% endif %}
-                        
+
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="autoReminders">
                             <label class="form-check-label" for="autoReminders">
@@ -269,8 +276,8 @@ Subject to local jurisdiction only.</textarea>
                             </label>
                         </div>
                     </div>
-                </div>
-                
+                </div-->
+
                 <!-- Client Information (if selected) -->
                 <div id="clientInfoCard" class="glass-card p-4" style="display: none;">
                     <h6 class="fw-bold mb-2">
@@ -281,7 +288,7 @@ Subject to local jurisdiction only.</textarea>
                 </div>
             </div>
         </div>
-        
+
         <!-- Hidden Fields -->
         <input type="hidden" id="line_items" name="line_items" value="[]">
         <input type="hidden" id="ai_generated" name="ai_generated" value="false">
@@ -294,40 +301,38 @@ Subject to local jurisdiction only.</textarea>
 
 <!-- Invoice Format Selection Modal -->
 <div class="modal fade" id="invoiceFormatModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content glass-card">
-      <div class="modal-header">
-        <h5 class="modal-title">Select Invoice Format</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card">
+            <div class="modal-header">
+                <h5 class="modal-title">Select Invoice Format</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
 
-      <div class="modal-body">
-        <div class="form-check mb-2">
-         <input class="form-check-input" type="radio"
-       name="format_choice"
-       value="excel_customer_A">
+            <div class="modal-body">
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="format_choice" value="excel_customer_A">
 
-          <label class="form-check-label">
-            Customer Excel Format (Provided)
-          </label>
-          
+                    <label class="form-check-label">
+                        Customer Excel Format (Provided)
+                    </label>
+
+                </div>
+
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="format_choice" value="default">
+                    <label class="form-check-label">
+                        System Default Format
+                    </label>
+
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-primary" onclick="confirmInvoiceFormat()">Continue</button>
+            </div>
         </div>
-
-        <div class="form-check">
-          <input class="form-check-input" type="radio" name="format_choice" value="default">
-          <label class="form-check-label">
-            System Default Format
-          </label>
-           
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button class="btn btn-primary" onclick="confirmInvoiceFormat()">Continue</button>
-      </div>
     </div>
-  </div>
 </div>
 
 <!-- Item Row Template -->
@@ -337,16 +342,15 @@ Subject to local jurisdiction only.</textarea>
             <span class="item-number">1</span>
         </td>
         <td>
-            <input type="text" class="form-control form-control-sm glass-input" 
-                   placeholder="HSN" name="hsn_code">
+            <input type="text" class="form-control form-control-sm glass-input" placeholder="HSN" name="hsn_code">
         </td>
         <td>
-            <input type="text" class="form-control form-control-sm glass-input" 
-                   placeholder="Item description" name="description" required>
+            <input type="text" class="form-control form-control-sm glass-input" placeholder="Item description"
+                name="description" required>
         </td>
         <td>
-            <input type="number" class="form-control form-control-sm glass-input" 
-                   placeholder="1" name="quantity" min="0" step="0.01" required>
+            <input type="number" class="form-control form-control-sm glass-input" placeholder="1" name="quantity"
+                min="0" step="0.01" required>
         </td>
         <td>
             <select class="form-select form-select-sm glass-input" name="unit">
@@ -359,12 +363,19 @@ Subject to local jurisdiction only.</textarea>
             </select>
         </td>
         <td>
-            <input type="number" class="form-control form-control-sm glass-input" 
-                   placeholder="0.00" name="unit_price" min="0" step="0.01" required>
+            <input type="number" class="form-control form-control-sm glass-input" placeholder="0.00" name="unit_price"
+                min="0" step="0.01" required>
         </td>
         <td>
-            <input type="number" class="form-control form-control-sm glass-input" 
-                   placeholder="18" name="tax_percentage" min="0" max="100" step="0.01" value="18">
+            <input type="number" class="form-control form-control-sm glass-input" placeholder="..." name="cgst_percentage" min="0"
+                max="100" step="0.01">
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm glass-input" placeholder="..." name="sgst_percentage" readonly>
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm glass-input" placeholder="..."
+                name="igst_percentage" readonly>
         </td>
         <td>
             <div class="item-amount fw-bold">₹0.00</div>
@@ -379,322 +390,422 @@ Subject to local jurisdiction only.</textarea>
 {% endblock %}
 {% block scripts %}
 <script>
-let itemCounter = 0;
-let lineItems = [];
+    let itemCounter = 0;
+    let lineItems = [];
 
-document.addEventListener('DOMContentLoaded', function() {
-     const voiceBtn = document.getElementById("voiceCreateBtn");
-    if (!voiceBtn) return; // Stop if button doesn't exist
-
-    voiceBtn.addEventListener("click", () => {
-        console.log("✅ Voice button clicked");
-        // Start SpeechRecognition here
-    });
-    // Initialize first row
-    addItemRow();
-
-    // Add new item row button
-    document.getElementById('addItemBtn').addEventListener('click', addItemRow);
-
-    // Form submission
-    document.getElementById('invoiceForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        saveInvoice();
-    });
-});
-
-// Add a new invoice item row
-function addItemRow(suggestion = null) {
-    itemCounter++;
-    const template = document.getElementById('itemRowTemplate');
-    const clone = template.content.cloneNode(true); // deep clone
-    const row = clone.querySelector('.item-row');
-
-    // Update item number
-    row.querySelector('.item-number').textContent = itemCounter;
-
-    // If suggestion passed (AI), populate fields
-    if (suggestion) {
-        row.querySelector('[name="description"]').value = suggestion.description || '';
-        row.querySelector('[name="quantity"]').value = suggestion.quantity || 1;
-        row.querySelector('[name="unit_price"]').value = suggestion.unit_price || 0;
-        row.querySelector('[name="hsn_code"]').value = suggestion.hsn_code || '';
-    }
-
-    // Add event listeners for calculation
-    const inputs = row.querySelectorAll('input, select');
-    inputs.forEach(input => {
-        input.addEventListener('input', () => {
-            calculateItemAmount(row);
-            updateInvoiceSummary();
+    document.addEventListener('DOMContentLoaded', function () {
+        // Initialize Tom Select for Client Dropdown
+        const clientSelect = new TomSelect('#client_id', {
+            create: false,
+            sortField: {
+                field: "text",
+                direction: "asc"
+            },
+            placeholder: "Select a client...",
+            maxOptions: null // Show all options, but let it scroll
         });
-        input.addEventListener('change', () => {
-            calculateItemAmount(row);
-            updateInvoiceSummary();
+
+        const voiceBtn = document.getElementById("voiceCreateBtn");
+        if (!voiceBtn) return; // Stop if button doesn't exist
+
+        voiceBtn.addEventListener("click", () => {
+            console.log("✅ Voice button clicked");
+            // Start SpeechRecognition here
+        });
+        // Initialize first row
+        // addItemRow();
+
+        // Add new item row button
+        document.getElementById('addItemBtn').addEventListener('click', addItemRow);
+
+        // Form submission
+        document.getElementById('invoiceForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            saveInvoice();
         });
     });
 
-    // Remove button
-    row.querySelector('.remove-item-btn').addEventListener('click', () => {
-        removeItemRow(row);
-    });
+    // Add a new invoice item row
+    function addItemRow(suggestion = null) {
+        itemCounter++;
+        const template = document.getElementById('itemRowTemplate');
+        const clone = template.content.cloneNode(true); // deep clone
+        const row = clone.querySelector('.item-row');
 
-    // Append row to table
-    document.getElementById('itemsTableBody').appendChild(clone);
+        // Update item number
+        row.querySelector('.item-number').textContent = itemCounter;
 
-    // Re-render feather icons inside new row
-    feather.replace();
+        // If suggestion passed (AI), populate fields
+        if (suggestion) {
+            row.querySelector('[name="description"]').value = suggestion.description || '';
+            row.querySelector('[name="quantity"]').value = suggestion.quantity || 1;
+            row.querySelector('[name="unit_price"]').value = suggestion.unit_price || 0;
+            row.querySelector('[name="hsn_code"]').value = suggestion.hsn_code || '';
+        }
 
-    // Focus on description
-    setTimeout(() => {
-        row.querySelector('[name="description"]').focus();
-    }, 50);
-}
+        // Add event listeners for calculation
+        const inputs = row.querySelectorAll('input, select');
+        inputs.forEach(input => {
+            input.addEventListener('input', () => {
+                calculateItemAmount(row);
+                updateInvoiceSummary();
+            });
+            input.addEventListener('change', () => {
+                calculateItemAmount(row);
+                updateInvoiceSummary();
+            });
+        });
 
+        // Remove button
+        row.querySelector('.remove-item-btn').addEventListener('click', () => {
+            removeItemRow(row);
+        });
 
-// Remove item row
-function removeItemRow(row) {
-    const rows = document.querySelectorAll('.item-row');
+        // Append row to table
+        document.getElementById('itemsTableBody').appendChild(clone);
 
-    // 1. Check if the row is empty
-    const description = row.querySelector('[name="description"]').value.trim();
-    const quantity = parseFloat(row.querySelector('[name="quantity"]').value) || 0;
-    const unitPrice = parseFloat(row.querySelector('[name="unit_price"]').value) || 0;
+        // Re-render feather icons inside new row
+        feather.replace();
 
-    if (!description && quantity === 0 && unitPrice === 0) {
-        // disable delete for empty row
-        row.querySelector('.remove-item-btn').disabled = true;
-        return; // do not delete
+        // Focus on description
+        setTimeout(() => {
+            row.querySelector('[name="description"]').focus();
+        }, 50);
     }
 
-    // 2. Check if it's the last row
-    if (rows.length <= 1) {
-        alert('At least one item is required');
-        return;
-    }
 
-    // 3. Remove row normally
-    row.remove();
-    updateItemNumbers();
-    updateInvoiceSummary();
-}
+    // Remove item row
+    function removeItemRow(row) {
+        const rows = document.querySelectorAll('.item-row');
 
-// Enable delete button when a row is edited
-document.addEventListener('input', function(e) {
-    const row = e.target.closest('.item-row');
-    if (!row) return;
-
-    const deleteBtn = row.querySelector('.remove-item-btn');
-    const description = row.querySelector('[name="description"]').value.trim();
-    const quantity = parseFloat(row.querySelector('[name="quantity"]').value) || 0;
-    const unitPrice = parseFloat(row.querySelector('[name="unit_price"]').value) || 0;
-
-    deleteBtn.disabled = (!description && quantity === 0 && unitPrice === 0);
-});
-// Update row numbers
-function updateItemNumbers() {
-    const rows = document.querySelectorAll('.item-row');
-    rows.forEach((row, index) => {
-        row.querySelector('.item-number').textContent = index + 1;
-    });
-}
-
-// Calculate line item amount
-function calculateItemAmount(row) {
-    const quantity = parseFloat(row.querySelector('[name="quantity"]').value) || 0;
-    const unitPrice = parseFloat(row.querySelector('[name="unit_price"]').value) || 0;
-    const taxPercentage = parseFloat(row.querySelector('[name="tax_percentage"]').value) || 0;
-
-    const lineTotal = quantity * unitPrice;
-    const taxAmount = (lineTotal * taxPercentage) / 100;
-    const totalAmount = lineTotal + taxAmount;
-
-    row.querySelector('.item-amount').textContent = `₹${totalAmount.toFixed(2)}`;
-}
-
-// Update invoice summary
-function updateInvoiceSummary() {
-    let subtotal = 0;
-    let totalTax = 0;
-
-    document.querySelectorAll('.item-row').forEach(row => {
+        // 1. Check if the row is empty
+        const description = row.querySelector('[name="description"]').value.trim();
         const quantity = parseFloat(row.querySelector('[name="quantity"]').value) || 0;
         const unitPrice = parseFloat(row.querySelector('[name="unit_price"]').value) || 0;
-        const taxPercentage = parseFloat(row.querySelector('[name="tax_percentage"]').value) || 0;
 
-        const lineTotal = quantity * unitPrice;
-        const taxAmount = (lineTotal * taxPercentage) / 100;
+        if (!description && quantity === 0 && unitPrice === 0) {
+            // disable delete for empty row
+            row.querySelector('.remove-item-btn').disabled = true;
+            return; // do not delete
+        }
 
-        subtotal += lineTotal;
-        totalTax += taxAmount;
-    });
+        // 2. Check if it's the last row
+        if (rows.length <= 1) {
+            alert('At least one item is required');
+            return;
+        }
 
-    const clientSelect = document.getElementById('client_id');
-    const selectedClient = clientSelect.options[clientSelect.selectedIndex];
-
-    let cgst = 0, sgst = 0, igst = 0;
-    if (selectedClient && selectedClient.dataset.address && selectedClient.dataset.address.includes('Tamil Nadu')) {
-        cgst = totalTax / 2;
-        sgst = totalTax / 2;
-    } else {
-        igst = totalTax;
+        // 3. Remove row normally
+        row.remove();
+        updateItemNumbers();
+        updateInvoiceSummary();
     }
 
-    const total = subtotal + totalTax;
+    // Enable delete button when a row is edited
+    document.addEventListener('input', function (e) {
+        const row = e.target.closest('.item-row');
+        if (!row) return;
 
-    document.getElementById('subtotalAmount').textContent = `₹${subtotal.toFixed(2)}`;
-    document.getElementById('cgstAmount').textContent = `₹${cgst.toFixed(2)}`;
-    document.getElementById('sgstAmount').textContent = `₹${sgst.toFixed(2)}`;
-    document.getElementById('igstAmount').textContent = `₹${igst.toFixed(2)}`;
-    document.getElementById('totalAmount').textContent = `₹${total.toFixed(2)}`;
-
-    document.getElementById('amountInWords').textContent = `${convertNumberToWords(Math.floor(total))} Rupees Only`;
-}
-
-// Convert number to words (simplified)
-function convertNumberToWords(num) {
-    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
-    const teens = ['Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
-    const tens = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
-    if (num===0) return 'Zero';
-    if (num<10) return ones[num];
-    if (num<20) return teens[num-10];
-    if (num<100) return tens[Math.floor(num/10)] + (num%10!==0 ? ' ' + ones[num%10] : '');
-    if (num<1000) return ones[Math.floor(num/100)] + ' Hundred' + (num%100!==0 ? ' ' + convertNumberToWords(num%100) : '');
-    if (num<100000) return convertNumberToWords(Math.floor(num/1000)) + ' Thousand' + (num%1000!==0 ? ' ' + convertNumberToWords(num%1000) : '');
-    if (num<10000000) return convertNumberToWords(Math.floor(num/100000)) + ' Lakh' + (num%100000!==0 ? ' ' + convertNumberToWords(num%100000) : '');
-    return convertNumberToWords(Math.floor(num/10000000)) + ' Crore' + (num%10000000!==0 ? ' ' + convertNumberToWords(num%10000000) : '');
-}
-
-// Save invoice
-function saveInvoice() {
-    const rows = document.querySelectorAll('.item-row');
-    lineItems = [];
-
-    rows.forEach(row => {
+        const deleteBtn = row.querySelector('.remove-item-btn');
         const description = row.querySelector('[name="description"]').value.trim();
-        if (description) {
+        const quantity = parseFloat(row.querySelector('[name="quantity"]').value) || 0;
+        const unitPrice = parseFloat(row.querySelector('[name="unit_price"]').value) || 0;
+
+        deleteBtn.disabled = (!description && quantity === 0 && unitPrice === 0);
+    });
+    // Update row numbers
+    function updateItemNumbers() {
+        const rows = document.querySelectorAll('.item-row');
+        rows.forEach((row, index) => {
+            row.querySelector('.item-number').textContent = index + 1;
+        });
+    }
+
+    // Calculate line item amount
+    function calculateItemAmount(row) {
+        let quantity = parseFloat(row.querySelector('[name="quantity"]').value) || 0;
+        let unitPrice = parseFloat(row.querySelector('[name="unit_price"]').value) || 0;
+
+        let cgstInput = row.querySelector('[name="cgst_percentage"]');
+        let sgstInput = row.querySelector('[name="sgst_percentage"]');
+        let igstInput = row.querySelector('[name="igst_percentage"]');
+
+        let cgstPercent = parseFloat(cgstInput.value) || 0;
+
+        // Automatically update SGST to match CGST
+        if (sgstInput) {
+            sgstInput.value = cgstPercent.toFixed(2);
+        }
+        let sgstPercent = parseFloat(sgstInput.value) || 0;
+
+        // IGST = CGST + SGST
+        let igstPercent = cgstPercent + sgstPercent;
+
+        const lineAmount = quantity * unitPrice;
+
+        const cgstAmount = (lineAmount * cgstPercent) / 100;
+        const sgstAmount = (lineAmount * sgstPercent) / 100;
+        const igstAmount = (lineAmount * igstPercent) / 100;
+
+        const totalAmount = lineAmount + cgstAmount + sgstAmount + igstAmount;
+
+        if (igstInput) {
+            igstInput.value = igstPercent.toFixed(2);
+            igstInput.readOnly = true;
+        }
+
+        row.querySelector('.item-amount').textContent = `₹${totalAmount.toFixed(2)}`;
+    }
+
+    // Update invoice summary
+    function updateInvoiceSummary() {
+        let subtotal = 0;
+        let totalCgst = 0;
+        let totalSgst = 0;
+        let totalIgst = 0;
+
+        document.querySelectorAll('.item-row').forEach(row => {
+            const quantity = parseFloat(row.querySelector('[name="quantity"]').value) || 0;
+            const unitPrice = parseFloat(row.querySelector('[name="unit_price"]').value) || 0;
+
+            const cgstPercent = parseFloat(row.querySelector('[name="cgst_percentage"]').value) || 0;
+            const sgstPercent = parseFloat(row.querySelector('[name="sgst_percentage"]').value) || 0;
+
+            const igstPercent = cgstPercent + sgstPercent;
+
+            const lineAmount = quantity * unitPrice;
+
+            const cgstAmount = (lineAmount * cgstPercent) / 100;
+            const sgstAmount = (lineAmount * sgstPercent) / 100;
+            const igstAmount = (lineAmount * igstPercent) / 100;
+
+            subtotal += lineAmount;
+            totalCgst += cgstAmount;
+            totalSgst += sgstAmount;
+            totalIgst += igstAmount;
+        });
+
+        const totalAmount = subtotal + totalCgst + totalSgst + totalIgst;
+
+        document.getElementById('subtotalAmount').textContent = `₹${subtotal.toFixed(2)}`;
+        document.getElementById('cgstAmount').textContent = `₹${totalCgst.toFixed(2)}`;
+        document.getElementById('sgstAmount').textContent = `₹${totalSgst.toFixed(2)}`;
+        document.getElementById('igstAmount').textContent = `₹${totalIgst.toFixed(2)}`;
+        document.getElementById('totalAmount').textContent = `₹${totalAmount.toFixed(2)}`;
+
+        document.getElementById('amountInWords').textContent =
+            `${convertNumberToWords(Math.floor(totalAmount))} Rupees Only`;
+    }
+
+
+    // Convert number to words (simplified)
+    function convertNumberToWords(num) {
+        const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+        const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+        const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+        if (num === 0) return 'Zero';
+        if (num < 10) return ones[num];
+        if (num < 20) return teens[num - 10];
+        if (num < 100) return tens[Math.floor(num / 10)] + (num % 10 !== 0 ? ' ' + ones[num % 10] : '');
+        if (num < 1000) return ones[Math.floor(num / 100)] + ' Hundred' + (num % 100 !== 0 ? ' ' + convertNumberToWords(num % 100) : '');
+        if (num < 100000) return convertNumberToWords(Math.floor(num / 1000)) + ' Thousand' + (num % 1000 !== 0 ? ' ' + convertNumberToWords(num % 1000) : '');
+        if (num < 10000000) return convertNumberToWords(Math.floor(num / 100000)) + ' Lakh' + (num % 100000 !== 0 ? ' ' + convertNumberToWords(num % 100000) : '');
+        return convertNumberToWords(Math.floor(num / 10000000)) + ' Crore' + (num % 10000000 !== 0 ? ' ' + convertNumberToWords(num % 10000000) : '');
+    }
+
+    // Save invoice
+    function saveInvoice() {
+        const rows = document.querySelectorAll('.item-row');
+        lineItems = [];
+
+        rows.forEach(row => {
+            const description = row.querySelector('[name="description"]').value.trim();
+            if (description) {
+                lineItems.push({
+                    hsn_code: row.querySelector('[name="hsn_code"]').value,
+                    description: description,
+                    quantity: parseFloat(row.querySelector('[name="quantity"]').value) || 0,
+                    unit: row.querySelector('[name="unit"]').value,
+                    unit_price: parseFloat(row.querySelector('[name="unit_price"]').value) || 0,
+                    tax_percentage: parseFloat(row.querySelector('[name="tax_percentage"]').value) || 0
+                });
+            }
+        });
+
+        if (lineItems.length === 0) {
+            alert('Please add at least one item to the invoice.');
+            return;
+        }
+
+        document.getElementById('line_items').value = JSON.stringify(lineItems);
+        document.getElementById('invoiceForm').submit();
+    }
+    document.addEventListener("DOMContentLoaded", () => {
+        const voiceBtn = document.getElementById("voiceCreateBtn");
+        const langSelect = document.getElementById("voiceLangSelect");
+
+        if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
+            alert("Your browser does not support voice recognition.");
+            return;
+        }
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+
+        recognition.lang = "en-IN"; // Default
+        recognition.continuous = false;
+        recognition.interimResults = false;
+
+        // Update language when dropdown changes
+        if (langSelect) {
+            langSelect.addEventListener("change", () => {
+                recognition.lang = langSelect.value;
+                console.log("🗣 Language set to:", recognition.lang);
+            });
+        }
+
+        let isListening = false;
+
+        voiceBtn.addEventListener("click", () => {
+            if (isListening) {
+                recognition.stop();
+                return;
+            }
+
+            // Update lang just in case
+            if (langSelect) recognition.lang = langSelect.value;
+
+            try {
+                recognition.start();
+                isListening = true;
+                voiceBtn.classList.add("active");
+                voiceBtn.innerHTML = '<i data-feather="mic-off" class="me-1"></i> Listening...';
+                feather.replace();
+            } catch (e) {
+                console.error("Recognition start error:", e);
+                isListening = false;
+            }
+        });
+
+        recognition.onresult = (event) => {
+            const command = event.results[0][0].transcript.trim();
+            console.log("🗣 Spoken:", command);
+            console.log("📤 Sending to backend with language:", recognition.lang);
+
+            // Send to backend
+            fetch('/api/voice-command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': "{{ csrf_token() if csrf_token else '' }}"
+                },
+                body: JSON.stringify({
+                    text: command,
+                    language: recognition.lang
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log("🧠 Backend response:", data);
+                    if (data.success) {
+                        // Show success message
+                        const alertDiv = document.createElement('div');
+                        alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-4';
+                        alertDiv.style.zIndex = '9999';
+                        alertDiv.innerHTML = `
+                <i data-feather="mic" class="me-2"></i> ${data.message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+                        document.body.appendChild(alertDiv);
+                        feather.replace();
+
+                        // Auto dismiss after 3s
+                        setTimeout(() => alertDiv.remove(), 3000);
+
+                        // Reload to reflect changes if needed (optional, but good for "Invoice for X")
+                        if (command.toLowerCase().includes("invoice for") || command.toLowerCase().includes("add") || command.toLowerCase().includes("save")) {
+                            // ideally we should update UI without reload, but as per current backend design
+                            // we might need to rely on the message or reload.
+                            // For now, let's just show the message as the backend seems start simplified.
+                        }
+
+                    } else {
+                        alert("Voice Assist: " + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert("Failed to process voice command via API");
+                });
+        };
+
+
+        recognition.onend = () => {
+            voiceBtn.classList.remove("active");
+            voiceBtn.innerHTML = '<i data-feather="mic" class="me-1"></i> Voice Assist';
+            feather.replace();
+        };
+    });
+    function openInvoiceFormatModal() {
+        const modal = new bootstrap.Modal(
+            document.getElementById('invoiceFormatModal')
+        );
+        modal.show();
+    }
+
+    function confirmInvoiceFormat() {
+        const selected = document.querySelector(
+            'input[name="format_choice"]:checked'
+        );
+
+        if (!selected) {
+            alert("Please select a format");
+            return;
+        }
+
+        // set selected format
+        document.getElementById("invoice_format").value = selected.value;
+
+        // 🔥 CALL saveInvoice (DO NOT SUBMIT HERE)
+        saveInvoice();
+    }
+
+    function saveInvoice() {
+        const rows = document.querySelectorAll('.item-row');
+        const lineItems = [];
+
+        rows.forEach(row => {
+            const description = row.querySelector('[name="description"]').value.trim();
+            if (!description) return;
+
             lineItems.push({
                 hsn_code: row.querySelector('[name="hsn_code"]').value,
                 description: description,
-                quantity: parseFloat(row.querySelector('[name="quantity"]').value) || 0,
+                quantity: row.querySelector('[name="quantity"]').value,
                 unit: row.querySelector('[name="unit"]').value,
-                unit_price: parseFloat(row.querySelector('[name="unit_price"]').value) || 0,
-                tax_percentage: parseFloat(row.querySelector('[name="tax_percentage"]').value) || 0
+                unit_price: row.querySelector('[name="unit_price"]').value,
+                tax_percentage: row.querySelector('[name="tax_percentage"]').value
             });
-        }
-    });
-
-    if (lineItems.length === 0) {
-        alert('Please add at least one item to the invoice.');
-        return;
-    }
-
-    document.getElementById('line_items').value = JSON.stringify(lineItems);
-    document.getElementById('invoiceForm').submit();
-}
-document.addEventListener("DOMContentLoaded", () => {
-   const voiceBtn = document.getElementById("voiceCreateBtn");
-
-  if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
-    alert("Your browser does not support voice recognition.");
-    return;
-  }
-
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const recognition = new SpeechRecognition();
-
-  recognition.lang = "en-IN"; // you can change this locale
-  recognition.continuous = false;
-  recognition.interimResults = false;
-
-  voiceBtn.addEventListener("click", () => {
-    recognition.start();
-    voiceBtn.classList.add("active");
-    voiceBtn.innerHTML = '<i data-feather="mic-off" class="me-1"></i> Listening...';
-    feather.replace();
-  });
-
-  recognition.onresult = (event) => {
-    const command = event.results[0][0].transcript.trim();
-    console.log("Recognized Command:", command);
-
-    // Example: simple command handling
-    if (command.toLowerCase().includes("create invoice")) {
-      window.location.href = "/create_invoice";
-    } else if (command.toLowerCase().includes("open dashboard")) {
-      window.location.href = "/dashboard";
-    } else {
-      alert("Command recognized: " + command);
-    }
-  };
-
-  recognition.onend = () => {
-    voiceBtn.classList.remove("active");
-    voiceBtn.innerHTML = '<i data-feather="mic" class="me-1"></i> Voice Assist';
-    feather.replace();
-  };
-});
-function openInvoiceFormatModal() {
-    const modal = new bootstrap.Modal(
-        document.getElementById('invoiceFormatModal')
-    );
-    modal.show();
-}
-
-function confirmInvoiceFormat() {
-    const selected = document.querySelector(
-        'input[name="format_choice"]:checked'
-    );
-
-    if (!selected) {
-        alert("Please select a format");
-        return;
-    }
-
-    // set selected format
-    document.getElementById("invoice_format").value = selected.value;
-
-    // 🔥 CALL saveInvoice (DO NOT SUBMIT HERE)
-    saveInvoice();
-}
-
-function saveInvoice() {
-    const rows = document.querySelectorAll('.item-row');
-    const lineItems = [];
-
-    rows.forEach(row => {
-        const description = row.querySelector('[name="description"]').value.trim();
-        if (!description) return;
-
-        lineItems.push({
-            hsn_code: row.querySelector('[name="hsn_code"]').value,
-            description: description,
-            quantity: row.querySelector('[name="quantity"]').value,
-            unit: row.querySelector('[name="unit"]').value,
-            unit_price: row.querySelector('[name="unit_price"]').value,
-            tax_percentage: row.querySelector('[name="tax_percentage"]').value
         });
-    });
 
-    console.log("FINAL lineItems:", lineItems); // 🔥 MUST SHOW DATA
+        console.log("FINAL lineItems:", lineItems); // 🔥 MUST SHOW DATA
 
-    if (lineItems.length === 0) {
-        alert("Please add at least one item");
-        return;
+        if (lineItems.length === 0) {
+            alert("Please add at least one item");
+            return;
+        }
+
+        document.getElementById("line_items").value = JSON.stringify(lineItems);
+
+        document.getElementById("invoiceForm").submit();
     }
 
-    document.getElementById("line_items").value = JSON.stringify(lineItems);
-
-    document.getElementById("invoiceForm").submit();
-}
 
 
-
-// override save click
-document.getElementById("saveInvoiceBtn").addEventListener("click", function () {
-    openInvoiceFormatModal();
-});
+    // override save click
+    document.getElementById("saveInvoiceBtn").addEventListener("click", function () {
+        openInvoiceFormatModal();
+    });
 
 
 

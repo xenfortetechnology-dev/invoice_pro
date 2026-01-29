@@ -4,10 +4,13 @@
 
 :root {
   /* Color Palette */
-  --primary: #1E56A0;       /* Sidebar / main blue */
-  --primary-dark: #164183;  /* darker variant */
+  --primary: #1E56A0;
+  /* Sidebar / main blue */
+  --primary-dark: #164183;
+  /* darker variant */
   --secondary: #7c3aed;
-  --success: #28A745;       /* corrected green */
+  --success: #28A745;
+  /* corrected green */
   --warning: #f59e0b;
   --danger: #dc2626;
   --info: #2563eb;
@@ -20,7 +23,8 @@
   --btn-green: #28A745;
   --btn-gray: #f8f9fa;
 
-  --text-primary: #111827;  /* darker for readability */
+  --text-primary: #111827;
+  /* darker for readability */
   --text-light: #ffffff;
   --text-dark: #111827;
 
@@ -49,15 +53,15 @@
   --border-radius-2xl: 1.5rem;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
-  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 
   /* Transitions */
   --transition-fast: 150ms ease-in-out;
-  --transition-base: 300ms cubic-bezier(0.4,0,0.2,1);
-  --transition-slow: 500ms cubic-bezier(0.4,0,0.2,1);
+  --transition-base: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
 
   /* Z-Index */
   --z-dropdown: 1000;
@@ -71,10 +75,14 @@
 
 /* Sidebar */
 .sidebar {
-  background-color: var(--primary); 
+  background-color: var(--primary);
   color: var(--text-light);
 }
-.sidebar .nav-link { color: var(--text-light); }
+
+.sidebar .nav-link {
+  color: var(--text-light);
+}
+
 .sidebar .nav-link.active {
   background-color: rgba(255, 255, 255, 0.2);
   border-radius: 8px;
@@ -82,33 +90,64 @@
 
 /* Navbar */
 .navbar {
-  background-color: #ffffff; 
+  background-color: #ffffff;
   color: var(--text-dark);
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 /* Cards */
-.card-green { background-color: var(--card-green); }
-.card-blue { background-color: var(--card-blue); }
-.card-orange { background-color: var(--card-orange); }
-.card-red { background-color: var(--card-red); }
+.card-green {
+  background-color: var(--card-green);
+}
+
+.card-blue {
+  background-color: var(--card-blue);
+}
+
+.card-orange {
+  background-color: var(--card-orange);
+}
+
+.card-red {
+  background-color: var(--card-red);
+}
 
 /* Buttons */
 .btn-add {
   background-color: var(--btn-green);
   color: #fff;
 }
-.btn-add:hover { background-color: #218838; }
+
+.btn-add:hover {
+  background-color: #218838;
+}
 
 .btn-upload {
   background-color: var(--btn-gray);
   color: var(--text-primary);
   border: 1px solid #ccc;
 }
-.btn-upload:hover { background-color: #e2e6ea; }
-    .dropdown-menu {
-    z-index: 2000 !important;
+
+.btn-upload:hover {
+  background-color: #e2e6ea;
 }
+
+.dropdown-menu {
+  z-index: 2000 !important;
+}
+
+/* Tom Select Z-Index Fix */
+.ts-dropdown,
+.ts-wrapper.single.input-active .ts-dropdown,
+.ts-dropdown.plugin-dropdown_input {
+  z-index: 2000 !important;
+}
+
+.ts-wrapper {
+  z-index: 1050;
+  /* Ensure wrapper is above normal inputs */
+}
+
 .table-responsive {
-    overflow: visible !important;
+  overflow: visible !important;
 }

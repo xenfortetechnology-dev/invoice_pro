@@ -1,6 +1,9 @@
 import io
+from io import BytesIO
+from app import db
 import os
 from datetime import datetime
+from turtle import pd
 from flask import send_file
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -12,8 +15,11 @@ from reportlab.pdfgen import canvas
 import logging
  
 from reportlab.pdfgen import canvas
+from routes import safe_dict
 from utils import number_to_words
+from utils import safe_dict
 from models import Company
+from analytics_engine import AnalyticsEngine
 import config
 
 def generate_invoice_pdf(invoice):
@@ -487,3 +493,87 @@ def generate_quotation_pdf(q):
 
     buffer.seek(0)
     return buffer
+class AnalyticsReportGenerator:
+    def __init__(self):
+        self.engine = AnalyticsEngine(db.session)
+        
+    def generate_excel_report(self, analytics_data):
+        revenue_trends = safe_dict(analytics_data.get("revenue_trends", {}))
+    # build excel
+
+        output = io.BytesIO()
+
+        revenue = self.engine.get_revenue_trends()
+        profit = self.engine.get_profitability_analysis()
+        payments = self.engine.get_payment_analytics()
+        clients = self.engine.get_client_performance_metrics()
+
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+
+            pd.DataFrame(revenue["monthly_data"]) \
+                .to_excel(writer, sheet_name="Revenue Trends", index=False)
+
+            pd.DataFrame(profit["monthly_trends"]) \
+                .to_excel(writer, sheet_name="Profitability", index=False)
+
+            pd.DataFrame(payments["payment_status_distribution"]) \
+                .to_excel(writer, sheet_name="Payments", index=False)
+
+            pd.DataFrame(clients["top_clients"]) \
+                .to_excel(writer, sheet_name="Client Performance", index=False)
+
+        output.seek(0)
+        return output
+
+    def generate_pdf_report(self, analytics_data):
+        revenue_trends = safe_dict(analytics_data.get("revenue_trends", {}))
+        # build pdf
+
+        buffer = BytesIO()
+        pdf = SimpleDocTemplate(buffer, pagesize=A4)
+        styles = getSampleStyleSheet()
+        elements = []
+
+        revenue = self.engine.get_revenue_trends()
+        profit = self.engine.get_profitability_analysis()
+        payments = self.engine.get_payment_analytics()
+        clients = self.engine.get_client_performance_metrics()
+
+        elements.append(Paragraph("Analytics Report", styles["Title"]))
+        elements.append(Spacer(1, 12))
+
+        # Revenue
+        elements.append(Paragraph("Revenue Trends", styles["Heading2"]))
+        revenue_table = [["Month", "Revenue"]]
+        for r in revenue["monthly_data"]:
+            revenue_table.append([r["month"], f"₹{r['revenue']}"])
+        elements.append(Table(revenue_table))
+        elements.append(Spacer(1, 10))
+
+        # Profit
+        elements.append(Paragraph("Profitability Analysis", styles["Heading2"]))
+        profit_table = [["Month", "Profit"]]
+        for p in profit["monthly_trends"]:
+            profit_table.append([p["month"], f"₹{p['profit']}"])
+        elements.append(Table(profit_table))
+        elements.append(Spacer(1, 10))
+
+        # Payments
+        elements.append(Paragraph("Payment Status", styles["Heading2"]))
+        payment_table = [["Status", "Amount"]]
+        for pay in payments["payment_status_distribution"]:
+            payment_table.append([pay["status"], f"₹{pay['amount']}"])
+        elements.append(Table(payment_table))
+        elements.append(Spacer(1, 10))
+
+        # Clients
+        elements.append(Paragraph("Top Clients", styles["Heading2"]))
+        client_table = [["Client", "Revenue", "Invoices"]]
+        for c in clients["top_clients"]:
+            client_table.append([c["name"], f"₹{c['total_revenue']}", c["invoice_count"]])
+        elements.append(Table(client_table))
+
+        pdf.build(elements)
+        buffer.seek(0)
+        return buffer
+

@@ -13,6 +13,9 @@ from utils import *
 from utils import safe_dict
 from pdf_generator import generate_invoice_pdf, generate_challan_pdf, AnalyticsReportGenerator
 from ai_services import ai_assistant, predictive_analytics, inventory_ai
+from utils import safe_dict
+from pdf_generator import generate_invoice_pdf, generate_challan_pdf, AnalyticsReportGenerator
+from ai_services import ai_assistant, predictive_analytics, inventory_ai
 from blockchain_service import blockchain_service, smart_contract_manager
 from ocr_service import ocr_processor, receipt_processor
 from voice_service import voice_processor, voice_invoice_builder
@@ -41,6 +44,8 @@ import ai_client
 
 # Initialize analytics engine
 analytics_engine = AnalyticsEngine(db.session)
+from report_generator import AnalyticsReportGenerator
+report_generator = AnalyticsReportGenerator()
 from report_generator import AnalyticsReportGenerator
 report_generator = AnalyticsReportGenerator()
 
@@ -411,6 +416,8 @@ def edit_invoice(id):
     if request.method == 'POST':
         action = request.form.get('action', 'update')
 
+        action = request.form.get('action', 'update')
+
         # Update fields from the form
         invoice.notes = request.form.get('notes', invoice.notes)
         invoice.terms_conditions = request.form.get('terms_conditions', invoice.terms_conditions)
@@ -419,6 +426,16 @@ def edit_invoice(id):
         client_id = request.form.get('client_id')
         if client_id:
             invoice.client_id = int(client_id)
+            
+        # Handle specific actions
+        if action == 'mark_paid':
+            invoice.payment_status = 'Paid'
+            flash('Invoice marked as Paid!', 'success')
+        elif action == 'mark_unpaid':
+            invoice.payment_status = 'Unpaid'
+            flash('Invoice marked as Unpaid!', 'success')
+        else:
+            flash('Invoice updated successfully!', 'success')
             
         # Handle specific actions
         if action == 'mark_paid':
@@ -793,6 +810,48 @@ def analytics():
         # Generate comprehensive analytics using helper
         analytics_data = _get_analytics_data_dict(time_range)
         
+
+def _get_analytics_data_dict(time_range='12m'):
+    """Helper to gather all analytics data as a dictionary"""
+    analytics_data = {
+        'revenue_trends': analytics_engine.get_revenue_trends(time_range),
+        'client_performance': analytics_engine.get_client_performance_metrics(),
+        'payment_analytics': analytics_engine.get_payment_analytics(),
+        'profitability_analysis': analytics_engine.get_profitability_analysis(),
+        'ai_predictions': {},
+        'blockchain_insights': {}
+    }
+    
+    # AI-powered predictions
+    if app.config.get("AI_FEATURES_ENABLED") and predictive_analytics:
+        try:
+            analytics_data['ai_predictions'] = {
+                'cash_flow': predictive_analytics.predict_cash_flow(6),
+                'payment_patterns': predictive_analytics.analyze_client_payment_patterns()
+            }
+        except Exception as e:
+            logging.error(f"AI predictions failed: {e}")
+    
+    # Blockchain analytics
+    if app.config.get("BLOCKCHAIN_ENABLED") and blockchain_service:
+        try:
+            analytics_data['blockchain_insights'] = blockchain_service.get_blockchain_stats()
+        except Exception as e:
+            logging.error(f"Blockchain analytics failed: {e}")
+            
+    return analytics_data
+
+@app.route('/analytics')
+@login_required
+def analytics():
+    """Advanced analytics dashboard with AI insights"""
+    try:
+        # Time range for analytics
+        time_range = request.args.get('range', '12m')  # 12 months default
+        
+        # Generate comprehensive analytics using helper
+        analytics_data = _get_analytics_data_dict(time_range)
+        
         print("Client Performance Data:", analytics_data['client_performance'])
         print("Full Analytics Data:", analytics_data)
 
@@ -927,6 +986,7 @@ def api_voice_command():
         voice_text = data.get('text', '')
         context = data.get('context', {})
         
+        result = voice_processor.process(voice_text)
         result = voice_processor.process(voice_text)
         
         return jsonify(result)
@@ -1504,6 +1564,7 @@ def handle_voice_command():
 
         voice_text = data.get("text", "").strip()
         language = data.get("language", "en-IN")
+        language = data.get("language", "en-IN")
         user_id = data.get("user_id", 1)  # default for now
 
         if not voice_text:
@@ -1512,6 +1573,7 @@ def handle_voice_command():
                 "message": "No voice text received"
             }), 400
 
+        result = voice_processor.process(voice_text, language=language)
         result = voice_processor.process(voice_text, language=language)
 
         return jsonify(result)
@@ -1801,6 +1863,11 @@ def dashboard_page():
         monthly_revenue=monthly_revenue   # ✅ NEW
     )
     
+    
+
+
+
+
 
 
 

@@ -148,14 +148,14 @@
 #             calculate_total, save_invoice, send_invoice, payment_status, client_summary, get_analytics
 #             """
             
-#             response = openai.chat.completions.create(
-#                 model=self.model,
-#                 messages=[{"role": "user", "content": prompt}],
-#                 response_format={"type": "json_object"}
-#             )
+#             # Call Gemini via common client
+#             ai_data = ai_client.generate_json_response(prompt)
             
-#             intent_data = json.loads(response.choices[0].message.content)
-#             return intent_data
+#             intent = ai_data.get("intent")
+#             entities = ai_data.get("entities", {})
+
+#             logging.info(f"🧠 AI Interpretation: {ai_data}")
+#             return ai_data
             
 #         except Exception as e:
 #             logging.error(f"Intent analysis failed: {e}")
@@ -563,10 +563,12 @@
 
 import re
 import logging
+import json
 from datetime import datetime
 from typing import Dict, Any
 from app import db
 from models import Client, Invoice, InvoiceLineItem
+import ai_client
 
 # =========================
 # GLOBAL SESSION (simple)
@@ -579,6 +581,10 @@ ACTIVE_INVOICE = {
 # =========================
 # HELPER FUNCTIONS
 # =========================
+
+def is_tamil(text):
+    """Check if text contains Tamil characters"""
+    return any('\u0B80' <= char <= '\u0BFF' for char in text)
 
 def extract_client_name(text: str):
     patterns = [
@@ -599,15 +605,31 @@ def extract_item(text: str):
     """
     add pen quantity 2 price 10
     """
-    item_match = re.search(r"add (\w+)", text)
+    item_match = re.search(r"add ([a-zA-Z0-9\s]+)", text)
+    # Check for quantity (optional)
     qty_match = re.search(r"quantity (\d+)", text)
-    price_match = re.search(r"price (\d+)", text)
+    # Check for price/rate (optional)
+    price_match = re.search(r"(?:price|rate) (\d+)", text)
+    # Check for unit (optional)
+    unit_match = re.search(r"unit ([a-zA-Z]+)", text)
+    # Check for tax/gst (optional)
+    tax_match = re.search(r"(?:tax|gst) (\d+)", text)
+    # Check for HSN code (optional)
+    hsn_match = re.search(r"(?:hsn|code) (\w+)", text)
 
-    if item_match and qty_match and price_match:
+    if item_match:
+        # Stop capturing at keywords
+        raw_name = item_match.group(1)
+        # Split by any of the keywords
+        name = re.split(r" quantity| price| rate| unit| tax| gst| hsn| code", raw_name)[0].strip()
+        
         return {
-            "name": item_match.group(1),
-            "quantity": int(qty_match.group(1)),
-            "price": int(price_match.group(1))
+            "name": name,
+            "quantity": int(qty_match.group(1)) if qty_match else 1,
+            "price": int(price_match.group(1)) if price_match else 0,
+            "unit": unit_match.group(1).capitalize() if unit_match else None,
+            "tax": int(tax_match.group(1)) if tax_match else 18,
+            "hsn_code": hsn_match.group(1) if hsn_match else None
         }
     return None
 
@@ -618,8 +640,180 @@ def extract_item(text: str):
 
 class VoiceCommandProcessor:
 
-    def process(self, text: str) -> Dict[str, Any]:
+    def process(self, text: str, language: str = "en-IN") -> Dict[str, Any]:
+        original_text = text
         text = text.lower().strip()
+        
+        print(f"\n[VOICE DEBUG] Input: '{text}' | Lang: '{language}'")
+        logging.info(f"🎤 Process called with text: '{text}', language: '{language}'")
+
+        # ----------------------------
+        # TAMIL TRANSLATION (if Tamil script detected)
+        # ----------------------------
+        if is_tamil(text) and ai_client.AI_AVAILABLE:
+            try:
+                print(f"[VOICE DEBUG] Tamil script detected, translating...")
+                logging.info(f"🔤 Translating Tamil to English: {text}")
+                
+                translation_prompt = f"""
+                Translate the following Tamil text to English. 
+                This is a voice command for an invoice system.
+                Return ONLY the English translation, nothing else.
+                
+                Tamil Text: "{text}"
+                """
+                
+                translated = ai_client.generate_json_response(translation_prompt)
+                if isinstance(translated, dict) and "translation" in translated:
+                    text = translated["translation"].lower().strip()
+                else:
+                    # If response is just a string
+                    text = str(translated).lower().strip()
+                
+                print(f"[VOICE DEBUG] Translated to: '{text}'")
+                logging.info(f"✅ Translation: {text}")
+                
+            except Exception as e:
+                logging.error(f"❌ Translation failed: {e}")
+                print(f"[VOICE DEBUG] Translation error: {e}")
+                # Continue with original text
+
+        # ----------------------------
+        # AI LAYER FOR TAMIL (Script or Tanglish)
+        # ----------------------------
+        # Trigger if explicitly Tamil (ta-IN) OR if text contains Tamil script
+        is_tamil_mode = (language == "ta-IN") or is_tamil(text)
+        logging.info(f"🤔 Tamil Mode: {is_tamil_mode} (AI Available: {ai_client.AI_AVAILABLE})")
+        
+        if is_tamil_mode and ai_client.AI_AVAILABLE:
+            try:
+                logging.info(f"🧠 Processing Tamil/Tanglish command via AI: {text}")
+                prompt = f"""
+                You are a Tamil Voice Assistant (supporting Tanglish) for an Invoice Validation System.
+                Analyze the voice command and extract the intent and entities.
+                The input might be in proper Tamil script OR "Tanglish" (Tamil words in English script).
+
+                Input Text: "{text}"
+
+                Examples:
+                1. "Aravind ku invoice podu" (Create invoice for Aravind) -> intent: "create_invoice", entities: {{"client_name": "Aravind"}}
+                2. "Pen pathu ruba quantity rendu" (Pen 10 rupees quantity 2) -> intent: "add_item", entities: {{"item_description": "Pen", "quantity": 2, "amount": 10, "unit": "Nos"}}
+                3. "patruba quantity and unit taxpanandez amount" (interpretation: 10 rupees... tax 15...) -> intent: "add_item", entities: {{"amount": 10, "tax": 15}}
+                4. "Save pannu" -> intent: "save_invoice"
+
+                JSON Schema:
+                {{
+                    "intent": "create_invoice" | "add_item" | "save_invoice" | "calculate_total",
+                    "entities": {{
+                        "client_name": string (in English script),
+                        "item_description": string,
+                        "quantity": number,
+                        "amount": number,
+                        "unit": string,
+                        "tax": number
+                    }}
+                }}
+                """
+                
+                ai_data = ai_client.generate_json_response(prompt)
+                
+                # Sanitize response already done in client, but extra safety
+                intent = ai_data.get("intent")
+                entities = ai_data.get("entities", {})
+
+                print(f"[VOICE DEBUG] AI Response: {ai_data}")
+                logging.info(f"🧠 AI Interpretation: {ai_data}")
+
+                # --- Handle Intents from AI ---
+                if intent == "create_invoice":
+                     if not entities.get("client_name"):
+                         return {"success": False, "message": "Client name not found in Tamil command."}
+                     
+                     client = Client.query.filter(Client.name.ilike(f"%{entities['client_name']}%")).first()
+                     if not client:
+                         return {"success": False, "message": f"Client '{entities['client_name']}' not found from Tamil input."}
+                     
+                     ACTIVE_INVOICE["client"] = client
+                     ACTIVE_INVOICE["items"] = []
+                     return {
+                         "success": True, 
+                         "message": f"Invoice started for {client.name} (via AI).", 
+                         "intent": "create_invoice",
+                         "client_id": client.id
+                     }
+
+                elif intent == "add_item":
+                    if ACTIVE_INVOICE["client"]:
+                        item_data = {
+                            "name": entities.get("item_description", "Unknown"),
+                            "quantity": entities.get("quantity", 1),
+                            "price": entities.get("amount", 0),
+                            "unit": entities.get("unit", "Nos"),
+                            "tax": entities.get("tax", 18),
+                            "hsn_code": None
+                        }
+                        ACTIVE_INVOICE["items"].append(item_data)
+                    
+                    return {
+                        "success": True,
+                        "message": f"{entities.get('item_description')} added (Qty: {entities.get('quantity')}).",
+                        "intent": "add_item",
+                        "entities": entities
+                    }
+                
+                elif intent == "save_invoice":
+                    # Fallthrough to existing save logic using text keywords, 
+                    # but since we have intent, we can just trigger logic below or duplicated here.
+                    # Simpler to let fallthrough or handle here. 
+                    # Let's handle here to be safe since text might be full Tamil.
+                    if not ACTIVE_INVOICE["client"]:
+                        return {"success": False, "message": "No active invoice to save"}
+                    
+                    # (Reusing save logic would be better refactored, but for now copying the essential part)
+                    invoice = Invoice(client_id=ACTIVE_INVOICE["client"].id, invoice_date=datetime.utcnow(), total_amount=0)
+                    db.session.add(invoice)
+                    db.session.flush()
+                    
+                    total = 0
+                    for item in ACTIVE_INVOICE["items"]:
+                        line = InvoiceLineItem(
+                            invoice_id=invoice.id, description=item["name"], quantity=item["quantity"],
+                            unit_price=item["price"], total=item["quantity"]*item["price"]
+                        )
+                        total += line.total
+                        db.session.add(line)
+                    
+                    invoice.total_amount = total
+                    db.session.commit()
+                    
+                    ACTIVE_INVOICE["client"] = None
+                    ACTIVE_INVOICE["items"] = []
+                    
+                    return {"success": True, "message": f"Invoice saved (Tamil). Total {total}", "intent": "save_invoice", "invoice_id": invoice.id}
+
+                elif intent == "calculate_total":
+                    if not ACTIVE_INVOICE["items"]:
+                        return {"success": False, "message": "No items added yet."}
+                    total = sum(i["quantity"] * i["price"] for i in ACTIVE_INVOICE["items"])
+                    return {"success": True, "message": f"Total amount is {total}"}
+                
+                else:
+                    logging.warning(f"⚠️ AI returned unknown intent: {intent}")
+                    # Don't return here, let it fall through to regex just in case? 
+                    # Or return debug info? Let's return debug info to be clear it was AI.
+                    return {
+                        "success": False, 
+                        "message": f"AI understood: {intent}, but I don't know how to handle it."
+                    }
+
+            except Exception as e:
+                logging.error(f"❌ AI Tamil Processing Failed: {e}")
+                # For debugging, return the error
+                return {
+                    "success": False, 
+                    "message": f"AI Error: {str(e)}"
+                }
+
 
         # --------------------
         # CREATE INVOICE
@@ -644,31 +838,41 @@ class VoiceCommandProcessor:
 
             return {
                 "success": True,
-                "message": f"Invoice started for {client.name}. Now add items."
+                "message": f"Invoice started for {client.name}. Now add items.",
+                "intent": "create_invoice",
+                "client_id": client.id
             }
 
         # --------------------
         # ADD ITEM
         # --------------------
         if "add" in text or "சேர்க்க" in text:
-            if not ACTIVE_INVOICE["client"]:
-                return {
-                    "success": False,
-                    "message": "No active invoice. Say 'Invoice for Aravind' first."
-                }
-
+            # We removed the strict check for ACTIVE_INVOICE["client"] to allow UI usage
+            # but we still check if item valid
+            
             item = extract_item(text)
             if not item:
                 return {
                     "success": False,
-                    "message": "Say like: 'Add pen quantity 2 price 10'"
+                    "message": "Say like: 'Add pen' (optional: quantity 2 price 10)"
                 }
 
-            ACTIVE_INVOICE["items"].append(item)
+            # Only update backend state if we have a client context, otherwise just return intent for UI
+            if ACTIVE_INVOICE["client"]:
+                 ACTIVE_INVOICE["items"].append(item)
 
             return {
                 "success": True,
-                "message": f"{item['name']} added. Qty {item['quantity']} Price {item['price']}"
+                "message": f"{item['name']} added. Qty {item['quantity']} Price {item['price']} Tax {item['tax']}%",
+                "intent": "add_item",
+                "entities": {
+                    "item_description": item['name'],
+                    "quantity": item['quantity'],
+                    "amount": item['price'],
+                    "unit": item['unit'],
+                    "tax": item['tax'],
+                    "hsn_code": item['hsn_code']
+                }
             }
 
         # --------------------
@@ -725,7 +929,9 @@ class VoiceCommandProcessor:
 
             return {
                 "success": True,
-                "message": f"Invoice saved successfully. Total ₹{total}"
+                "message": f"Invoice saved successfully. Total ₹{total}",
+                "intent": "save_invoice",
+                "invoice_id": invoice.id
             }
 
         # --------------------
@@ -750,3 +956,4 @@ class VoiceInvoiceBuilder:
 # =========================
 voice_processor = VoiceCommandProcessor()
 voice_invoice_builder = VoiceInvoiceBuilder()
+

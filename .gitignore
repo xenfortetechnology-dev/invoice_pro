@@ -10,6 +10,7 @@ __pycache__/
 .venv/
 env/
 venv/
+myenv/
 
 # --------------------
 # Environment variables
@@ -36,3 +37,4 @@ instance/
 # Project-specific
 # --------------------
 seed_revolutionary_invoice.py
+seed_revolutionary_db.py
