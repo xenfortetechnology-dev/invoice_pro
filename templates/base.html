@@ -139,7 +139,7 @@
 
         <!-- Brand -->
         <a class="navbar-brand fw-bold text-primary mb-4" href="{{ url_for('dashboard_page') }}">
-            <i data-feather="zap" class="me-2"></i>
+            <img src="static/Xen_logo.png" alt="Xen Logo" class="mb xen-logo logo-glow" ;/>
             Revolutionary Invoice
         </a>
 
@@ -293,7 +293,17 @@
         </div>
     </footer>
     {% endif %}
+   
+<!-- logo-glow and  size -->
+<style>
+.logo-glow {
+    width: 40px;height: auto;
 
+    filter:
+        drop-shadow(0 0 1px rgba(255,255,255,0.9))   /* sharp edge */
+        drop-shadow(0 0 4px rgba(255,255,255,0.6));  /* soft glow */
+}
+</style>
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
