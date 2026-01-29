@@ -15,7 +15,7 @@ from pdf_generator import generate_invoice_pdf, generate_challan_pdf, AnalyticsR
 from ai_services import ai_assistant, predictive_analytics, inventory_ai
 from blockchain_service import blockchain_service, smart_contract_manager
 from ocr_service import ocr_processor, receipt_processor
-from voice_service import voice_processor, voice_invoice_builder
+from voice_service import get_voice_processor, get_voice_session
 from analytics_engine import AnalyticsEngine
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
@@ -25,8 +25,6 @@ from flask import Response, request
 
 from datetime import datetime
 from sqlalchemy import func
-
-from voice_service import VoiceCommandProcessor, VoiceInvoiceBuilder
 
 from pdf_generator import generate_quotation_pdf
 from flask import send_file
@@ -1495,39 +1493,9 @@ def api_ai_chat():
         return jsonify({'reply': f"Sorry, I encountered an error: {str(e)}"})
 
 
-voice_processor = VoiceCommandProcessor()
+# Voice command routes are now defined above (lines ~1808-1890)
+# Using get_voice_processor() and get_voice_session() functions
 
-@app.route("/api/voice-command", methods=["POST"])
-def handle_voice_command():
-    try:
-        data = request.get_json(force=True)
-
-        voice_text = data.get("text", "").strip()
-        language = data.get("language", "en-IN")
-        user_id = data.get("user_id", 1)  # default for now
-
-        if not voice_text:
-            return jsonify({
-                "success": False,
-                "message": "No voice text received"
-            }), 400
-
-        result = voice_processor.process(voice_text, language=language)
-
-        return jsonify(result)
-
-    except Exception as e:
-        # 🔴 THIS IS THE MOST IMPORTANT PART
-        import traceback
-        traceback.print_exc()
-
-        return jsonify({
-            "success": False,
-            "message": "Internal server error in voice command",
-            "error": str(e)
-        }), 500
-
-    
 
  
 
@@ -1802,6 +1770,92 @@ def dashboard_page():
     )
     
 
+# =========================
+# VOICE COMMAND API
+# =========================
 
+@app.route('/api/voice-command', methods=['POST'])
+@login_required
+def voice_command_api():
+    """
+    Process voice commands using script-based pattern matching
+    No AI/API dependencies - Pure regex matching
+    """
+    try:
+        data = request.get_json()
+        text = data.get('text', '').strip()
+        language = data.get('language', 'en-IN')
+        
+        if not text:
+            return jsonify({
+                'success': False,
+                'message': 'No voice input received',
+                'intent': 'error'
+            }), 400
+        
+        logging.info(f"🎤 Voice command received: '{text}' (Language: {language})")
+        
+        # Get voice processor
+        voice_processor = get_voice_processor()
+        
+        # Process command
+        result = voice_processor.process(text, language)
+        
+        logging.info(f"✅ Voice command processed: {result.get('intent')}")
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logging.error(f"❌ Voice command API error: {e}")
+        return jsonify({
+            'success': False,
+            'message': 'Error processing voice command',
+            'error': str(e),
+            'intent': 'error'
+        }), 500
+
+
+@app.route('/api/voice-session/status', methods=['GET'])
+@login_required
+def voice_session_status():
+    """Get current voice session status"""
+    try:
+        voice_session = get_voice_session()
+        
+        return jsonify({
+            'success': True,
+            'has_active_invoice': voice_session.has_active_invoice(),
+            'client_name': voice_session.active_invoice['client'].name if voice_session.active_invoice['client'] else None,
+            'item_count': len(voice_session.active_invoice['items']),
+            'total_amount': voice_session.get_total()
+        })
+        
+    except Exception as e:
+        logging.error(f"Voice session status error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/voice-session/clear', methods=['POST'])
+@login_required
+def voice_session_clear():
+    """Clear voice session"""
+    try:
+        voice_session = get_voice_session()
+        voice_session.clear()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Voice session cleared'
+        })
+        
+    except Exception as e:
+        logging.error(f"Voice session clear error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 

@@ -22,11 +22,6 @@
                     <div class="col-md-4 text-end">
                         <div class="d-flex gap-2 justify-content-end">
                             {% if ai_enabled %}
-                            <select class="form-select form-select-sm glass-input d-inline-block w-auto me-2"
-                                id="voiceLangSelect">
-                                <option value="en-IN">English (India)</option>
-                                <option value="ta-IN">Tamil (India)</option>
-                            </select>
                             <button class="btn btn-success glass-btn" id="voiceCreateBtn">
                                 <i data-feather="mic" class="me-1"></i> Voice Assist
                             </button>
@@ -278,22 +273,22 @@ Subject to local jurisdiction only.</textarea>
                     </div>
                 </div-->
 
-                <!-- Client Information (if selected) -->
-                <div id="clientInfoCard" class="glass-card p-4" style="display: none;">
-                    <h6 class="fw-bold mb-2">
-                        <i data-feather="user" class="me-2 text-primary"></i>
-                        Client Information
-                    </h6>
-                    <div id="clientDetails"></div>
+                    <!-- Client Information (if selected) -->
+                    <div id="clientInfoCard" class="glass-card p-4" style="display: none;">
+                        <h6 class="fw-bold mb-2">
+                            <i data-feather="user" class="me-2 text-primary"></i>
+                            Client Information
+                        </h6>
+                        <div id="clientDetails"></div>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Hidden Fields -->
-        <input type="hidden" id="line_items" name="line_items" value="[]">
-        <input type="hidden" id="ai_generated" name="ai_generated" value="false">
-        <input type="hidden" id="voice_created" name="voice_created" value="false">
-        <input type="hidden" name="invoice_format" id="invoice_format" value="default">
+            <!-- Hidden Fields -->
+            <input type="hidden" id="line_items" name="line_items" value="[]">
+            <input type="hidden" id="ai_generated" name="ai_generated" value="false">
+            <input type="hidden" id="voice_created" name="voice_created" value="false">
+            <input type="hidden" name="invoice_format" id="invoice_format" value="default">
 
     </form>
 </div>
@@ -367,11 +362,12 @@ Subject to local jurisdiction only.</textarea>
                 min="0" step="0.01" required>
         </td>
         <td>
-            <input type="number" class="form-control form-control-sm glass-input" placeholder="..." name="cgst_percentage" min="0"
-                max="100" step="0.01">
+            <input type="number" class="form-control form-control-sm glass-input" placeholder="..."
+                name="cgst_percentage" min="0" max="100" step="0.01">
         </td>
         <td>
-            <input type="number" class="form-control form-control-sm glass-input" placeholder="..." name="sgst_percentage" readonly>
+            <input type="number" class="form-control form-control-sm glass-input" placeholder="..."
+                name="sgst_percentage" readonly>
         </td>
         <td>
             <input type="number" class="form-control form-control-sm glass-input" placeholder="..."
@@ -641,111 +637,24 @@ Subject to local jurisdiction only.</textarea>
         document.getElementById('invoiceForm').submit();
     }
     document.addEventListener("DOMContentLoaded", () => {
-        const voiceBtn = document.getElementById("voiceCreateBtn");
-        const langSelect = document.getElementById("voiceLangSelect");
+        // Voice commands are handled by external script: static/Js/voice-commands.js
+        // This uses script-based pattern matching (no AI/API dependencies)
 
-        if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
-            alert("Your browser does not support voice recognition.");
-            return;
+        // Set default language to English for voice-commands.js
+        const voiceLangToggle = document.getElementById("voiceLangToggle");
+
+        if (!voiceLangToggle) {
+            // Create hidden toggle for voice-commands.js compatibility
+            const toggle = document.createElement("select");
+            toggle.id = "voiceLangToggle";
+            toggle.style.display = "none";
+            toggle.innerHTML = '<option value="en-IN" selected>English (India)</option>';
+            toggle.value = "en-IN";
+            document.body.appendChild(toggle);
         }
-
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-
-        recognition.lang = "en-IN"; // Default
-        recognition.continuous = false;
-        recognition.interimResults = false;
-
-        // Update language when dropdown changes
-        if (langSelect) {
-            langSelect.addEventListener("change", () => {
-                recognition.lang = langSelect.value;
-                console.log("🗣 Language set to:", recognition.lang);
-            });
-        }
-
-        let isListening = false;
-
-        voiceBtn.addEventListener("click", () => {
-            if (isListening) {
-                recognition.stop();
-                return;
-            }
-
-            // Update lang just in case
-            if (langSelect) recognition.lang = langSelect.value;
-
-            try {
-                recognition.start();
-                isListening = true;
-                voiceBtn.classList.add("active");
-                voiceBtn.innerHTML = '<i data-feather="mic-off" class="me-1"></i> Listening...';
-                feather.replace();
-            } catch (e) {
-                console.error("Recognition start error:", e);
-                isListening = false;
-            }
-        });
-
-        recognition.onresult = (event) => {
-            const command = event.results[0][0].transcript.trim();
-            console.log("🗣 Spoken:", command);
-            console.log("📤 Sending to backend with language:", recognition.lang);
-
-            // Send to backend
-            fetch('/api/voice-command', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': "{{ csrf_token() if csrf_token else '' }}"
-                },
-                body: JSON.stringify({
-                    text: command,
-                    language: recognition.lang
-                })
-            })
-                .then(response => response.json())
-                .then(data => {
-                    console.log("🧠 Backend response:", data);
-                    if (data.success) {
-                        // Show success message
-                        const alertDiv = document.createElement('div');
-                        alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-4';
-                        alertDiv.style.zIndex = '9999';
-                        alertDiv.innerHTML = `
-                <i data-feather="mic" class="me-2"></i> ${data.message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            `;
-                        document.body.appendChild(alertDiv);
-                        feather.replace();
-
-                        // Auto dismiss after 3s
-                        setTimeout(() => alertDiv.remove(), 3000);
-
-                        // Reload to reflect changes if needed (optional, but good for "Invoice for X")
-                        if (command.toLowerCase().includes("invoice for") || command.toLowerCase().includes("add") || command.toLowerCase().includes("save")) {
-                            // ideally we should update UI without reload, but as per current backend design
-                            // we might need to rely on the message or reload.
-                            // For now, let's just show the message as the backend seems start simplified.
-                        }
-
-                    } else {
-                        alert("Voice Assist: " + data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert("Failed to process voice command via API");
-                });
-        };
-
-
-        recognition.onend = () => {
-            voiceBtn.classList.remove("active");
-            voiceBtn.innerHTML = '<i data-feather="mic" class="me-1"></i> Voice Assist';
-            feather.replace();
-        };
     });
+
+
     function openInvoiceFormatModal() {
         const modal = new bootstrap.Modal(
             document.getElementById('invoiceFormatModal')
@@ -810,4 +719,8 @@ Subject to local jurisdiction only.</textarea>
 
 
 </script>
+
+<!-- Voice Commands Script (Script-based Pattern Matching - No AI) -->
+<script src="{{ url_for('static', filename='Js/voice-commands.js') }}"></script>
+
 {% endblock %}
