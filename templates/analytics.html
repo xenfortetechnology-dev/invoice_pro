@@ -3,6 +3,9 @@
 {% block title %}Analytics - Revolutionary Invoice System{% endblock %}
 
 {% block content %}
+<!-- Toast Container -->
+<div id="toast-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>
+
 <div class="container-fluid">
     <!-- Header -->
     <div class="row mb-4">
@@ -40,13 +43,13 @@
                                 </button>
                                 <ul class="dropdown-menu glass-dropdown dropdown-menu-end">
                                     <li>
-                                        <a class="dropdown-item" href="/analytics/export/excel">
+                                        <a class="dropdown-item" href="#" onclick="exportAnalyticsToExcel()">
                                             <i data-feather="file-text" class="me-2"></i> Excel
                                         </a>
                                     </li>
 
                                     <li>
-                                        <a class="dropdown-item" href="/analytics/export/pdf">
+                                        <a class="dropdown-item" href="#" onclick="exportAnalyticsToPDF()">
                                             <i data-feather="file" class="me-2"></i> PDF Report
                                         </a>
                                     </li>
@@ -641,12 +644,53 @@
     {% endif %}
 }
 
+    // Toast notification function
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`;
+        toast.style.cssText = 'min-width: 300px; margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+        toast.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        container.appendChild(toast);
+
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 150);
+        }, 5000);
+    }
+
     function exportAnalyticsToPDF() {
-        alert("Analytics PDF exported successfully (demo).");
+        fetch('/analytics/export/pdf')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(`✅ ${data.message}`, 'success');
+                } else {
+                    showToast(`❌ Export failed: ${data.message}`, 'error');
+                }
+            })
+            .catch(error => {
+                showToast(`❌ Error: ${error.message}`, 'error');
+            });
     }
 
     function exportAnalyticsToExcel() {
-        alert("Analytics Excel exported successfully (demo).");
+        fetch('/analytics/export/excel')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(`✅ ${data.message}`, 'success');
+                } else {
+                    showToast(`❌ Export failed: ${data.message}`, 'error');
+                }
+            })
+            .catch(error => {
+                showToast(`❌ Error: ${error.message}`, 'error');
+            });
     }
 
 

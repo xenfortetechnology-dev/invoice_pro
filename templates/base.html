@@ -255,44 +255,46 @@
     {% endif %}
 
     <!-- Main Content -->
-    <main class="content">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div class="container mt-3">
-            {% for category, message in messages %}
-            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show glass-card"
-                role="alert">
-                <i data-feather="{% if category == 'success' %}check-circle{% elif category == 'error' %}alert-circle{% else %}info{% endif %}"
-                    class="me-2"></i>
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <main class="content d-flex flex-column min-vh-100">
+        <div class="flex-grow-1">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="container mt-3">
+                {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show glass-card"
+                    role="alert">
+                    <i data-feather="{% if category == 'success' %}check-circle{% elif category == 'error' %}alert-circle{% else %}info{% endif %}"
+                        class="me-2"></i>
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endfor %}
             </div>
-            {% endfor %}
+            {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
         </div>
+
+        <!-- Footer -->
+        {% if session.user_id %}
+        <footer class="footer bg-light border-top text-center py-3 mt-auto">
+
+            <h5 class="fw-bold text-primary mb-1">
+                ⚡ Revolutionary Invoice System
+            </h5>
+
+            <p class="mb-0 text-muted">
+                © 2025 Revolutionary Invoice Systems. All rights reserved.
+            </p>
+
+            <div class="mt-1">
+                <span class="badge bg-success">AI Enabled</span>
+                <span class="badge bg-primary">Blockchain Secured</span>
+            </div>
+        </footer>
         {% endif %}
-        {% endwith %}
-
-        {% block content %}{% endblock %}
     </main>
-
-    <!-- Footer -->
-    {% if session.user_id %}
-    <footer class="footer bg-light border-top text-center py-3">
-
-        <h5 class="fw-bold text-primary mb-1">
-            ⚡ Revolutionary Invoice System
-        </h5>
-
-        <p class="mb-0 text-muted">
-            © 2025 Revolutionary Invoice Systems. All rights reserved.
-        </p>
-
-        <div class="mt-1">
-            <span class="badge bg-success">AI Enabled</span>
-            <span class="badge bg-primary">Blockchain Secured</span>
-        </div>
-    </footer>
-    {% endif %}
 
 
     <!-- Bootstrap JS -->
