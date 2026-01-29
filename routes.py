@@ -196,15 +196,31 @@ def create_invoice():
 
             line_items_data = json.loads(request.form.get('line_items', '[]'))
             subtotal = 0
-            total_tax = 0
+            total_cgst = 0
+            total_sgst = 0
+            total_igst = 0
 
             for i, item_data in enumerate(line_items_data, 1):
                 quantity = float(item_data['quantity'])
                 unit_price = float(item_data['unit_price'])
-                tax_percentage = float(item_data.get('tax_percentage', 18.0))
+                
+                # Get individual tax percentages
+                cgst_percentage = float(item_data.get('cgst_percentage', 0.0))
+                sgst_percentage = float(item_data.get('sgst_percentage', 0.0))
+                igst_percentage = float(item_data.get('igst_percentage', 0.0))
 
                 line_total = quantity * unit_price
-                tax_amount = (line_total * tax_percentage) / 100
+                
+                # Calculate individual tax amounts
+                cgst_amount = (line_total * cgst_percentage) / 100
+                sgst_amount = (line_total * sgst_percentage) / 100
+                igst_amount = (line_total * igst_percentage) / 100
+                
+                # Total tax for this line
+                tax_amount = cgst_amount + sgst_amount + igst_amount
+                
+                # For backward compatibility, use total tax percentage
+                tax_percentage = cgst_percentage + sgst_percentage + igst_percentage
 
                 line_item = InvoiceLineItem(
                     invoice_id=invoice.id,
@@ -216,6 +232,12 @@ def create_invoice():
                     unit_price=unit_price,
                     tax_percentage=tax_percentage,
                     tax_amount=tax_amount,
+                    cgst_percentage=cgst_percentage,
+                    sgst_percentage=sgst_percentage,
+                    igst_percentage=igst_percentage,
+                    cgst_amount=cgst_amount,
+                    sgst_amount=sgst_amount,
+                    igst_amount=igst_amount,
                     total_amount=line_total + tax_amount,
                     cost_price=float(item_data.get('cost_price', 0)),
                     ai_suggested=item_data.get('ai_suggested', False)
@@ -223,24 +245,21 @@ def create_invoice():
 
                 db.session.add(line_item)
                 subtotal += line_total
-                total_tax += tax_amount
+                total_cgst += cgst_amount
+                total_sgst += sgst_amount
+                total_igst += igst_amount
             db.session.commit()
 
-            # Calculate taxes based on client location
+            # Calculate invoice-level taxes
             client = Client.query.get(client_id)
             company = Company.query.first()
 
-            if client and company and client.state == company.state:
-                invoice.cgst = total_tax / 2
-                invoice.sgst = total_tax / 2
-                invoice.igst = 0
-            else:
-                invoice.igst = total_tax
-                invoice.cgst = 0
-                invoice.sgst = 0
-
+            # Set invoice totals based on what was calculated from line items
+            invoice.cgst = total_cgst
+            invoice.sgst = total_sgst
+            invoice.igst = total_igst
             invoice.subtotal = subtotal
-            invoice.total_amount = subtotal + total_tax
+            invoice.total_amount = subtotal + total_cgst + total_sgst + total_igst
 
             # Generate QR code
             invoice.qr_payment_code = generate_payment_qr_code(invoice)

@@ -617,13 +617,21 @@ Subject to local jurisdiction only.</textarea>
         rows.forEach(row => {
             const description = row.querySelector('[name="description"]').value.trim();
             if (description) {
+                const quantity = parseFloat(row.querySelector('[name="quantity"]').value) || 0;
+                const unitPrice = parseFloat(row.querySelector('[name="unit_price"]').value) || 0;
+                const cgstPercent = parseFloat(row.querySelector('[name="cgst_percentage"]').value) || 0;
+                const sgstPercent = parseFloat(row.querySelector('[name="sgst_percentage"]').value) || 0;
+                const igstPercent = parseFloat(row.querySelector('[name="igst_percentage"]').value) || 0;
+
                 lineItems.push({
                     hsn_code: row.querySelector('[name="hsn_code"]').value,
                     description: description,
-                    quantity: parseFloat(row.querySelector('[name="quantity"]').value) || 0,
+                    quantity: quantity,
                     unit: row.querySelector('[name="unit"]').value,
-                    unit_price: parseFloat(row.querySelector('[name="unit_price"]').value) || 0,
-                    tax_percentage: parseFloat(row.querySelector('[name="tax_percentage"]').value) || 0
+                    unit_price: unitPrice,
+                    cgst_percentage: cgstPercent,
+                    sgst_percentage: sgstPercent,
+                    igst_percentage: igstPercent
                 });
             }
         });
@@ -675,47 +683,60 @@ Subject to local jurisdiction only.</textarea>
         // set selected format
         document.getElementById("invoice_format").value = selected.value;
 
-        // 🔥 CALL saveInvoice (DO NOT SUBMIT HERE)
+        // Close modal and save invoice
+        bootstrap.Modal.getInstance(document.getElementById('invoiceFormatModal')).hide();
         saveInvoice();
     }
 
-    function saveInvoice() {
+
+    // Save button - opens format modal
+    document.getElementById("saveInvoiceBtn").addEventListener("click", function () {
+        // Validate form first
+        const clientId = document.getElementById('client_id').value;
         const rows = document.querySelectorAll('.item-row');
-        const lineItems = [];
 
-        rows.forEach(row => {
-            const description = row.querySelector('[name="description"]').value.trim();
-            if (!description) return;
-
-            lineItems.push({
-                hsn_code: row.querySelector('[name="hsn_code"]').value,
-                description: description,
-                quantity: row.querySelector('[name="quantity"]').value,
-                unit: row.querySelector('[name="unit"]').value,
-                unit_price: row.querySelector('[name="unit_price"]').value,
-                tax_percentage: row.querySelector('[name="tax_percentage"]').value
-            });
-        });
-
-        console.log("FINAL lineItems:", lineItems); // 🔥 MUST SHOW DATA
-
-        if (lineItems.length === 0) {
-            alert("Please add at least one item");
+        if (!clientId) {
+            alert('Please select a client');
             return;
         }
 
-        document.getElementById("line_items").value = JSON.stringify(lineItems);
+        let hasItems = false;
+        rows.forEach(row => {
+            const description = row.querySelector('[name="description"]').value.trim();
+            if (description) hasItems = true;
+        });
 
-        document.getElementById("invoiceForm").submit();
-    }
+        if (!hasItems) {
+            alert('Please add at least one item');
+            return;
+        }
 
-
-
-    // override save click
-    document.getElementById("saveInvoiceBtn").addEventListener("click", function () {
         openInvoiceFormatModal();
     });
 
+    // Preview button - validate and open in new tab without saving
+    document.getElementById("previewBtn").addEventListener("click", function () {
+        const clientId = document.getElementById('client_id').value;
+        const rows = document.querySelectorAll('.item-row');
+
+        if (!clientId) {
+            alert('Please select a client to preview invoice');
+            return;
+        }
+
+        let hasItems = false;
+        rows.forEach(row => {
+            const description = row.querySelector('[name="description"]').value.trim();
+            if (description) hasItems = true;
+        });
+
+        if (!hasItems) {
+            alert('Please add at least one item to preview');
+            return;
+        }
+
+        alert('Preview functionality: This would show a preview without saving.\nFor now, please use Save Invoice to create and view the invoice.');
+    });
 
 
 </script>

@@ -37,42 +37,42 @@
 
 
 
-import threading
-import webview
-from app import app
+# import threading
+# import webview
+# from app import app
 
 
-def start_flask():
-    app.run(
-        host="127.0.0.1",
-        port=5004,
-        debug=False,        # ❌ NEVER True in exe
-        use_reloader=False # ❌ MUST be False
-    )
+# def start_flask():
+#     app.run(
+#         host="127.0.0.1",
+#         port=5004,
+#         debug=False,        # ❌ NEVER True in exe
+#         use_reloader=False # ❌ MUST be False
+#     )
 
 
-if __name__ == "__main__":
-    threading.Thread(target=start_flask, daemon=True).start()
+# if __name__ == "__main__":
+#     threading.Thread(target=start_flask, daemon=True).start()
 
-    webview.create_window(
-        title="Invoice Application",
-        url="http://127.0.0.1:5004",
-        width=1200,
-        height=800
-    )
+#     webview.create_window(
+#         title="Invoice Application",
+#         url="http://127.0.0.1:5004",
+#         width=1200,
+#         height=800
+#     )
 
-    webview.start()
+#     webview.start()
 
 
 
 # for web application testing
 
-# from app import app
+from app import app
 
-# if __name__ == "__main__":
-#     app.run(
-#         host="127.0.0.1",
-#         port=5004,
-#         debug=True,         # 🔹 Enables code reload on changes
-#         use_reloader=True   # 🔹 Watches files for changes
-#     )
+if __name__ == "__main__":
+    app.run(
+        host="127.0.0.1",
+        port=5004,
+        debug=True,         # 🔹 Enables code reload on changes
+        use_reloader=True   # 🔹 Watches files for changes
+    )
