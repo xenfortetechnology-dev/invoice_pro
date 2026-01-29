@@ -1197,41 +1197,7 @@ def inject_globals():
     }
       
 
-@app.route('/analytics/export/pdf')
-@login_required
-def export_analytics_pdf():
-    try:
-        analytics_data = _get_analytics_data_dict()
-        pdf_file = report_generator.generate_pdf_report(analytics_data)
-        
-        return send_file(
-            pdf_file,
-            as_attachment=True,
-            download_name=f"analytics_report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-            mimetype="application/pdf"
-        )
-    except Exception as e:
-        logging.error(f"PDF export failed: {e}")
-        flash(f"Failed to export PDF: {e}", "error")
-        return redirect(url_for('analytics'))
 
-@app.route('/analytics/export/excel', endpoint="analytics_export_excel")
-@login_required
-def export_analytics_excel():
-    try:
-        analytics_data = _get_analytics_data_dict()
-        excel_file = report_generator.generate_excel_report(analytics_data)
-        
-        return send_file(
-            excel_file,
-            as_attachment=True,
-            download_name=f"analytics_report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-    except Exception as e:
-        logging.error(f"Excel export failed: {e}")
-        flash(f"Failed to export Excel: {e}", "error")
-        return redirect(url_for('analytics'))
 
 
 
@@ -1771,6 +1737,7 @@ def cancel_quotation(qid):
     q = Quotation.query.get_or_404(qid)
     q.status = "Cancelled"
     db.session.commit()
+    flash("Quotation has been cancelled.", "warning")
     return redirect(url_for("quotation_preview", qid=q.id))
 
 
@@ -1898,13 +1865,9 @@ def dashboard_page():
         recent_invoices=recent_invoices,
         monthly_revenue=monthly_revenue   # ✅ NEW
     )
-    
 
-# =========================
-# VOICE COMMAND API
-# =========================
 
-@app.route('/api/voice-command', methods=['POST'])
+@app.route('/analytics/export/excel')
 @login_required
 def voice_command_api():
     """
@@ -1987,5 +1950,120 @@ def voice_session_clear():
             'success': False,
             'error': str(e)
         }), 500
+
+
+@app.route('/analytics/export/excel')
+@login_required
+def export_analytics_excel():
+    """Export analytics to Excel (Saves to Downloads)"""
+    try:
+        import pandas as pd
+        time_range = request.args.get('range', '12m')
+        analytics_data = _get_analytics_data_dict(time_range)
+
+        # Generate filename and path
+        filename = f'Analytics_Report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        downloads_path = os.path.join(os.path.expanduser("~"), "Downloads")
+        file_path = os.path.join(downloads_path, filename)
+
+        with pd.ExcelWriter(file_path, engine='xlsxwriter') as writer:
+            # Sheet 1: Revenue Trends
+            if analytics_data.get('revenue_trends') and analytics_data['revenue_trends'].get('monthly_data'):
+                df_rev = pd.DataFrame(analytics_data['revenue_trends']['monthly_data'])
+                df_rev.to_excel(writer, sheet_name='Revenue', index=False)
+
+            # Sheet 2: Client Performance
+            if analytics_data.get('client_performance') and analytics_data['client_performance'].get('top_clients'):
+                # Flatten client object to dict
+                client_data = []
+                for client in analytics_data['client_performance']['top_clients']:
+                    client_data.append({
+                        'Name': client.name,
+                        'Revenue': client.total_revenue,
+                        'Invoices': client.invoice_count,
+                        'Avg Value': client.avg_invoice_value
+                    })
+                df_clients = pd.DataFrame(client_data)
+                df_clients.to_excel(writer, sheet_name='Clients', index=False)
+
+            # Sheet 3: Payment Status
+            if analytics_data.get('payment_analytics') and analytics_data['payment_analytics'].get('payment_status_distribution'):
+                df_payment = pd.DataFrame(analytics_data['payment_analytics']['payment_status_distribution'])
+                df_payment.to_excel(writer, sheet_name='Payments', index=False)
+
+        # Open file automatically
+        try:
+            os.startfile(file_path)
+        except Exception:
+            pass
+
+        return jsonify({"success": True, "message": f"Excel report saved to {file_path}", "path": file_path})
+
+    except Exception as e:
+        logging.error(f"Excel export failed: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/analytics/export/pdf')
+@login_required
+def export_analytics_pdf():
+    """Export analytics to PDF (Saves to Downloads)"""
+    try:
+        time_range = request.args.get('range', '12m')
+        analytics_data = _get_analytics_data_dict(time_range)
+
+        # Generate filename and path
+        filename = f'Analytics_Report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf'
+        downloads_path = os.path.join(os.path.expanduser("~"), "Downloads")
+        file_path = os.path.join(downloads_path, filename)
+
+        c = canvas.Canvas(file_path, pagesize=letter)
+        width, height = letter
+
+        # Header
+        c.setFont("Helvetica-Bold", 20)
+        c.drawString(50, height - 50, "Business Analytics Report")
+        c.setFont("Helvetica", 12)
+        c.drawString(50, height - 70, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+
+        y = height - 120
+
+        # Revenue Summary
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(50, y, "Revenue Summary")
+        y -= 20
+        c.setFont("Helvetica", 12)
+        if analytics_data.get('revenue_trends') and analytics_data['revenue_trends'].get('summary'):
+            summary = analytics_data['revenue_trends']['summary']
+            c.drawString(50, y, f"Total Revenue: {summary.get('total_revenue', 0)}")
+        else:
+            c.drawString(50, y, "No revenue data available.")
+        y -= 40
+
+        # Top Clients
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(50, y, "Top Clients")
+        y -= 25
+        c.setFont("Helvetica", 10)
+        if analytics_data.get('client_performance') and analytics_data['client_performance'].get('top_clients'):
+            for i, client in enumerate(analytics_data['client_performance']['top_clients'][:5]):
+                c.drawString(50, y, f"{i+1}. {client.name} - Revenue: {client.total_revenue}")
+                y -= 15
+        else:
+             c.drawString(50, y, "No client data available.")
+
+        c.save()
+
+        # Open file automatically
+        try:
+            os.startfile(file_path)
+        except Exception:
+            pass
+            
+        return jsonify({"success": True, "message": f"PDF report saved to {file_path}", "path": file_path})
+
+    except Exception as e:
+        logging.error(f"PDF export failed: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
 
 
