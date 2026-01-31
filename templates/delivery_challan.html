@@ -26,9 +26,9 @@
                 </button>
             </div>
         </div>
-       
-    <div class="card-body">
-        {% if challans %}
+
+        <div class="card-body">
+            {% if challans %}
             <div class="table-responsive">
                 <table class="table table-hover" id="challansTable">
                     <thead class="table-light">
@@ -48,7 +48,8 @@
                         <tr>
                             <td>
                                 {% if challan.status != 'Billed' %}
-                                <input type="checkbox" class="challanCheckbox" data-challan-id="{{ challan.id }}" data-client-id="{{ challan.client.id }}">
+                                <input type="checkbox" class="challanCheckbox" data-challan-id="{{ challan.id }}"
+                                    data-client-id="{{ challan.client.id }}">
                                 {% endif %}
                             </td>
                             <td><strong>{{ challan.challan_number }}</strong></td>
@@ -61,13 +62,14 @@
                             <td>{{ challan.challan_date.strftime('%d-%m-%Y') }}</td>
                             <td>
                                 {% if challan.delivery_date %}
-                                    {{ challan.delivery_date.strftime('%d-%m-%Y') }}
+                                {{ challan.delivery_date.strftime('%d-%m-%Y') }}
                                 {% else %}
-                                    <span class="text-muted">Not Scheduled</span>
+                                <span class="text-muted">Not Scheduled</span>
                                 {% endif %}
                             </td>
                             <td>
-                                <span class="badge bg-{{ 'success' if challan.status == 'Delivered' else 'info' if challan.status == 'Open' else 'primary' }}">
+                                <span
+                                    class="badge bg-{{ 'success' if challan.status == 'Delivered' else 'info' if challan.status == 'Open' else 'primary' }}">
                                     {{ challan.status }}
                                 </span>
                             </td>
@@ -75,18 +77,48 @@
                                 <span class="badge bg-light text-dark">{{ challan.line_items|length }} items</span>
                             </td>
                             <td>
-                                <div class="btn-group btn-group-sm">
-                                    <button class="btn btn-outline-primary" onclick="viewChallan({{ challan.id }})">
-                                        <i class="fas fa-eye"></i>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-light dropdown-toggle" type="button"
+                                        data-bs-toggle="dropdown">
+                                        Actions
                                     </button>
-                                    <a href="{{ url_for('challan_pdf', id=challan.id) }}" class="btn btn-outline-danger">
-                                        <i class="fas fa-file-pdf"></i>
-                                    </a>
-                                    {% if challan.status != 'Billed' %}
-                                    <button class="btn btn-outline-success" onclick="convertToInvoice({{ challan.id }})">
-                                        <i class="fas fa-file-invoice"></i>
-                                    </button>
-                                    {% endif %}
+                                    <ul class="dropdown-menu">
+                                        <li>
+                                            <a class="dropdown-item" href="#" onclick="viewChallan({{ challan.id }})">
+                                                <i class="fas fa-eye me-2"></i> View Details
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="{{ url_for('challan_pdf', id=challan.id) }}">
+                                                <i class="fas fa-file-pdf me-2"></i> Download PDF
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="#"
+                                                onclick="updateStatus({{ challan.id }}, '{{ challan.status }}')">
+                                                <i class="fas fa-edit me-2"></i> Update Status
+                                            </a>
+                                        </li>
+                                        {% if challan.status != 'Billed' %}
+                                        <li>
+                                            <a class="dropdown-item" href="#"
+                                                onclick="convertToInvoice({{ challan.id }})">
+                                                <i class="fas fa-file-invoice me-2"></i> Convert to Invoice
+                                            </a>
+                                        </li>
+                                        {% endif %}
+                                        <li>
+                                            <hr class="dropdown-divider">
+                                        </li>
+                                        <li>
+                                            <form action="{{ url_for('delete_challan', id=challan.id) }}" method="POST"
+                                                onsubmit="return confirm('Are you sure you want to delete this challan?');">
+                                                <button type="submit" class="dropdown-item text-danger">
+                                                    <i class="fas fa-trash me-2"></i> Delete
+                                                </button>
+                                            </form>
+                                        </li>
+                                    </ul>
                                 </div>
                             </td>
                         </tr>
@@ -94,7 +126,7 @@
                     </tbody>
                 </table>
             </div>
-        {% else %}
+            {% else %}
             <div class="text-center py-5">
                 <i class="fas fa-truck fa-3x text-muted mb-3"></i>
                 <h5 class="text-muted">No delivery challans found</h5>
@@ -103,203 +135,252 @@
                     <i class="fas fa-plus me-1"></i>Create First Challan
                 </a>
             </div>
-        {% endif %}
+            {% endif %}
+        </div>
     </div>
-</div>
 
-<!-- Modal moved OUTSIDE .card-body and .table-responsive -->
-<div class="modal fade" id="consolidatedInvoiceModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Generate Consolidated Invoice</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Select how to consolidate line items from selected challans:</p>
-                <div class="form-check">
-                    <input class="form-check-input" type="radio" name="consolidationOption" id="mergeItems" value="merge" checked>
-                    <label class="form-check-label" for="mergeItems">
-                        Merge all line items into one invoice
-                    </label>
+    <!-- Modal moved OUTSIDE .card-body and .table-responsive -->
+    <div class="modal fade" id="consolidatedInvoiceModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Generate Consolidated Invoice</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="radio" name="consolidationOption" id="groupByChallan" value="group">
-                    <label class="form-check-label" for="groupByChallan">
-                        Group line items by challan number
-                    </label>
+                <div class="modal-body">
+                    <p>Select how to consolidate line items from selected challans:</p>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="consolidationOption" id="mergeItems"
+                            value="merge" checked>
+                        <label class="form-check-label" for="mergeItems">
+                            Merge all line items into one invoice
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="consolidationOption" id="groupByChallan"
+                            value="group">
+                        <label class="form-check-label" for="groupByChallan">
+                            Group line items by challan number
+                        </label>
+                    </div>
+                    <div class="mb-3 mt-3">
+                        <label for="consolidatedDueDate" class="form-label">Due Date</label>
+                        <input type="date" class="form-control" id="consolidatedDueDate">
+                    </div>
+                    <div class="mb-3">
+                        <label for="consolidatedNotes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="consolidatedNotes" rows="3"></textarea>
+                    </div>
                 </div>
-                <div class="mb-3 mt-3">
-                    <label for="consolidatedDueDate" class="form-label">Due Date</label>
-                    <input type="date" class="form-control" id="consolidatedDueDate">
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" id="confirmConsolidatedInvoiceBtn">Generate
+                        Invoice</button>
                 </div>
-                <div class="mb-3">
-                    <label for="consolidatedNotes" class="form-label">Notes</label>
-                    <textarea class="form-control" id="consolidatedNotes" rows="3"></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success" id="confirmConsolidatedInvoiceBtn">Generate Invoice</button>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Challan Details Modal -->
-<div class="modal fade" id="challanModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Challan Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="challanModalBody">
-                <!-- Challan details will be loaded here -->
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+    <!-- Challan Details Modal -->
+    <div class="modal fade" id="challanModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Challan Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="challanModalBody">
+                    <!-- Challan details will be loaded here -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Convert to Invoice Modal -->
-<div class="modal fade" id="convertModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Convert to Invoice</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Convert this delivery challan to an invoice?</p>
-                <div class="mb-3">
-                    <label class="form-label">Due Date</label>
-                    <input type="date" class="form-control" id="convertDueDate">
+    <!-- Convert to Invoice Modal -->
+    <div class="modal fade" id="convertModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Convert to Invoice</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Notes</label>
-                    <textarea class="form-control" id="convertNotes" rows="3"></textarea>
+                <div class="modal-body">
+                    <p>Convert this delivery challan to an invoice?</p>
+                    <div class="mb-3">
+                        <label class="form-label">Due Date</label>
+                        <input type="date" class="form-control" id="convertDueDate">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" id="convertNotes" rows="3"></textarea>
+                    </div>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success" onclick="confirmConvert()">Convert to Invoice</button>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" onclick="confirmConvert()">Convert to Invoice</button>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<script>
-let selectedChallanId = null;
+    <!-- Update Status Modal -->
+    <div class="modal fade" id="updateStatusModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Update Delivery Status</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="updateStatusForm" method="POST">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">New Status</label>
+                            <select class="form-select" name="status" id="newStatusSelect">
+                                <option value="Open">Open</option>
+                                <option value="Dispatched">Dispatched</option>
+                                <option value="In Transit">In Transit</option>
+                                <option value="Delivered">Delivered</option>
+                                <option value="returned">Returned</option>
+                                <option value="Cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Note (Optional)</label>
+                            <textarea class="form-control" name="note" rows="2"
+                                placeholder="Add a note about this status update..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Update Status</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
-function viewChallan(challanId) {
-    const modalBody = document.getElementById('challanModalBody');
-    modalBody.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
-    const modal = new bootstrap.Modal(document.getElementById('challanModal'));
-    modal.show();
+    <script>
+        let selectedChallanId = null;
 
-    fetch(`/challan/${challanId}/details`)
-        .then(res => res.text())
-        .then(html => {
-            modalBody.innerHTML = html;
-        })
-        .catch(err => {
-            modalBody.innerHTML = '<div class="text-danger">Failed to load challan details.</div>';
-        });
-}
+        function viewChallan(challanId) {
+            const modalBody = document.getElementById('challanModalBody');
+            modalBody.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+            const modal = new bootstrap.Modal(document.getElementById('challanModal'));
+            modal.show();
 
-function convertToInvoice(challanId) {
-    selectedChallanId = challanId;
-    new bootstrap.Modal(document.getElementById('convertModal')).show();
-}
+            fetch(`/challan/${challanId}/details`)
+                .then(res => res.text())
+                .then(html => {
+                    modalBody.innerHTML = html;
+                })
+                .catch(err => {
+                    modalBody.innerHTML = '<div class="text-danger">Failed to load challan details.</div>';
+                });
+        }
 
-function confirmConvert() {
-    if (selectedChallanId) {
-        var dueDate = document.getElementById('convertDueDate').value;
-        var notes = document.getElementById('convertNotes').value;
-        window.location.href = '/convert_challan_to_invoice/' + selectedChallanId + '?due_date=' + dueDate + '&notes=' + encodeURIComponent(notes);
-    }
-}
+        function convertToInvoice(challanId) {
+            selectedChallanId = challanId;
+            new bootstrap.Modal(document.getElementById('convertModal')).show();
+        }
 
- </script>
+        function updateStatus(challanId, currentStatus) {
+            var form = document.getElementById('updateStatusForm');
+            form.action = '/challan/' + challanId + '/update_status';
 
-<script type="text/javascript">
-document.addEventListener('DOMContentLoaded', function() {
-    var selectAllCheckbox = document.getElementById('selectAllChallans');
-    var challanCheckboxes = document.querySelectorAll('.challanCheckbox');
-    var generateBtn = document.getElementById('generateConsolidatedInvoiceBtn');
-    var consolidatedModal = new bootstrap.Modal(document.getElementById('consolidatedInvoiceModal'));
-    var confirmConsolidatedBtn = document.getElementById('confirmConsolidatedInvoiceBtn');
+            var select = document.getElementById('newStatusSelect');
+            select.value = currentStatus;
 
-    function updateGenerateButtonState() {
-        var anyChecked = false;
-        for (var i = 0; i < challanCheckboxes.length; i++) {
-            if (challanCheckboxes[i].checked) {
-                anyChecked = true;
-                break;
+            new bootstrap.Modal(document.getElementById('updateStatusModal')).show();
+        }
+
+        function confirmConvert() {
+            if (selectedChallanId) {
+                var dueDate = document.getElementById('convertDueDate').value;
+                var notes = document.getElementById('convertNotes').value;
+                window.location.href = '/convert_challan_to_invoice/' + selectedChallanId + '?due_date=' + dueDate + '&notes=' + encodeURIComponent(notes);
             }
         }
-        generateBtn.disabled = !anyChecked;
-    }
 
-    if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', function() {
-            for (var i = 0; i < challanCheckboxes.length; i++) {
-                if (!challanCheckboxes[i].disabled) {
-                    challanCheckboxes[i].checked = selectAllCheckbox.checked;
+    </script>
+
+    <script type="text/javascript">
+        document.addEventListener('DOMContentLoaded', function () {
+            var selectAllCheckbox = document.getElementById('selectAllChallans');
+            var challanCheckboxes = document.querySelectorAll('.challanCheckbox');
+            var generateBtn = document.getElementById('generateConsolidatedInvoiceBtn');
+            var consolidatedModal = new bootstrap.Modal(document.getElementById('consolidatedInvoiceModal'));
+            var confirmConsolidatedBtn = document.getElementById('confirmConsolidatedInvoiceBtn');
+
+            function updateGenerateButtonState() {
+                var anyChecked = false;
+                for (var i = 0; i < challanCheckboxes.length; i++) {
+                    if (challanCheckboxes[i].checked) {
+                        anyChecked = true;
+                        break;
+                    }
                 }
+                generateBtn.disabled = !anyChecked;
             }
-            updateGenerateButtonState();
+
+            if (selectAllCheckbox) {
+                selectAllCheckbox.addEventListener('change', function () {
+                    for (var i = 0; i < challanCheckboxes.length; i++) {
+                        if (!challanCheckboxes[i].disabled) {
+                            challanCheckboxes[i].checked = selectAllCheckbox.checked;
+                        }
+                    }
+                    updateGenerateButtonState();
+                });
+            }
+
+            for (var i = 0; i < challanCheckboxes.length; i++) {
+                challanCheckboxes[i].addEventListener('change', function () {
+                    updateGenerateButtonState();
+                    if (!this.checked) {
+                        selectAllCheckbox.checked = false;
+                    }
+                });
+            }
+
+            generateBtn.addEventListener('click', function () {
+                consolidatedModal.show();
+            });
+
+            confirmConsolidatedBtn.addEventListener('click', function () {
+                var selectedChallans = [];
+                for (var i = 0; i < challanCheckboxes.length; i++) {
+                    if (challanCheckboxes[i].checked) {
+                        selectedChallans.push(challanCheckboxes[i].getAttribute('data-challan-id'));
+                    }
+                }
+                var consolidationOption = document.querySelector('input[name="consolidationOption"]:checked').value;
+                var dueDate = document.getElementById('consolidatedDueDate').value;
+                var notes = document.getElementById('consolidatedNotes').value;
+
+                console.log('Selected Challans:', selectedChallans);
+                console.log('Consolidation Option:', consolidationOption);
+                console.log('Due Date:', dueDate);
+                console.log('Notes:', notes);
+
+                if (selectedChallans.length === 0) {
+                    alert('Please select at least one challan.');
+                    return;
+                }
+
+                var url = window.location.origin + '/convert_multiple_challans_to_invoice?challan_ids=' + selectedChallans.join(',') + '&consolidation_option=' + consolidationOption;
+                if (dueDate) {
+                    url += '&due_date=' + dueDate;
+                }
+                if (notes) {
+                    url += '&notes=' + encodeURIComponent(notes);
+                }
+
+                window.location.href = url;
+            });
         });
-    }
+    </script>
 
-    for (var i = 0; i < challanCheckboxes.length; i++) {
-        challanCheckboxes[i].addEventListener('change', function() {
-            updateGenerateButtonState();
-            if (!this.checked) {
-                selectAllCheckbox.checked = false;
-            }
-        });
-    }
-
-    generateBtn.addEventListener('click', function() {
-        consolidatedModal.show();
-    });
-
-    confirmConsolidatedBtn.addEventListener('click', function() {
-        var selectedChallans = [];
-        for (var i = 0; i < challanCheckboxes.length; i++) {
-            if (challanCheckboxes[i].checked) {
-                selectedChallans.push(challanCheckboxes[i].getAttribute('data-challan-id'));
-            }
-        }
-        var consolidationOption = document.querySelector('input[name="consolidationOption"]:checked').value;
-        var dueDate = document.getElementById('consolidatedDueDate').value;
-        var notes = document.getElementById('consolidatedNotes').value;
-
-        console.log('Selected Challans:', selectedChallans);
-        console.log('Consolidation Option:', consolidationOption);
-        console.log('Due Date:', dueDate);
-        console.log('Notes:', notes);
-
-        if (selectedChallans.length === 0) {
-            alert('Please select at least one challan.');
-            return;
-        }
-
-        var url = window.location.origin + '/convert_multiple_challans_to_invoice?challan_ids=' + selectedChallans.join(',') + '&consolidation_option=' + consolidationOption;
-        if (dueDate) {
-            url += '&due_date=' + dueDate;
-        }
-        if (notes) {
-            url += '&notes=' + encodeURIComponent(notes);
-        }
-
-        window.location.href = url;
-    });
-});
-</script>
-
-{% endblock %}
+    {% endblock %}
