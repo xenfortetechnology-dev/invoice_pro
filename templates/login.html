@@ -2,12 +2,13 @@
 {% block title %}Login - Revolutionary Invoice System{% endblock %}
 
 {% block content %}
-<div class="container-fluid vh-100 login-bg px-0">
+<div class="container-fluid  login-bg px-0">
     <div class="row h-100 g-0">
 
 
         <!-- ================= LEFT BRANDING ================= -->
-        <div class="col-lg-6 d-none d-lg-flex align-items-center justify-content-center branding-panel">
+         <div class="container">
+                    <div class="col-lg-6 d-none d-lg-flex align-items-center justify-content-center branding-panel">
             <div class="text-center text-white branding-box">
 
                 <img src="static/Xen_logo.png" alt="Xen Logo" class="mb-4 floating glow xen-logo"/>
@@ -17,33 +18,28 @@
                     Revolutionary Invoice
                 </h1>
 
-                <p class="lead mb-4">AI-Powered • Blockchain Secured• Voice Enabled</p>
+                <p class="lead mb-4">AI-Powered • Voice Enabled</p>
 
                 <!-- FEATURE ICONS -->
                 <div class="row text-center mt-4 feature-icons">
-                <div class="row text-center mt-4 feature-icons greyed-out">
 
-                    <div class="col-4">
+                    <div class="col-2">
                         <i data-feather="cpu" size="42" class="ai-icon"></i>
                         <p>AI Assistant</p>
                     </div>
                    
-                    <div class="col-4">
-                        <i data-feather="shield" size="42" class="blockchain-icon"></i>
-                        <p>Blockchain</p>
-                    </div> 
-                    <div class="col-4">
+                    <div class="col-2">
                         <i data-feather="mic" size="42" class="voice-icon"></i>
                         <p>Voice</p>
                     </div>
-                    </div>
                 </div>
+
 
             </div>
         </div>
 
         <!-- ================= LOGIN CARD ================= -->
-        <div class="col-lg-6 d-flex align-items-center justify-content-center">
+        <div class="align-items-center justify-content-center login_body">
             <div class="login-card sparkle particle-zone">
 
                 <div class="text-center mb-4">
@@ -82,6 +78,7 @@
 
             </div>
         </div>
+         </div>
 
     </div>
 </div>
@@ -89,14 +86,28 @@
 <!-- ================= STYLES ================= -->
 <style>
 
+
+
+
+html, body {
+    height: 100%;
+    margin: 0;
+    /* padding: 0; */
+    overflow: hidden; 
+}
+
 /* ================= BACKGROUND ================= */
  
 
+
+
 /* LEFT PANEL */
 .branding-panel {
-    background:
+    /* background:
         radial-gradient(circle at top left, rgba(255,255,255,0.12), transparent 40%),
-        linear-gradient(135deg, #4f46e5, #7c3aed);
+        linear-gradient(135deg, #4f46e5, #7c3aed); */
+        
+        border-radius: 20px;
 }
 
 /* RIGHT PANEL */
@@ -111,6 +122,10 @@
 }
 
 /* ================= CARD ================= */
+.login_body{
+    background:transparent !important;
+    margin: 50px 40px;
+}
 .login-card {
     width: 100%;
     max-width: 430px;
@@ -309,6 +324,9 @@
 /* ================= FEATURE ICON EFFECTS ================= */
 .feature-icons i {
     transition:0.4s;
+}
+.feature-icons{
+    justify-content: center;
 }
 
 .ai-icon:hover {
@@ -517,12 +535,26 @@ html, body {
 
 /* Kill Bootstrap container padding */
 .container-fluid {
-    padding-top: -3px!important;
-    padding-left: 10px!important;
-    padding-right: 10px!important;
-    padding-bottom: 25px!important;
-    max-width: 100% !important;
+    height: 100vh;
+    width: 100vw;
+    background:
+        radial-gradient(circle at top left, rgba(255,255,255,0.12), transparent 40%),
+        linear-gradient(135deg, #4f46e5, #7c3aed);
+    
 }
+
+
+.container{
+    background-color: transparent;
+    /* padding: 20px;
+    margin: 40px;
+    margin-left: 60px; */
+    display: flex;
+    margin-top: 50px;
+    margin-bottom: 50px;
+    justify-content: center;
+}
+
 
 /* Kill Bootstrap row gutter */
 .row {
@@ -534,12 +566,6 @@ html, body {
 /* Force full width columns */
 .col-lg-6 {
     padding: 0 !important;
-}
-
-.greyed-out{
-    opacity: 0.55;                 /* soft fade */
-    filter: grayscale(60%) blur(1.2px);
-    transition: all 0.3s ease-in-out;
 }
 
 /* ===== REMOVE BROWSER DEFAULT PASSWORD EYE ICON ===== */
