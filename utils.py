@@ -17,8 +17,14 @@ from models import Invoice, Client, InvoiceLineItem, Company
 import config
 import logging
 
-def safe_dict(value):
-        return value if isinstance(value, dict) else {}
+def safe_dict(model):
+    if model is None:
+        return {}
+
+    return {
+        column.name: getattr(model, column.name)
+        for column in model.__table__.columns
+    }
 
 def generate_password_hash(password):
     """Generate password hash"""
@@ -598,4 +604,24 @@ def get_outstanding_invoices_summary():
         'overdue_amount': float(overdue.total_overdue or 0)
     }
 
+def company_to_dict(company):
+    return {
+        "id": company.id,
+        "name": company.name,
+        "address": company.address,
+        "city": company.city,
+        "state": company.state,
+        "pincode": company.pincode,
+        "phone": company.phone,
+        "email": company.email,
+        "website": company.website,
+        "gstin": company.gstin,
+        "pan": company.pan,
+        "logo_path": company.logo_path,
+        "ai_brand_voice": company.ai_brand_voice,
+        "auto_invoice_templates": company.auto_invoice_templates,
+        "blockchain_id": company.blockchain_id,
+        "created_at": company.created_at,
+        "updated_at": company.updated_at
+    }
 

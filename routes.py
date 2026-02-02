@@ -42,9 +42,13 @@ analytics_engine = AnalyticsEngine(db.session)
 from report_generator import AnalyticsReportGenerator
 report_generator = AnalyticsReportGenerator()
 
+from functools import wraps
+from flask import session, redirect, url_for, flash, jsonify
+
+# -------------------------
+# UI LOGIN DECORATOR
+# -------------------------
 def login_required(f):
-    """Decorator to require login for routes"""
-    from functools import wraps
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
@@ -52,6 +56,23 @@ def login_required(f):
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
+
+
+# -------------------------
+# API LOGIN DECORATOR
+# -------------------------
+def api_login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session:
+            return jsonify({
+                "success": False,
+                "message": "Unauthorized. Please login."
+            }), 401
+        return f(*args, **kwargs)
+    return decorated
+
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -2129,4 +2150,441 @@ def export_analytics_pdf():
         return jsonify({"success": False, "message": str(e)}), 500
 
 
+### API for core features
+'''----------------------------
+    Client
+--------------------------------'''
+@app.route("/api/clients", methods=["GET"])
+@api_login_required
+def api_get_clients():
+    clients = Client.query.order_by(Client.name).all()
+    return jsonify([safe_dict(c) for c in clients])
 
+
+@app.route("/api/clients", methods=["POST"])
+@api_login_required
+def api_create_client():
+    data = request.get_json()
+
+    try:
+        client = Client(
+            name=data.get("name"),
+            phone=data.get("phone"),
+            email=data.get("email"),
+            city=data.get("city")
+        )
+        db.session.add(client)
+        db.session.commit()
+        return jsonify({"success": True, "client_id": client.id})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/clients/<int:id>", methods=["PUT"])
+@api_login_required
+def api_update_client(id):
+    client = Client.query.get_or_404(id)
+    data = request.get_json()
+
+    try:
+        client.name = data.get("name", client.name)
+        client.phone = data.get("phone", client.phone)
+        client.email = data.get("email", client.email)
+        client.city = data.get("city", client.city)
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "client": safe_dict(client)
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route("/api/clients/<int:id>", methods=["DELETE"])
+@api_login_required
+def api_delete_client(id):
+    client = Client.query.get_or_404(id)
+
+    try:
+        db.session.delete(client)
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "message": "Client deleted successfully"
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+'''----------------------------
+    Invoice
+--------------------------------'''
+@app.route("/api/invoices", methods=["GET"])
+@api_login_required
+def api_get_invoices():
+    invoices = Invoice.query.order_by(Invoice.invoice_date.desc()).all()
+
+    result = []
+    for i in invoices:
+        result.append({
+            "id": i.id,
+            "invoice_number": i.invoice_number,
+            "client_id": i.client_id,
+            "invoice_date": i.invoice_date.isoformat() if i.invoice_date else None,
+            "total_amount": i.total_amount,
+            "payment_status": i.payment_status
+        })
+
+    return jsonify(result)
+
+
+@app.route("/api/invoices", methods=["POST"])
+@api_login_required
+def api_create_invoice():
+    data = request.get_json()
+
+    try:
+        invoice = Invoice(
+            invoice_number=generate_invoice_number(),
+            client_id=data["client_id"],
+            invoice_date=datetime.strptime(data["invoice_date"], "%Y-%m-%d").date(),
+            notes=data.get("notes", "")
+        )
+
+        db.session.add(invoice)
+        db.session.commit()
+
+        subtotal = 0
+        total_tax = 0
+
+        for i, item in enumerate(data["items"], 1):
+            qty = float(item["quantity"])
+            price = float(item["unit_price"])
+            tax = float(item.get("tax_percentage", 18))
+
+            line_total = qty * price
+            tax_amt = (line_total * tax) / 100
+
+            line = InvoiceLineItem(
+                invoice_id=invoice.id,
+                sr_no=i,
+                description=item["description"],
+                quantity=qty,
+                unit_price=price,
+                tax_percentage=tax,
+                tax_amount=tax_amt,
+                total_amount=line_total + tax_amt
+            )
+
+            db.session.add(line)
+            subtotal += line_total
+            total_tax += tax_amt
+
+        invoice.subtotal = subtotal
+        invoice.total_amount = subtotal + total_tax
+        db.session.commit()
+
+        return jsonify({"success": True, "invoice_id": invoice.id})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/invoices/<int:id>", methods=["PUT"])
+@api_login_required
+def api_update_invoice(id):
+    invoice = Invoice.query.get_or_404(id)
+    data = request.get_json()
+
+    invoice.notes = data.get("notes", invoice.notes)
+    invoice.payment_status = data.get("payment_status", invoice.payment_status)
+
+    db.session.commit()
+
+    return jsonify({"success": True, "message": "Invoice updated"})
+
+
+@app.route("/api/invoices/<int:id>/delete", methods=["DELETE"])
+@api_login_required
+def api_delete_invoice(id):
+    invoice = Invoice.query.get_or_404(id)
+    db.session.delete(invoice)
+    db.session.commit()
+
+    return jsonify({"success": True})
+
+'''----------------------------
+   quotation 
+--------------------------------'''
+@app.route("/api/quotations", methods=["GET"])
+@api_login_required
+def api_get_quotations():
+    quotations = Quotation.query.order_by(Quotation.id.desc()).all()
+    return jsonify([q.to_dict() for q in quotations])
+
+
+@app.route("/api/quotations", methods=["POST"])
+@api_login_required
+def api_create_quotation():
+    data = request.get_json()
+
+    try:
+        quotation = Quotation(
+            quotation_number=generate_quotation_number(),
+            quotation_date=datetime.strptime(data["quotation_date"], "%Y-%m-%d"),
+            validity_days=data.get("validity_days", 30),
+            status="Draft",
+            sales_person=data.get("sales_person"),
+            reference_id=data.get("reference_id"),
+            subtotal=data.get("subtotal", 0),
+            discount=data.get("discount", 0),
+            taxable_value=data.get("taxable_value", 0),
+            cgst=data.get("cgst", 0),
+            sgst=data.get("sgst", 0),
+            igst=data.get("igst", 0),
+            grand_total=data.get("grand_total", 0)
+        )
+
+        db.session.add(quotation)
+        db.session.commit()
+
+        return jsonify({"success": True, "quotation_id": quotation.id})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/quotations/<int:id>", methods=["PUT"])
+@api_login_required
+def api_update_quotation(id):
+    quotation = Quotation.query.get_or_404(id)
+    data = request.get_json()
+
+    for key, value in data.items():
+        if hasattr(quotation, key):
+            setattr(quotation, key, value)
+
+    db.session.commit()
+    return jsonify({"success": True})
+
+@app.route("/api/quotations/<int:id>", methods=["DELETE"])
+@api_login_required
+def api_delete_quotation(id):
+    quotation = Quotation.query.get_or_404(id)
+    db.session.delete(quotation)
+    db.session.commit()
+    return jsonify({"success": True})
+
+'''----------------------------
+   Challan
+--------------------------------'''
+
+@app.route("/api/challans", methods=["GET"])
+@api_login_required
+def api_get_challans():
+    challans = DeliveryChallan.query.order_by(DeliveryChallan.created_at.desc()).all()
+    return jsonify([safe_dict(c) for c in challans])
+
+
+@app.route("/api/challans", methods=["POST"])
+@api_login_required
+def api_create_challan():
+    data = request.get_json()
+
+    try:
+        challan = DeliveryChallan(
+            challan_number=data["challan_number"],
+            client_id=data["client_id"],
+            challan_date=datetime.strptime(
+                data.get("challan_date"), "%Y-%m-%d"
+            ).date() if data.get("challan_date") else datetime.utcnow().date(),
+            delivery_date=datetime.strptime(
+                data.get("delivery_date"), "%Y-%m-%d"
+            ).date() if data.get("delivery_date") else None,
+            status=data.get("status", "Open"),
+            notes=data.get("notes")
+        )
+
+        db.session.add(challan)
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "challan_id": challan.id
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/challans/<int:id>", methods=["PUT"])
+@api_login_required
+def api_update_challan(id):
+    data = request.get_json()
+    challan = DeliveryChallan.query.get_or_404(id)
+
+    try:
+        challan.status = data.get("status", challan.status)
+        challan.notes = data.get("notes", challan.notes)
+        challan.delivery_date = (
+            datetime.strptime(data["delivery_date"], "%Y-%m-%d").date()
+            if data.get("delivery_date") else challan.delivery_date
+        )
+
+        db.session.commit()
+        return jsonify({"success": True})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/challans/<int:id>", methods=["DELETE"])
+@api_login_required
+def api_delete_challan(id):
+    challan = DeliveryChallan.query.get_or_404(id)
+
+    try:
+        db.session.delete(challan)
+        db.session.commit()
+        return jsonify({"success": True})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+'''----------------------------
+   Company profile
+--------------------------------'''
+
+@app.route("/api/company", methods=["GET"])
+@api_login_required
+def api_get_company():
+    company = Company.query.first()
+
+    if not company:
+        return jsonify({"message": "Company profile not set"}), 404
+
+    return jsonify(company_to_dict(company))
+
+@app.route("/api/company", methods=["PUT"])
+@api_login_required
+def api_update_company():
+    data = request.get_json()
+
+    company = Company.query.first()
+
+    # If company not exists, create first time
+    if not company:
+        company = Company()
+        db.session.add(company)
+
+    try:
+        company.name = data.get("name", company.name)
+        company.address = data.get("address", company.address)
+        company.city = data.get("city", company.city)
+        company.state = data.get("state", company.state)
+        company.pincode = data.get("pincode", company.pincode)
+        company.phone = data.get("phone", company.phone)
+        company.email = data.get("email", company.email)
+        company.website = data.get("website", company.website)
+        company.gstin = data.get("gstin", company.gstin)
+        company.pan = data.get("pan", company.pan)
+        company.logo_path = data.get("logo_path", company.logo_path)
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "message": "Company profile updated successfully"
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+'''----------------------------
+   login profile
+--------------------------------'''
+@app.route("/api/auth/login", methods=["POST"])
+def api_login():
+    data = request.get_json()
+
+    username = data.get("username")
+    password = data.get("password")
+
+    if not username or not password:
+        return jsonify({
+            "success": False,
+            "message": "Username and password required"
+        }), 400
+
+    user = User.query.filter_by(username=username).first()
+
+    if not user or not check_password_hash(user.password_hash, password):
+        return jsonify({
+            "success": False,
+            "message": "Invalid credentials"
+        }), 401
+
+    # create session
+    session["user_id"] = user.id
+    session["username"] = user.username
+    session["is_admin"] = user.is_admin
+
+    return jsonify({
+        "success": True,
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "is_admin": user.is_admin
+        }
+    })
+
+
+@app.route("/api/auth/me", methods=["GET"])
+@api_login_required
+def api_me():
+    if "user_id" not in session:
+        return jsonify({
+            "authenticated": False
+        }), 401
+
+    return jsonify({
+        "authenticated": True,
+        "user": {
+            "id": session["user_id"],
+            "username": session["username"],
+            "is_admin": session.get("is_admin", False)
+        }
+    })
+
+
+
+@app.route("/api/auth/logout", methods=["POST"])
+@api_login_required
+def api_logout():
+    session.clear()
+    return jsonify({
+        "success": True,
+        "message": "Logged out successfully"
+    })
