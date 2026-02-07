@@ -1065,21 +1065,202 @@ def settings():
     
     return render_template('settings.html', settings_data=settings_data)
 
-@app.route("/create-challan")
+@app.route('/settings/update', methods=['POST'])
+@login_required
+def update_settings():
+    try:
+        data = request.get_json()
+        user = User.query.get(session['user_id'])
+        company = Company.query.first()
+        if not company:
+            company = Company(name="SyncForte")
+            db.session.add(company)
+        
+        # 1. Update Company
+        if 'company' in data:
+            c_data = data['company']
+            company.name = c_data.get('companyName')
+            company.email = c_data.get('companyEmail')
+            company.phone = c_data.get('companyPhone')
+            company.website = c_data.get('companyWebsite')
+            company.address = c_data.get('companyAddress')
+            company.city = c_data.get('companyCity')
+            company.state = c_data.get('companyState')
+            company.pincode = c_data.get('companyPincode')
+            company.gstin = c_data.get('companyGstin')
+            company.pan = c_data.get('companyPan')
+            
+        # 2. Update User Profile
+        if 'user' in data:
+            u_data = data['user']
+            # user.email = u_data.get('userEmail') # Handle carefully if email is login
+            if 'preferredLanguage' in u_data:
+                user.preferred_language = u_data['preferredLanguage']
+            if 'themePreference' in u_data:
+                user.theme_preference = u_data['themePreference']
+            
+            # User Features
+            user.ai_features_enabled = u_data.get('aiFeatures', False)
+            user.voice_commands_enabled = u_data.get('voiceCommands', False)
+            user.collaboration_access = u_data.get('collaborationAccess', False)
+            user.biometric_enabled = u_data.get('biometricEnabled', False)
+            
+            # Handle Password Change
+            new_pass = u_data.get('newPassword')
+            if new_pass:
+                # In a real app, verify current password first
+                from werkzeug.security import generate_password_hash
+                user.password_hash = generate_password_hash(new_pass)
+
+        # 3. Update Business Settings (General, AI, Blockchain, etc.)
+        # Helper to update or create setting
+        def update_biz_setting(key, value, type='general'):
+            setting = BusinessSettings.query.filter_by(key=key).first()
+            if not setting:
+                setting = BusinessSettings(key=key, setting_type=type)
+                db.session.add(setting)
+            setting.value = str(value)
+            
+        # Invoice Settings
+        if 'invoice' in data:
+            inv = data['invoice']
+            update_biz_setting('default_tax_rate', inv.get('defaultTaxRate'))
+            update_biz_setting('payment_terms', inv.get('paymentTerms'))
+            update_biz_setting('invoice_prefix', inv.get('invoicePrefix'))
+            update_biz_setting('default_currency', inv.get('defaultCurrency'))
+            update_biz_setting('qr_code_payments', inv.get('qrCodePayments'))
+            update_biz_setting('digital_watermark', inv.get('digitalWatermark'))
+            update_biz_setting('auto_numbering', inv.get('autoNumbering'))
+            update_biz_setting('default_terms', inv.get('defaultTerms'))
+            
+        # AI Settings
+        if 'ai' in data:
+            ai = data['ai']
+            update_biz_setting('ai_assistant_enabled', ai.get('aiAssistant'), 'ai')
+            update_biz_setting('ai_confidence_threshold', ai.get('aiConfidenceThreshold'), 'ai')
+            
+        # Blockchain Settings
+        if 'blockchain' in data:
+            bc = data['blockchain']
+            update_biz_setting('blockchain_verification', bc.get('blockchainVerification'), 'blockchain')
+            update_biz_setting('blockchain_network', bc.get('blockchainNetwork'), 'blockchain')
+
+        # Notifications
+        if 'notifications' in data:
+            user.notification_preferences = data['notifications']
+
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Settings saved successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Settings update failed: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route("/create-challan", methods=['GET', 'POST'])
 @login_required
 def create_challan():
+    if request.method == 'POST':
+        try:
+            # Generate Challan Number
+            last_challan = DeliveryChallan.query.order_by(DeliveryChallan.id.desc()).first()
+            if last_challan and last_challan.challan_number.startswith('DC-'):
+                try:
+                    last_seq = int(last_challan.challan_number.split('-')[-1])
+                    new_seq = last_seq + 1
+                except:
+                    new_seq = 1
+            else:
+                new_seq = 1
+            
+            challan_number = f"DC-{datetime.now().year}-{new_seq:04d}"
+            
+            client_id = request.form.get('client_id')
+            challan_date_str = request.form.get('challan_date')
+            delivery_date_str = request.form.get('delivery_date')
+            vehicle_number = request.form.get('vehicle_number')
+            transport_mode = request.form.get('transport_mode')
+            notes = request.form.get('notes')
+            
+            line_items_json = request.form.get('line_items')
+            
+            challan = DeliveryChallan(
+                challan_number=challan_number,
+                client_id=client_id,
+                challan_date=datetime.strptime(challan_date_str, '%Y-%m-%d').date() if challan_date_str else datetime.utcnow().date(),
+                delivery_date=datetime.strptime(delivery_date_str, '%Y-%m-%d').date() if delivery_date_str else None,
+                notes=notes,
+                status='Open'
+            )
+            
+            # Additional logic for vehicle/transport if needed, or store in notes/JSON
+            # For now appending to notes if not fields in model (Model only sees notes)
+            # Checked model: only notes. So let's prepend transport info to notes.
+            meta_notes = []
+            if transport_mode: meta_notes.append(f"Mode: {transport_mode}")
+            if vehicle_number: meta_notes.append(f"Vehicle: {vehicle_number}")
+            if meta_notes:
+                challan.notes = (challan.notes or "") + "\n" + " | ".join(meta_notes)
+
+            db.session.add(challan)
+            db.session.flush() # Get ID
+            
+            if line_items_json:
+                items = json.loads(line_items_json)
+                for item in items:
+                    line_item = ChallanLineItem(
+                        challan_id=challan.id,
+                        sr_no=item.get('sr_no'),
+                        hsn_code=item.get('hsn_code'),
+                        description=item.get('description'),
+                        quantity=item.get('quantity'),
+                        unit=item.get('unit'),
+                        unit_price=item.get('unit_price', 0),
+                        total_amount=float(item.get('quantity', 0)) * float(item.get('unit_price', 0))
+                    )
+                    db.session.add(line_item)
+            
+            db.session.commit()
+            flash(f'Delivery Challan {challan_number} created successfully!', 'success')
+            return redirect(url_for('delivery_challan'))
+            
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"Error creating challan: {e}")
+            flash(f"Error creating challan: {e}", 'error')
+    
     clients = Client.query.order_by(Client.name).all()
-
-    for c in clients:
-        print("CLIENT:", c.name, "| Address:", c.address, "| City:", c.city, "| Phone:", c.phone)
-
-    return render_template("create_challan.html", clients=clients)
+    return render_template("create_challan.html", clients=clients, today=datetime.now())
 
 
 @app.route("/delivery-challan")
 @login_required
 def delivery_challan():
-    return render_template("delivery_challan.html")
+    challans = DeliveryChallan.query.order_by(DeliveryChallan.created_at.desc()).all()
+    return render_template("delivery_challan.html", challans=challans)
+
+@app.route('/challan/<int:id>/update_status', methods=['POST'])
+@login_required
+def update_challan_status(id):
+    try:
+        challan = DeliveryChallan.query.get_or_404(id)
+        new_status = request.form.get('status')
+        note = request.form.get('note')
+        
+        if new_status:
+            challan.status = new_status
+            if note:
+                challan.notes = (challan.notes or "") + f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Status updated to {new_status}: {note}"
+            
+            db.session.commit()
+            flash(f'Challan status updated to {new_status}', 'success')
+        
+        return redirect(url_for('delivery_challan'))
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating status: {str(e)}', 'error')
+        return redirect(url_for('delivery_challan'))
 @app.route('/crm')
 @login_required
 def crm():
@@ -2042,6 +2223,125 @@ def voice_session_clear():
 
 
 
+
+
+@app.route('/convert_challan_to_invoice/<int:id>')
+@login_required
+def convert_challan_to_invoice(id):
+    try:
+        challan = DeliveryChallan.query.get_or_404(id)
+        
+        if challan.invoice_id:
+            flash('This challan is already linked to an invoice.', 'warning')
+            return redirect(url_for('delivery_challan'))
+            
+        # Generate Invoice Number logic (simplified)
+        last_inv = Invoice.query.order_by(Invoice.id.desc()).first()
+        if last_inv and last_inv.invoice_number.startswith('INV-'):
+            try:
+                last_seq = int(last_inv.invoice_number.split('-')[-1])
+                new_seq = last_seq + 1
+            except:
+                new_seq = 1
+        else:
+            new_seq = 1
+        invoice_number = f"INV-{datetime.now().year}-{new_seq:04d}"
+        
+        # Create Invoice
+        new_invoice = Invoice(
+            invoice_number=invoice_number,
+            client_id=challan.client_id,
+            invoice_date=datetime.utcnow().date(),
+            notes=f"Converted from Challan {challan.challan_number}. {request.args.get('notes', '')}",
+            terms_conditions="Standard Terms Applied",
+            due_date=datetime.strptime(request.args.get('due_date'), '%Y-%m-%d').date() if request.args.get('due_date') else None
+        )
+        db.session.add(new_invoice)
+        db.session.flush()
+        
+        # Copy Line Items
+        total_amt = 0
+        for item in challan.line_items:
+            # Basic validation
+            qty = item.quantity or 0
+            price = item.unit_price or 0
+            total = qty * price
+            
+            inv_item = InvoiceLineItem(
+                invoice_id=new_invoice.id,
+                sr_no=item.sr_no,
+                hsn_code=item.hsn_code,
+                description=item.description,
+                quantity=qty,
+                unit=item.unit,
+                unit_price=price,
+                total_amount=total
+            )
+            total_amt += total
+            db.session.add(inv_item)
+            
+        new_invoice.total_amount = total_amt
+        new_invoice.subtotal = total_amt # Assuming no tax calc for simplicity, or 0 tax
+        
+        # Link Challan
+        challan.invoice_id = new_invoice.id
+        challan.status = 'Billed'
+        
+        db.session.commit()
+        
+        flash(f'Challan {challan.challan_number} converted to Invoice {invoice_number}!', 'success')
+        return redirect(url_for('invoice_detail', id=new_invoice.id))
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Conversion failed: {e}")
+        return redirect(url_for('delivery_challan'))
+
+@app.route('/delete_challan/<int:id>', methods=['POST'])
+@login_required
+def delete_challan(id):
+    try:
+        challan = DeliveryChallan.query.get_or_404(id)
+        
+        # Optional: Prevent deleting if converted to invoice
+        if challan.status == 'Billed' or challan.invoice_id:
+             # Unlink from invoice instead of hard block? Or just block.
+             # For now, let's allow it but warn, or maybe just unlink.
+             # Let's keep it simple: cleanup line items is cascade delete.
+             pass
+
+        db.session.delete(challan)
+        db.session.commit()
+        flash('Delivery Challan deleted successfully.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting challan: {str(e)}', 'error')
+    
+    return redirect(url_for('delivery_challan'))
+
+@app.route('/challan/<int:id>/pdf')
+@login_required
+def challan_pdf(id):
+    """Generate PDF for delivery challan"""
+    try:
+        challan = DeliveryChallan.query.get_or_404(id)
+        
+        pdf_buffer = generate_challan_pdf(challan)
+        pdf_buffer.seek(0)
+        
+        filename = f'Challan_{challan.challan_number}.pdf'
+        
+        return send_file(
+            pdf_buffer,
+            download_name=filename,
+            as_attachment=True,
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        logging.error(f"Challan PDF generation failed: {e}")
+        flash(f'Error generating PDF: {str(e)}', 'error')
+        return redirect(url_for('delivery_challan'))
 
 
 

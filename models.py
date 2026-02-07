@@ -110,6 +110,7 @@ class Invoice(db.Model):
     
     line_items = db.relationship('InvoiceLineItem', backref='invoice', lazy=True, cascade='all, delete-orphan')
     ai_interactions = db.relationship('AIInteraction', backref='invoice', lazy=True)
+    challans = db.relationship('DeliveryChallan', backref='related_invoice', lazy=True)
 
 class InvoiceLineItem(db.Model):
     __tablename__ = "invoice_line_item"
