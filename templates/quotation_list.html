@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container py-4">
+   <!-- Toast Container -->
+   <div id="toast-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>
 
    <div class="d-flex justify-content-between align-items-center mb-3">
       <h3>Quotations</h3>
@@ -9,53 +11,101 @@
       </a>
    </div>
 
-   <table class="table table-bordered">
-      <tr>
-         <th>No</th>
-         <th>Quotation</th>
-         <th>Status</th>
-         <th>Total</th>
-         <th>Actions</th>
-      </tr>
-
-      {% for q in quotations %}
-      <tr>
-         <td>{{ loop.index }}</td>
-         <td>{{ q.quotation_number }}</td>
-         <td>{{ q.status }}</td>
-         <td>₹{{ q.grand_total }}</td>
-         <td>
-            <a href="/quotations/{{ q.id }}/pdf" class="btn btn-sm btn-primary">PDF</a>
-            <a href="/quotations/{{ q.id }}/convert" class="btn btn-sm btn-success">Convert to Invoice</a>
-            <a href="/quotations/{{ q.id }}/delete" class="btn btn-sm btn-danger"
-               onclick="return confirm('Are you sure you want to delete this quotation?')">
-               Delete
-            </a>
-         <td class="d-flex flex-wrap gap-1">
-
-            <!-- Preview -->
-            <a href="/quotations/preview/{{ q.id }}" class="btn btn-sm btn-info">
-               Preview
-            </a>
-
-
-            <!-- Email -->
-            <a href="/quotations/{{ q.id }}/send-email" class="btn btn-sm btn-warning">
-               Email
-            </a>
-
-            <!-- WhatsApp -->
-            <a href="/quotations/{{ q.id }}/send-whatsapp" class="btn btn-sm btn-success">
-               WhatsApp
-            </a>
-
-
-         </td>
-
-         </td>
-      </tr>
-      {% endfor %}
-
-   </table>
+   <div class="glass-card p-0 overflow-hidden shadow-sm border-0">
+      <table class="table table-hover mb-0">
+         <thead class="bg-light">
+            <tr>
+               <th class="ps-3">No</th>
+               <th>Quotation</th>
+               <th>Status</th>
+               <th>Total</th>
+               <th class="text-end pe-3">Actions</th>
+            </tr>
+         </thead>
+         <tbody>
+            {% for q in quotations %}
+            <tr>
+               <td class="ps-3">{{ loop.index }}</td>
+               <td class="fw-bold">{{ q.quotation_number }}</td>
+               <td>
+                  <span
+                     class="badge bg-{{ 'success' if q.status == 'Accepted' else 'warning' if q.status == 'Sent' else 'secondary' }}">
+                     {{ q.status }}
+                  </span>
+               </td>
+               <td class="text-primary fw-bold">₹{{ q.grand_total }}</td>
+               <td class="text-end pe-3">
+                  <div class="d-flex justify-content-end gap-1">
+                     <a href="/quotations/preview/{{ q.id }}" class="btn btn-sm btn-info text-white" title="Preview">
+                        <i data-feather="eye" size="14"></i>
+                     </a>
+                     <button onclick="downloadQuotationPDF({{ q.id }})" class="btn btn-sm btn-primary" title="PDF">
+                        <i data-feather="file-text" size="14"></i>
+                     </button>
+                     <a href="/quotations/{{ q.id }}/convert" class="btn btn-sm btn-success" title="Convert">
+                        <i data-feather="refresh-cw" size="14"></i>
+                     </a>
+                     <a href="/quotations/{{ q.id }}/send-email" class="btn btn-sm btn-warning" title="Email">
+                        <i data-feather="mail" size="14"></i>
+                     </a>
+                     <a href="/quotations/{{ q.id }}/send-whatsapp" class="btn btn-sm btn-success" title="WhatsApp">
+                        <i data-feather="message-circle" size="14"></i>
+                     </a>
+                     <a href="/quotations/{{ q.id }}/delete" class="btn btn-sm btn-danger"
+                        onclick="return confirm('Are you sure you want to delete this quotation?')" title="Delete">
+                        <i data-feather="trash-2" size="14"></i>
+                     </a>
+                  </div>
+               </td>
+            </tr>
+            {% endfor %}
+         </tbody>
+      </table>
+   </div>
 </div>
+
+<script>
+   function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `glass-card p-3 mb-2 animate-slide-up bg-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'primary'} text-white`;
+      toast.style.minWidth = '250px';
+      toast.style.boxShadow = '0 8px 32px rgba(0,0,0,0.2)';
+      toast.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i data-feather="${type === 'error' ? 'alert-circle' : type === 'success' ? 'check-circle' : 'info'}" class="me-2"></i>
+            <div>${message}</div>
+        </div>
+    `;
+      container.appendChild(toast);
+      feather.replace();
+
+      setTimeout(() => {
+         toast.style.opacity = '0';
+         toast.style.transform = 'translateX(20px)';
+         toast.style.transition = 'all 0.5s ease-out';
+         setTimeout(() => toast.remove(), 500);
+      }, 5000);
+   }
+
+   async function downloadQuotationPDF(qid) {
+      showToast('Generating Quotation PDF...', 'info');
+      try {
+         const response = await fetch(`/quotations/${qid}/pdf`);
+         const data = await response.json();
+         if (data.success) {
+            showToast(data.message, 'success');
+         } else {
+            showToast(data.message || 'Export failed', 'error');
+         }
+      } catch (error) {
+         showToast('System error during export', 'error');
+         console.error('Export error:', error);
+      }
+   }
+
+   document.addEventListener('DOMContentLoaded', () => {
+      feather.replace();
+   });
+</script>
 {% endblock %}

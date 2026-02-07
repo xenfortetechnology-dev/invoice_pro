@@ -3,6 +3,8 @@
 {% block content %}
 
 <div class="container py-4">
+    <!-- Toast Container -->
+    <div id="toast-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>
 
     <div class="d-flex justify-content-between mb-3">
         <h3>Quotation Preview</h3>
@@ -43,39 +45,39 @@
             <table class="table table-bordered">
                 <tr>
                     <td>Subtotal</td>
-                    <td>{{ q.subtotal }}</td>
+                    <td>₹ {{ q.subtotal }}</td>
                 </tr>
                 <tr>
                     <td>Discount</td>
-                    <td>{{ q.discount }}</td>
+                    <td>₹ {{ q.discount }}</td>
                 </tr>
                 <tr>
                     <td>Taxable</td>
-                    <td>{{ q.taxable_value }}</td>
+                    <td>₹ {{ q.taxable_value }}</td>
                 </tr>
                 <tr>
                     <td>CGST</td>
-                    <td>{{ q.cgst }}</td>
+                    <td>₹ {{ q.cgst }}</td>
                 </tr>
                 <tr>
                     <td>SGST</td>
-                    <td>{{ q.sgst }}</td>
+                    <td>₹ {{ q.sgst }}</td>
                 </tr>
                 <tr>
                     <td>IGST</td>
-                    <td>{{ q.igst }}</td>
+                    <td>₹ {{ q.igst }}</td>
                 </tr>
                 <tr>
                     <td>Shipping</td>
-                    <td>{{ q.shipping }}</td>
+                    <td>₹ {{ q.shipping }}</td>
                 </tr>
                 <tr>
                     <td>Rounding</td>
-                    <td>{{ q.rounding }}</td>
+                    <td>₹ {{ q.rounding }}</td>
                 </tr>
                 <tr class="fw-bold">
                     <td>Grand Total</td>
-                    <td>{{ q.grand_total }}</td>
+                    <td>₹ {{ q.grand_total }}</td>
                 </tr>
             </table>
 
@@ -102,11 +104,50 @@
 
 <div class="d-flex flex-wrap gap-2 mt-3">
     <!-- Download PDF -->
-    <a href="/quotations/{{ q.id }}/pdf" class="btn btn-primary">
+    <button onclick="downloadQuotationPDF({{ q.id }})" class="btn btn-primary">
         📄 Download PDF
-    </a>
-
-
+    </button>
 </div>
+
+<script>
+    function showToast(message, type = 'info') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `glass-card p-3 mb-2 animate-slide-up bg-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'primary'} text-white`;
+        toast.style.minWidth = '250px';
+        toast.style.boxShadow = '0 8px 32px rgba(0,0,0,0.2)';
+        toast.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i data-feather="${type === 'error' ? 'alert-circle' : type === 'success' ? 'check-circle' : 'info'}" class="me-2"></i>
+            <div>${message}</div>
+        </div>
+    `;
+        container.appendChild(toast);
+        feather.replace();
+
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(20px)';
+            toast.style.transition = 'all 0.5s ease-out';
+            setTimeout(() => toast.remove(), 500);
+        }, 5000);
+    }
+
+    async function downloadQuotationPDF(qid) {
+        showToast('Generating Quotation PDF...', 'info');
+        try {
+            const response = await fetch(`/quotations/${qid}/pdf`);
+            const data = await response.json();
+            if (data.success) {
+                showToast(data.message, 'success');
+            } else {
+                showToast(data.message || 'Export failed', 'error');
+            }
+        } catch (error) {
+            showToast('System error during export', 'error');
+            console.error('Export error:', error);
+        }
+    }
+</script>
 
 {% endblock %}

@@ -4,6 +4,8 @@
 
 {% block content %}
 <div class="container-fluid">
+    <!-- Toast Container -->
+    <div id="toast-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>
     <!-- Header -->
     <div class="row mb-4">
         <div class="col-12">
@@ -18,38 +20,39 @@
                         <p class="text-muted mb-0">Manage your clients with AI-powered insights and CRM features</p>
                     </div>
 
-                    
+
                     <div class="col-md-6 text-end">
                         <div class="d-flex gap-2 justify-content-end">
                             <a href="{{ url_for('create_client') }}" class="btn btn-primary glass-btn-primary">
                                 <i data-feather="user-plus" class="me-1"></i> New Client
                             </a>
                             <div class="dropdown">
-    <button class="btn btn-success glass-btn dropdown-toggle" data-bs-toggle="dropdown">
-        <i data-feather="download" class="me-1"></i> Export
-    </button>
-    <ul class="dropdown-menu glass-dropdown dropdown-menu-end">
-       <a class="dropdown-item" href="javascript:void(0)" onclick="exportClientsToExcel()">
-    <i data-feather="file-text" class="me-2"></i> Excel
-</a>
+                                <button class="btn btn-success glass-btn dropdown-toggle" data-bs-toggle="dropdown">
+                                    <i data-feather="download" class="me-1"></i> Export
+                                </button>
+                                <ul class="dropdown-menu glass-dropdown dropdown-menu-end">
+                                    <a class="dropdown-item" href="javascript:void(0)" onclick="exportClientsToExcel()">
+                                        <i data-feather="file-text" class="me-2"></i> Excel
+                                    </a>
 
-        <li>
-           <a class="dropdown-item" href="javascript:void(0)" onclick="exportClientsToPDF()">
-                <i data-feather="file" class="me-2"></i> PDF Report
-            </a>
-        </li>
-        <li>
-     
-</li>
-    </ul>
-</div>
+                                    <li>
+                                        <a class="dropdown-item" href="javascript:void(0)"
+                                            onclick="exportClientsToPDF()">
+                                            <i data-feather="file" class="me-2"></i> PDF Report
+                                        </a>
+                                    </li>
+                                    <li>
+
+                                    </li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div><br>
-    
+
     <!-- Client Stats -->
     <div class="row mb-4">
         <div class="col-md-3">
@@ -61,13 +64,13 @@
                     <div>
 
                         <h3 class="fw-bold mb-0">Showing {{ client_list|length }} of {{ clients.total }} clients
-</h3>
+                        </h3>
                         <p class="text-muted mb-0 small">Total Clients</p>
                     </div>
                 </div>
             </div>
         </div>
-        
+
         <div class="col-md-3">
             <div class="glass-card p-4 metric-card">
                 <div class="d-flex align-items-center">
@@ -75,13 +78,15 @@
                         <i data-feather="trending-up" size="24"></i>
                     </div>
                     <div>
-                        <h3 class="fw-bold mb-0">{{ client_insights.values()|map(attribute='predicted_ltv')|select('greaterthan', 0)|list|length if client_insights else 0 }}</h3>
+                        <h3 class="fw-bold mb-0">{{
+                            client_insights.values()|map(attribute='predicted_ltv')|select('greaterthan', 0)|list|length
+                            if client_insights else 0 }}</h3>
                         <p class="text-muted mb-0 small">High Value Clients</p>
                     </div>
                 </div>
             </div>
         </div>
-        
+
         <div class="col-md-3">
             <div class="glass-card p-4 metric-card">
                 <div class="d-flex align-items-center">
@@ -89,13 +94,14 @@
                         <i data-feather="alert-triangle" size="24"></i>
                     </div>
                     <div>
-                        <h3 class="fw-bold mb-0">{{ client_insights.values()|selectattr('risk_level', 'equalto', 'High')|list|length if client_insights else 0 }}</h3>
+                        <h3 class="fw-bold mb-0">{{ client_insights.values()|selectattr('risk_level', 'equalto',
+                            'High')|list|length if client_insights else 0 }}</h3>
                         <p class="text-muted mb-0 small">High Risk</p>
                     </div>
                 </div>
             </div>
         </div>
-        
+
         <div class="col-md-3">
             <div class="glass-card p-4 metric-card">
                 <div class="d-flex align-items-center">
@@ -103,14 +109,15 @@
                         <i data-feather="user-check" size="24"></i>
                     </div>
                     <div>
-                        <h3 class="fw-bold mb-0">{{ clients.items|selectattr('blockchain_verified', 'equalto', True)|list|length if clients.items else 0 }}</h3>
+                        <h3 class="fw-bold mb-0">{{ clients.items|selectattr('blockchain_verified', 'equalto',
+                            True)|list|length if clients.items else 0 }}</h3>
                         <p class="text-muted mb-0 small">Verified</p>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    
+
     <!-- Search and Filters -->
     <div class="row mb-4">
         <div class="col-12">
@@ -122,24 +129,24 @@
                             <span class="input-group-text glass-input-addon">
                                 <i data-feather="search" size="16"></i>
                             </span>
-                            <input type="text" class="form-control filter-input" id="search" name="search" 
-                                   value="{{ search }}" placeholder="Name, email, phone...">
+                            <input type="text" class="form-control filter-input" id="search" name="search"
+                                value="{{ search }}" placeholder="Name, email, phone...">
                         </div>
                     </div>
-                    
+
                     <div class="col-md-2">
                         <label for="type" class="form-label">Client Type</label>
-                        <select  class="form-control filter-input" id="type" name="type">
+                        <select class="form-control filter-input" id="type" name="type">
                             <option value="">All Types</option>
-                            <option value="Regular" {% if client_type == 'Regular' %}selected{% endif %}>Regular</option>
-                            <option value="Premium" {% if client_type == 'Premium' %}selected{% endif %}>Premium</option>
-                            <option value="VIP" {% if client_type == 'VIP' %}selected{% endif %}>VIP</option>
+                            <option value="Regular" {% if client_type=='Regular' %}selected{% endif %}>Regular</option>
+                            <option value="Premium" {% if client_type=='Premium' %}selected{% endif %}>Premium</option>
+                            <option value="VIP" {% if client_type=='VIP' %}selected{% endif %}>VIP</option>
                         </select>
                     </div>
-                    
+
                     <div class="col-md-2">
                         <label for="lead_stage" class="form-label">Lead Stage</label>
-                        <select  class="form-control filter-input" id="lead_stage" name="lead_stage">
+                        <select class="form-control filter-input" id="lead_stage" name="lead_stage">
                             <option value="">All Stages</option>
                             <option value="New">New</option>
                             <option value="In Discussion">In Discussion</option>
@@ -148,45 +155,43 @@
                             <option value="Payment">Payment</option>
                         </select>
                     </div>
-                    
+
                     <div class="col-md-2">
                         <label for="risk_level" class="form-label">Risk Level</label>
-                        <select  class="form-control filter-input" id="risk_level" name="risk_level">
+                        <select class="form-control filter-input" id="risk_level" name="risk_level">
                             <option value="">All Levels</option>
                             <option value="Low">Low Risk</option>
                             <option value="Medium">Medium Risk</option>
                             <option value="High">High Risk</option>
                         </select>
                     </div>
-                    
-      <div class="col-md-1 d-flex align-items-end justify-content-center">
-          <div class="d-flex gap-2">
-           <button type="submit"
-            class="btn btn-primary glass-btn d-flex align-items-center justify-content-center"
-            title="Filter"
-            onclick="checkInvoiceFilter(event)">
-      <i data-feather="filter" size="16"></i>
-    </button>
-         <a href="#" 
-   class="btn btn-outline-secondary glass-btn d-flex align-items-center justify-content-center" 
-   title="Clear"
-   onclick="clearFilters(event)">
-    <i data-feather="x" size="16"></i>
-</a>
 
-          </div>
-        </div>
-
-
+                    <div class="col-md-1 d-flex align-items-end justify-content-center">
+                        <div class="d-flex gap-2">
+                            <button type="submit"
+                                class="btn btn-primary glass-btn d-flex align-items-center justify-content-center"
+                                title="Filter" onclick="checkInvoiceFilter(event)">
+                                <i data-feather="filter" size="16"></i>
+                            </button>
+                            <a href="#"
+                                class="btn btn-outline-secondary glass-btn d-flex align-items-center justify-content-center"
+                                title="Clear" onclick="clearFilters(event)">
+                                <i data-feather="x" size="16"></i>
+                            </a>
 
                         </div>
                     </div>
-                </form>
+
+
+
             </div>
         </div>
+        </form>
     </div>
-    
-    <!-- Client List -->
+</div>
+</div>
+
+<!-- Client List -->
 <div class="row">
     <div class="col-12">
         <div class="glass-card p-4">
@@ -198,13 +203,13 @@
                     <label class="btn btn-outline-primary btn-sm" for="gridView">
                         <i data-feather="grid" size="16"></i> Grid
                     </label>
-                    
+
                     <input type="radio" class="btn-check" name="viewMode" id="listView">
                     <label class="btn btn-outline-primary btn-sm" for="listView">
                         <i data-feather="list" size="16"></i> List
                     </label>
                 </div>
-                
+
                 <div class="text-muted small">
                     Showing {{ client_list|length }} clients
 
@@ -212,165 +217,168 @@
                 </div>
             </div>
 
-           <!-- Grid View -->
-                        <div id="gridViewContainer">
-                            {% if client_list|length > 0 %}
-                                {% for client in client_list %}
-                                    <div class="card glass-card client-card p-3 mb-3">
-                                        <h5>{{ client.name }}</h5>
-                                        <p class="text-muted mb-1">{{ client.email }}</p>
-                                        <p class="small">{{ client.phone }}</p>
-                                        <p class="small">Type: {{ client.client_type }}</p>
-                                        <p class="small">Stage: {{ client.lead_stage }}</p>
-                                        <p class="small">Business: {{ client.total_business or "—" }}</p>
-                                        <p class="small">
-                                            Insights:
-                                            {% if client.id in client_insights %}
-                                                {{ client_insights[client.id].risk_level }} Risk
-                                            {% else %}
-                                                N/A
-                                            {% endif %}
-                                        </p>
-                                    </div>
-                                {% endfor %}
-                            {% else %}
-                                <!-- Empty State -->
-                                    <div class="text-center py-5">
-                                        <i data-feather="users" size="64" class="text-muted mb-3"></i>
-                                        <h4 class="text-muted">No clients found</h4>
-                                        <p class="text-muted mb-4">
-                                            {% if search or client_type %}
-                                            Try adjusting your filters or add a new client.
-                                            {% else %}
-                                            Start by adding your first client to manage relationships and create invoices.
-                                            {% endif %}
-                                        </p>
-                                        <div class="d-flex gap-2 justify-content-center">
-                                            <a href="{{ url_for('create_client') }}" class="btn btn-primary glass-btn-primary">
-                                                <i data-feather="user-plus" class="me-1"></i> Add First Client
-                                            </a>
-                                            {% if search or client_type %}
-                                            <a href="{{ url_for('client_management') }}" class="btn btn-outline-secondary glass-btn">
-                                                <i data-feather="x" class="me-1"></i> Clear Filters
-                                            </a>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                            {% endif %}
-                        </div>
-
-
-
-           <!-- List View -->
-                        <div id="listViewContainer" style="display: none;">
-                            {% if client_list|length > 0 %}
-                                <div class="table-responsive">
-                                    <table class="table table-hover">
-                                        <thead>
-                                            <tr>
-                                                <th>Client</th>
-                                                <th>Contact</th>
-                                                <th>Type</th>
-                                                <th>Lead Stage</th>
-                                                <th>Total Business</th>
-                                                <th>AI Insights</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for client in client_list %}
-                                                <tr>
-                                                    <td>{{ client.name }}</td>
-                                                    <td>{{ client.email }}<br><small>{{ client.phone }}</small></td>
-                                                    <td>{{ client.client_type }}</td>
-                                                    <td>{{ client.lead_stage }}</td>
-                                                    <td>{{ client.total_business or "—" }}</td>
-                                                    <td>
-                                                        {% if client.id in client_insights %}
-                                                            {{ client_insights[client.id].risk_level }} Risk <br>
-                                                            LTV: {{ client_insights[client.id].predicted_ltv }}
-                                                        {% else %}
-                                                            N/A
-                                                        {% endif %}
-                                                    </td>
-                                                    <td><!-- future actions --></td>
-                                                </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            {% else %}
-                                <!-- Empty State -->
-                                        <div class="text-center py-5">
-                                            <i data-feather="users" size="64" class="text-muted mb-3"></i>
-                                            <h4 class="text-muted">No clients found</h4>
-                                            <p class="text-muted mb-4">
-                                                {% if search or client_type %}
-                                                Try adjusting your filters or add a new client.
-                                                {% else %}
-                                                Start by adding your first client to manage relationships and create invoices.
-                                                {% endif %}
-                                            </p>
-                                            <div class="d-flex gap-2 justify-content-center">
-                                                <a href="{{ url_for('create_client') }}" class="btn btn-primary glass-btn-primary">
-                                                    <i data-feather="user-plus" class="me-1"></i> Add First Client
-                                                </a>
-                                                {% if search or client_type %}
-                                                <a href="{{ url_for('client_management') }}" class="btn btn-outline-secondary glass-btn">
-                                                    <i data-feather="x" class="me-1"></i> Clear Filters
-                                                </a>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                            {% endif %}
-                        </div>
-
-                
-                <!-- Pagination -->
-                {% if clients.pages and clients.pages > 1 %}
-                <nav aria-label="Client pagination" class="mt-4">
-                    <ul class="pagination justify-content-center">
-                        <li class="page-item {% if not clients.has_prev %}disabled{% endif %}">
-                            <a class="page-link glass-btn" href="{{ url_for('client_management', page=clients.prev_num, search=search, type=client_type) }}">
-                                <i data-feather="chevron-left" size="16"></i>
-                            </a>
-                        </li>
-                        
-                        {% for page_num in clients.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
-                            {% if page_num %}
-                                {%if page_num != clients.page %}
-                                    <li class="page-item">
-                                         <a class="page-link glass-btn" href="{{ url_for('client_management', page=page_num, search=search, type=client_type) }}">
-                                           {{ page_num }}
-                                      </a>
-                                    </li>
-                                {% else %}
-                                <li class="page-item active">
-                                    <span class="page-link bg-primary border-primary">{{ page_num }}</span>
-                                </li>
-                                {% endif %}
-                            {% else %}
-                            <li class="page-item disabled">
-                                <span class="page-link">...</span>
-                            </li>
-                            {% endif %}
-                        {% endfor %}
-                        
-                        <li class="page-item {% if not clients.has_next %}disabled{% endif %}">
-                            <a class="page-link glass-btn" href="{{ url_for('client_management', page=clients.next_num, search=search, type=client_type) }}">
-                                <i data-feather="chevron-right" size="16"></i>
-                            </a>
-                        </li>
-                    </ul>
-                </nav>
+            <!-- Grid View -->
+            <div id="gridViewContainer">
+                {% if client_list|length > 0 %}
+                {% for client in client_list %}
+                <div class="card glass-card client-card p-3 mb-3">
+                    <h5>{{ client.name }}</h5>
+                    <p class="text-muted mb-1">{{ client.email }}</p>
+                    <p class="small">{{ client.phone }}</p>
+                    <p class="small">Type: {{ client.client_type }}</p>
+                    <p class="small">Stage: {{ client.lead_stage }}</p>
+                    <p class="small">Business: {{ client.total_business or "—" }}</p>
+                    <p class="small">
+                        Insights:
+                        {% if client.id in client_insights %}
+                        {{ client_insights[client.id].risk_level }} Risk
+                        {% else %}
+                        N/A
+                        {% endif %}
+                    </p>
+                </div>
+                {% endfor %}
+                {% else %}
+                <!-- Empty State -->
+                <div class="text-center py-5">
+                    <i data-feather="users" size="64" class="text-muted mb-3"></i>
+                    <h4 class="text-muted">No clients found</h4>
+                    <p class="text-muted mb-4">
+                        {% if search or client_type %}
+                        Try adjusting your filters or add a new client.
+                        {% else %}
+                        Start by adding your first client to manage relationships and create invoices.
+                        {% endif %}
+                    </p>
+                    <div class="d-flex gap-2 justify-content-center">
+                        <a href="{{ url_for('create_client') }}" class="btn btn-primary glass-btn-primary">
+                            <i data-feather="user-plus" class="me-1"></i> Add First Client
+                        </a>
+                        {% if search or client_type %}
+                        <a href="{{ url_for('client_management') }}" class="btn btn-outline-secondary glass-btn">
+                            <i data-feather="x" class="me-1"></i> Clear Filters
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
                 {% endif %}
-                
-               
-                
-             
             </div>
+
+
+
+            <!-- List View -->
+            <div id="listViewContainer" style="display: none;">
+                {% if client_list|length > 0 %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Client</th>
+                                <th>Contact</th>
+                                <th>Type</th>
+                                <th>Lead Stage</th>
+                                <th>Total Business</th>
+                                <th>AI Insights</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for client in client_list %}
+                            <tr>
+                                <td>{{ client.name }}</td>
+                                <td>{{ client.email }}<br><small>{{ client.phone }}</small></td>
+                                <td>{{ client.client_type }}</td>
+                                <td>{{ client.lead_stage }}</td>
+                                <td>{{ client.total_business or "—" }}</td>
+                                <td>
+                                    {% if client.id in client_insights %}
+                                    {{ client_insights[client.id].risk_level }} Risk <br>
+                                    LTV: {{ client_insights[client.id].predicted_ltv }}
+                                    {% else %}
+                                    N/A
+                                    {% endif %}
+                                </td>
+                                <td><!-- future actions --></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <!-- Empty State -->
+                <div class="text-center py-5">
+                    <i data-feather="users" size="64" class="text-muted mb-3"></i>
+                    <h4 class="text-muted">No clients found</h4>
+                    <p class="text-muted mb-4">
+                        {% if search or client_type %}
+                        Try adjusting your filters or add a new client.
+                        {% else %}
+                        Start by adding your first client to manage relationships and create invoices.
+                        {% endif %}
+                    </p>
+                    <div class="d-flex gap-2 justify-content-center">
+                        <a href="{{ url_for('create_client') }}" class="btn btn-primary glass-btn-primary">
+                            <i data-feather="user-plus" class="me-1"></i> Add First Client
+                        </a>
+                        {% if search or client_type %}
+                        <a href="{{ url_for('client_management') }}" class="btn btn-outline-secondary glass-btn">
+                            <i data-feather="x" class="me-1"></i> Clear Filters
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+
+            <!-- Pagination -->
+            {% if clients.pages and clients.pages > 1 %}
+            <nav aria-label="Client pagination" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    <li class="page-item {% if not clients.has_prev %}disabled{% endif %}">
+                        <a class="page-link glass-btn"
+                            href="{{ url_for('client_management', page=clients.prev_num, search=search, type=client_type) }}">
+                            <i data-feather="chevron-left" size="16"></i>
+                        </a>
+                    </li>
+
+                    {% for page_num in clients.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                    {% if page_num %}
+                    {%if page_num != clients.page %}
+                    <li class="page-item">
+                        <a class="page-link glass-btn"
+                            href="{{ url_for('client_management', page=page_num, search=search, type=client_type) }}">
+                            {{ page_num }}
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item active">
+                        <span class="page-link bg-primary border-primary">{{ page_num }}</span>
+                    </li>
+                    {% endif %}
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+
+                    <li class="page-item {% if not clients.has_next %}disabled{% endif %}">
+                        <a class="page-link glass-btn"
+                            href="{{ url_for('client_management', page=clients.next_num, search=search, type=client_type) }}">
+                            <i data-feather="chevron-right" size="16"></i>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            {% endif %}
+
+
+
+
         </div>
     </div>
+</div>
 </div>
 
 <!-- Client Details Modal -->
@@ -391,74 +399,74 @@
 
 {% block scripts %}
 <script>
-document.addEventListener("DOMContentLoaded", function () {
+    document.addEventListener("DOMContentLoaded", function () {
 
-    // ===== View Toggle =====
-    const gridViewRadio = document.getElementById("gridView");
-    const listViewRadio = document.getElementById("listView");
-    const gridContainer = document.getElementById("gridViewContainer");
-    const listContainer = document.getElementById("listViewContainer");
+        // ===== View Toggle =====
+        const gridViewRadio = document.getElementById("gridView");
+        const listViewRadio = document.getElementById("listView");
+        const gridContainer = document.getElementById("gridViewContainer");
+        const listContainer = document.getElementById("listViewContainer");
 
-    // Default
-    gridContainer.style.display = "grid";
-    listContainer.style.display = "none";
+        // Default
+        gridContainer.style.display = "grid";
+        listContainer.style.display = "none";
 
-    gridViewRadio.addEventListener("change", function () {
-        if (this.checked) {
-            gridContainer.style.display = "grid";
-            listContainer.style.display = "none";
-        }
-    });
-
-    listViewRadio.addEventListener("change", function () {
-        if (this.checked) {
-            gridContainer.style.display = "none";
-            listContainer.style.display = "block";
-        }
-    });
-
-    // ===== Card Hover Effect =====
-    document.querySelectorAll(".client-card").forEach(card => {
-        card.addEventListener("mouseenter", () => {
-            card.style.transform = "translateY(-5px)";
+        gridViewRadio.addEventListener("change", function () {
+            if (this.checked) {
+                gridContainer.style.display = "grid";
+                listContainer.style.display = "none";
+            }
         });
-        card.addEventListener("mouseleave", () => {
-            card.style.transform = "translateY(0)";
+
+        listViewRadio.addEventListener("change", function () {
+            if (this.checked) {
+                gridContainer.style.display = "none";
+                listContainer.style.display = "block";
+            }
         });
+
+        // ===== Card Hover Effect =====
+        document.querySelectorAll(".client-card").forEach(card => {
+            card.addEventListener("mouseenter", () => {
+                card.style.transform = "translateY(-5px)";
+            });
+            card.addEventListener("mouseleave", () => {
+                card.style.transform = "translateY(0)";
+            });
+        });
+
+
+        document.querySelectorAll(".client-card").forEach(card => {
+            card.addEventListener("mouseenter", () => {
+                card.style.transform = "translateY(-5px)";
+            });
+            card.addEventListener("mouseleave", () => {
+                card.style.transform = "translateY(0)";
+            });
+        });
+
+        feather.replace();
     });
 
-   
-    document.querySelectorAll(".client-card").forEach(card => {
-    card.addEventListener("mouseenter", () => {
-        card.style.transform = "translateY(-5px)";
-    });
-    card.addEventListener("mouseleave", () => {
-        card.style.transform = "translateY(0)";
-    });
-});
-
-feather.replace();
-});
 
 
-  
-function viewClientDetails(clientId) {
-    // Show loading state
-    const modal = new bootstrap.Modal(document.getElementById('clientDetailsModal'));
-    const content = document.getElementById('clientDetailsContent');
-    
-    content.innerHTML = `
+    function viewClientDetails(clientId) {
+        // Show loading state
+        const modal = new bootstrap.Modal(document.getElementById('clientDetailsModal'));
+        const content = document.getElementById('clientDetailsContent');
+
+        content.innerHTML = `
         <div class="text-center py-4">
             <div class="spinner-border text-primary"></div>
             <p class="mt-2 text-muted">Loading client details...</p>
         </div>
     `;
-    
-    modal.show();
-    
-    // In a real application, this would fetch client details via API
-    setTimeout(() => {
-        content.innerHTML = `
+
+        modal.show();
+
+        // In a real application, this would fetch client details via API
+        setTimeout(() => {
+            content.innerHTML = `
             <div class="row">
                 <div class="col-md-6">
                     <h6 class="fw-bold">Contact Information</h6>
@@ -492,150 +500,199 @@ function viewClientDetails(clientId) {
                 </div>
             </div>
         `;
-    }, 1000);
-}
-
-function contactClient(clientId) {
-    // Implement contact functionality
-    alert('Contact client functionality - could open email client or show contact options');
-}
-
-function exportClientsToExcel() {
-    window.location.href = '/api/export/clients/excel?' + new URLSearchParams(window.location.search);
-}
-
-function exportClientsToPDF() {
-    window.location.href = '/api/export/clients/pdf?' + new URLSearchParams(window.location.search);
-}
- 
-
-document.addEventListener('DOMContentLoaded', function() {
-    const tableBody = document.getElementById('clientsTableBody'); // table body
-    const originalRows = Array.from(tableBody.children).map(row => row.cloneNode(true)); // save original rows
-    const clearBtn = document.getElementById('clearFilterBtn');
-    const filterInputs = document.querySelectorAll('.filter-input'); // your search fields should have this class
-
-    clearBtn.addEventListener('click', function() {
-        // Clear input fields
-        filterInputs.forEach(input => input.value = '');
-
-        // Restore table rows
-        tableBody.innerHTML = '';
-        originalRows.forEach(row => tableBody.appendChild(row.cloneNode(true)));
-    });
-});
-
-
-
-
-function checkInvoiceFilter(event) {
-    // Prevent empty filters from being submitted
-    const filters = document.querySelectorAll('.filter-input');
-    let hasValue = false;
-
-    filters.forEach(input => {
-        if (input.value.trim() !== '') {
-            hasValue = true;
-        }
-    });
-
-    if (!hasValue) {
-        event.preventDefault(); // Stop form submit
-        alert("Please enter at least one filter before searching.");
+        }, 1000);
     }
-}
-function clearFilters(event) {
-    event.preventDefault();
 
-    // Get all filter inputs (adjust class name if needed)
-    const filters = document.querySelectorAll('.filter-input');
-    let hasValue = false;
+    function contactClient(clientId) {
+        // Implement contact functionality
+        alert('Contact client functionality - could open email client or show contact options');
+    }
 
-    filters.forEach(input => {
-        if (input.value.trim() !== '') {
-            hasValue = true;
+    function showToast(message, type = 'info') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `glass-card p-3 mb-2 animate-slide-up bg-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'primary'} text-white`;
+        toast.style.minWidth = '250px';
+        toast.style.boxShadow = '0 8px 32px rgba(0,0,0,0.2)';
+        toast.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i data-feather="${type === 'error' ? 'alert-circle' : type === 'success' ? 'check-circle' : 'info'}" class="me-2"></i>
+            <div>${message}</div>
+        </div>
+    `;
+        container.appendChild(toast);
+        feather.replace();
+
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(20px)';
+            toast.style.transition = 'all 0.5s ease-out';
+            setTimeout(() => toast.remove(), 500);
+        }, 5000);
+    }
+
+    async function exportClientsToExcel() {
+        showToast('Generating Excel report...', 'info');
+        try {
+            const response = await fetch('/api/export/clients/excel' + window.location.search);
+            const data = await response.json();
+            if (data.success) {
+                showToast(data.message, 'success');
+            } else {
+                showToast(data.message || 'Export failed', 'error');
+            }
+        } catch (error) {
+            showToast('System error during export', 'error');
+            console.error('Export error:', error);
         }
+    }
+
+    async function exportClientsToPDF() {
+        showToast('Generating PDF report...', 'info');
+        try {
+            const response = await fetch('/api/export/clients/pdf' + window.location.search);
+            const data = await response.json();
+            if (data.success) {
+                showToast(data.message, 'success');
+            } else {
+                showToast(data.message || 'Export failed', 'error');
+            }
+        } catch (error) {
+            showToast('System error during export', 'error');
+            console.error('Export error:', error);
+        }
+    }
+
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const tableBody = document.getElementById('clientsTableBody'); // table body
+        const originalRows = Array.from(tableBody.children).map(row => row.cloneNode(true)); // save original rows
+        const clearBtn = document.getElementById('clearFilterBtn');
+        const filterInputs = document.querySelectorAll('.filter-input'); // your search fields should have this class
+
+        clearBtn.addEventListener('click', function () {
+            // Clear input fields
+            filterInputs.forEach(input => input.value = '');
+
+            // Restore table rows
+            tableBody.innerHTML = '';
+            originalRows.forEach(row => tableBody.appendChild(row.cloneNode(true)));
+        });
     });
 
-    if (hasValue) {
-        // If any filter has value → reload to clear filters
-        window.location.href = "{{ url_for('client_management') }}";
-    } else {
-        // If no filters → do nothing
-        console.log("No filters to clear.");
+
+
+
+    function checkInvoiceFilter(event) {
+        // Prevent empty filters from being submitted
+        const filters = document.querySelectorAll('.filter-input');
+        let hasValue = false;
+
+        filters.forEach(input => {
+            if (input.value.trim() !== '') {
+                hasValue = true;
+            }
+        });
+
+        if (!hasValue) {
+            event.preventDefault(); // Stop form submit
+            alert("Please enter at least one filter before searching.");
+        }
     }
-}
+    function clearFilters(event) {
+        event.preventDefault();
+
+        // Get all filter inputs (adjust class name if needed)
+        const filters = document.querySelectorAll('.filter-input');
+        let hasValue = false;
+
+        filters.forEach(input => {
+            if (input.value.trim() !== '') {
+                hasValue = true;
+            }
+        });
+
+        if (hasValue) {
+            // If any filter has value → reload to clear filters
+            window.location.href = "{{ url_for('client_management') }}";
+        } else {
+            // If no filters → do nothing
+            console.log("No filters to clear.");
+        }
+    }
 
 </script>
 
 <style>
-.avatar-circle {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    font-size: 16px;
-}
+    .avatar-circle {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 16px;
+    }
 
-.client-card {
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-    cursor: pointer;
-}
+    .client-card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        cursor: pointer;
+    }
 
-.client-card:hover {
-    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-}
+    .client-card:hover {
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    }
 
-.timeline {
-    position: relative;
-    padding-left: 30px;
-}
+    .timeline {
+        position: relative;
+        padding-left: 30px;
+    }
 
-.timeline-item {
-    position: relative;
-    margin-bottom: 20px;
-}
+    .timeline-item {
+        position: relative;
+        margin-bottom: 20px;
+    }
 
-.timeline-marker {
-    position: absolute;
-    left: -35px;
-    top: 5px;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-}
+    .timeline-marker {
+        position: absolute;
+        left: -35px;
+        top: 5px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+    }
 
-.timeline::before {
-    content: '';
-    position: absolute;
-    left: -30px;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background: #e9ecef;
-}
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: -30px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #e9ecef;
+    }
 
-.metric-card {
-    transition: transform 0.3s ease;
-}
+    .metric-card {
+        transition: transform 0.3s ease;
+    }
 
-.metric-card:hover {
-    transform: translateY(-3px);
-}
-.glass-card {
-    overflow: visible !important;
-}
-.row.mb-4:first-of-type .glass-card {
-    position: relative;
-    z-index: 100;
-}
-.metric-card {
-    position: relative;
-    z-index: 1;
-}
+    .metric-card:hover {
+        transform: translateY(-3px);
+    }
 
+    .glass-card {
+        overflow: visible !important;
+    }
+
+    .row.mb-4:first-of-type .glass-card {
+        position: relative;
+        z-index: 100;
+    }
+
+    .metric-card {
+        position: relative;
+        z-index: 1;
+    }
 </style>
 {% endblock %}

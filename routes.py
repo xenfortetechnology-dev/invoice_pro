@@ -800,147 +800,165 @@ def create_client():
 @app.route('/api/export/clients/excel')
 @login_required
 def export_clients_excel():
-    clients = Client.query.order_by(Client.name).all()
+    search = request.args.get('search', '')
+    client_type = request.args.get('type', '')
+    
+    # Build query with filters
+    query = Client.query
+    if search:
+        query = query.filter(
+            or_(
+                Client.name.contains(search),
+                Client.phone.contains(search),
+                Client.email.contains(search),
+                Client.contact_person.contains(search)
+            )
+        )
+    if client_type:
+        query = query.filter(Client.client_type == client_type)
+        
+    clients = query.order_by(Client.name).all()
 
     client_data = [{
-        'ID': c.id,
-        'Name': c.name,
-        'Email': c.email,
-        'Phone': c.phone,
-        'Type': c.client_type,
-        'Lead Stage': c.lead_stage,
-        'Total Business': c.total_business,
-        'Risk Score': c.ai_risk_score,
-        'Predicted LTV': c.predicted_ltv,
-        'Verified': c.blockchain_verified,
-        'Date': c.created_at.strftime('%d-%m-%Y') if c.created_at else 'N/A',
         'Name': c.name or 'N/A',
-        'Amount': c.total_business if c.total_business else 0,
+        'Email': c.email or 'N/A',
+        'Phone': c.phone or 'N/A',
+        'Type': c.client_type or 'Regular',
+        'Lead Stage': c.lead_stage or 'N/A',
+        'Total Business': c.total_business if c.total_business else 0,
+        'Risk Score': c.ai_risk_score if c.ai_risk_score else 0,
         'GST No': c.gstin or 'N/A',
-        'PAN No': c.pan or 'N/A'
+        'PAN No': c.pan or 'N/A',
+        'Created Date': c.created_at.strftime('%d-%m-%Y') if c.created_at else 'N/A'
     } for c in clients]
 
     df = pd.DataFrame(client_data)
-
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df.to_excel(writer, index=False, sheet_name='Clients')
     output.seek(0)
 
-    return send_file(
-        output,
-        as_attachment=True,
-        download_name='clients.xlsx',
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
+    # Use desktop integration
+    filename = f"clients_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filepath = _save_buffer_to_downloads(output, filename)
+    
+    if filepath:
+        return jsonify({
+            'success': True,
+            'message': f'Excel report generated and saved to Downloads: {filename}',
+            'filename': filename
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'message': 'Failed to save file to system Downloads folder.'
+        }), 500
 
 @app.route('/api/export/clients/pdf')
 @login_required
 def export_clients_pdf():
-    clients = Client.query.all()
+    search = request.args.get('search', '')
+    client_type = request.args.get('type', '')
+    
+    # Build query with filters
+    query = Client.query
+    if search:
+        query = query.filter(
+            or_(
+                Client.name.contains(search),
+                Client.phone.contains(search),
+                Client.email.contains(search),
+                Client.contact_person.contains(search)
+            )
+        )
+    if client_type:
+        query = query.filter(Client.client_type == client_type)
+        
+    clients = query.order_by(Client.name).all()
+    
     buffer = io.BytesIO()
     p = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
 
-    col_x = [50, width / 2 + 10]
-    col = 0
-    y = height - 70
- 
-    PAGE_MARGIN = 10   # 👈 moved border closer to page edge
+    PAGE_MARGIN = 20
 
     def draw_page_border():
-        p.setStrokeColorRGB(0, 0, 0)   # black border
-        p.setLineWidth(2)
-        p.rect(
-            PAGE_MARGIN,
-            PAGE_MARGIN,
-            width - PAGE_MARGIN * 2,
-            height - PAGE_MARGIN * 2
-        )
+        p.setStrokeColorRGB(0, 0, 0)
+        p.setLineWidth(1)
+        p.rect(PAGE_MARGIN, PAGE_MARGIN, width - PAGE_MARGIN*2, height - PAGE_MARGIN*2)
 
-    # Draw border on first page
     draw_page_border()
-
-    
     p.setFont("Helvetica-Bold", 18)
-    p.drawCentredString(width / 2, height - 40, "Client Directory Report")
-
-    # Light header line
+    p.drawCentredString(width / 2, height - 50, "Client Directory Report")
+    
     p.setStrokeColorRGB(0.7, 0.7, 0.7)
-    p.line(40, height - 55, width - 40, height - 55)
- 
+    p.line(40, height - 65, width - 40, height - 65)
+
+    y = height - 100
+    col_x = [60, width / 2 + 10]
+    col = 0
+    block_height = 130
+
     for c in clients:
-
-        block_height = 150
-
-        # Page & column handling
-        if y - block_height < 80:
+        if y - block_height < 60:
             if col == 0:
                 col = 1
-                y = height - 70
+                y = height - 100
             else:
                 p.showPage()
-                draw_page_border()   # redraw border on new page
+                draw_page_border()
                 col = 0
-                y = height - 70
+                y = height - 100
 
         x = col_x[col]
         box_width = width / 2 - 70
 
-        # Light background color
-        p.setFillColorRGB(0.95, 0.97, 1)
-        p.roundRect(x, y - block_height, box_width, block_height, 8, fill=1)
-
-        # Block border
-        p.setStrokeColorRGB(0.75, 0.8, 0.9)
-        p.roundRect(x, y - block_height, box_width, block_height, 8, fill=0)
+        p.setFillColorRGB(0.97, 0.98, 1)
+        p.roundRect(x, y - block_height, box_width, block_height, 6, fill=1)
+        
+        p.setStrokeColorRGB(0.8, 0.8, 0.9)
+        p.roundRect(x, y - block_height, box_width, block_height, 6, fill=0)
 
         p.setFillColorRGB(0, 0, 0)
-        text_y = y - 30
-
-        # Client Name
-        p.setFont("Helvetica-Bold", 14)
-        p.drawString(x + 15, text_y, c.name or "N/A")
-        text_y -= 24
-
-        # Details
-        p.setFont("Helvetica", 11)
-        p.drawString(x + 15, text_y,
-            f"Date      : {c.created_at.strftime('%d-%m-%Y') if c.created_at else 'N/A'}")
-        text_y -= 18
-
-        p.drawString(x + 15, text_y, f"Mail ID   : {c.email or 'N/A'}")
-        text_y -= 18
-
-        p.drawString(x + 15, text_y,
-            f"Amount    : ₹{c.total_business:,.2f}" if c.total_business else "Amount    : ₹0.00")
-        text_y -= 18
-
-        p.drawString(x + 15, text_y, f"GST No    : {c.gstin or 'N/A'}")
-        text_y -= 18
-
-        p.drawString(x + 15, text_y, f"PAN No    : {c.pan or 'N/A'}")
+        curr_y = y - 25
+        
+        p.setFont("Helvetica-Bold", 12)
+        p.drawString(x + 15, curr_y, c.name or "N/A")
+        curr_y -= 20
+        
+        p.setFont("Helvetica", 10)
+        p.drawString(x + 15, curr_y, f"Email: {c.email or 'N/A'}")
+        curr_y -= 15
+        p.drawString(x + 15, curr_y, f"Phone: {c.phone or 'N/A'}")
+        curr_y -= 15
+        p.drawString(x + 15, curr_y, f"Type: {c.client_type or 'Regular'}")
+        curr_y -= 15
+        p.drawString(x + 15, curr_y, f"Business: ₹{c.total_business:,.2f}" if c.total_business else "Business: ₹0.00")
+        curr_y -= 15
+        p.drawString(x + 15, curr_y, f"GSTIN: {c.gstin or 'N/A'}")
 
         y -= block_height + 20
 
+    p.setFont("Helvetica-Oblique", 8)
+    p.drawCentredString(width/2, 35, f"Generated: {datetime.now().strftime('%d-%m-%Y %H:%M')}")
     
-    p.setFont("Helvetica", 9)
-    p.setFillColorRGB(0.4, 0.4, 0.4)
-    p.drawCentredString(
-        width / 2,
-        25,
-        f"Generated On : {datetime.now().strftime('%d-%m-%Y %H:%M')} | System Generated Report"
-    )
-
     p.save()
     buffer.seek(0)
-
-    return send_file(
-        buffer,
-        as_attachment=True,
-        download_name="clients_styled.pdf",
-        mimetype="application/pdf"
-    )
+    
+    filename = f"client_directory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    filepath = _save_buffer_to_downloads(buffer, filename)
+    
+    if filepath:
+        return jsonify({
+            'success': True,
+            'message': f'PDF report generated and saved to Downloads: {filename}',
+            'filename': filename
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'message': 'Failed to save PDF to system Downloads folder.'
+        }), 500
 
 
 def _get_analytics_data_dict(time_range='12m'):
@@ -2063,13 +2081,22 @@ def delete_quotation(qid):
 @app.route("/quotations/<int:qid>/pdf")
 def quotation_pdf(qid):
     quotation = Quotation.query.get_or_404(qid)
-    pdf_file = generate_quotation_pdf(quotation)
+    pdf_buffer = generate_quotation_pdf(quotation)
 
-    return send_file(
-        pdf_file,
-        download_name=f"{quotation.quotation_number}.pdf",
-        as_attachment=True
-    )
+    filename = f"Quotation_{quotation.quotation_number.replace('-', '_')}.pdf"
+    filepath = _save_buffer_to_downloads(pdf_buffer, filename)
+    
+    if filepath:
+        return jsonify({
+            'success': True,
+            'message': f'Quotation PDF generated and saved to Downloads: {filename}',
+            'filename': filename
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'message': 'Failed to save PDF to system Downloads folder.'
+        }), 500
 
 
 @app.route("/quotations/<int:qid>/convert")
