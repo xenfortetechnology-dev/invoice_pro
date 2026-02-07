@@ -20,7 +20,6 @@
                         <p class="text-muted mb-0">AI-powered insights and comprehensive business intelligence</p>
                     </div>
 
-
                     <div class="col-md-4 text-end">
                         <div class="d-flex gap-2 justify-content-end">
                             <div class="dropdown time-range-dropdown">
@@ -47,20 +46,15 @@
                                             <i data-feather="file-text" class="me-2"></i> Excel
                                         </a>
                                     </li>
-
                                     <li>
                                         <a class="dropdown-item" href="#" onclick="exportAnalyticsToPDF()">
                                             <i data-feather="file" class="me-2"></i> PDF Report
                                         </a>
                                     </li>
-
                                 </ul>
                             </div>
-
                         </div>
                     </div>
-
-
                 </div>
             </div>
         </div>
@@ -77,7 +71,7 @@
                             analytics_data.revenue_trends.summary else 0) }}</h3>
                         <p class="text-muted mb-0 small">Total Revenue</p>
                         <small class="text-success">
-                            <i data-feather="trending-up" size="14"></i> +{{ "%.1f"|format(12.5) }}% vs last period
+                            <i data-feather="trending-up" size="14"></i> +12.5% vs last period
                         </small>
                     </div>
                     <div class="kpi-icon bg-success bg-opacity-10 text-success">
@@ -145,7 +139,6 @@
 
     <!-- Charts Section -->
     <div class="row mb-4">
-        <!-- Revenue Trends -->
         <div class="col-lg-8 mb-4">
             <div class="glass-card p-4">
                 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -155,24 +148,18 @@
                         <span class="legend-item"><span class="legend-color bg-success"></span> Profit</span>
                     </div>
                 </div>
-
-                <!-- chart container -->
                 <div class="chart-container" style="height: 500px">
                     <canvas id="revenueProfitChart" height="400"></canvas>
                 </div>
             </div>
         </div>
 
-
-        <!-- Payment Status Distribution -->
         <div class="col-lg-4 mb-4">
             <div class="glass-card p-4">
                 <h5 class="fw-bold mb-3">Payment Status</h5>
                 <div class="chart-container">
                     <canvas id="paymentStatusChart"></canvas>
                 </div>
-
-
                 <div class="payment-status-details mt-3">
                     {% if analytics_data.payment_analytics.payment_status_distribution %}
                     {% for status in analytics_data.payment_analytics.payment_status_distribution %}
@@ -200,9 +187,7 @@
                     <i data-feather="cpu" class="me-2 text-primary"></i>
                     AI-Powered Insights
                 </h5>
-
                 <div class="row">
-                    <!-- Cash Flow Prediction -->
                     <div class="col-lg-6 mb-3">
                         <div class="ai-insight-card glass-card-sm p-3">
                             <h6 class="text-primary mb-2">Cash Flow Prediction</h6>
@@ -227,7 +212,6 @@
                         </div>
                     </div>
 
-                    <!-- Payment Behavior Analysis -->
                     <div class="col-lg-6 mb-3">
                         <div class="ai-insight-card glass-card-sm p-3">
                             <h6 class="text-success mb-2">Payment Behavior Analysis</h6>
@@ -239,7 +223,6 @@
                                         analytics_data.ai_predictions.payment_patterns.insights.overall_collection_health.title()
                                         }}</span>
                                 </div>
-
                                 {% if analytics_data.ai_predictions.payment_patterns.insights.best_performing_clients %}
                                 <div class="mb-2">
                                     <strong>Top Performers:</strong>
@@ -253,7 +236,6 @@
                                     </div>
                                 </div>
                                 {% endif %}
-
                                 {% if analytics_data.ai_predictions.payment_patterns.insights.at_risk_clients %}
                                 <div class="mb-2">
                                     <strong>Needs Attention:</strong>
@@ -272,7 +254,6 @@
                     </div>
                 </div>
 
-                <!-- AI Recommendations -->
                 <div class="ai-recommendations mt-3">
                     <h6 class="text-info mb-2">Recommended Actions</h6>
                     <div class="row">
@@ -306,7 +287,6 @@
         <div class="col-lg-8 mb-4">
             <div class="glass-card p-4">
                 <h5 class="fw-bold mb-3">Top Performing Clients</h5>
-
                 {% if analytics_data.client_performance.top_clients %}
                 <div class="table-responsive">
                     <table class="table table-hover">
@@ -336,7 +316,7 @@
                                 <td>
                                     <div class="performance-bar">
                                         <div class="performance-fill"
-                                            style="width: {{ (client.total_revenue / analytics_data.client_performance.top_clients[0].total_revenue * 100) if analytics_data.client_performance.top_clients else 0 }}%">
+                                            style="width: {{ (client.total_revenue / analytics_data.client_performance.top_clients[0].total_revenue * 100) if (analytics_data.client_performance.top_clients and analytics_data.client_performance.top_clients[0].total_revenue > 0) else 0 }}%">
                                         </div>
                                     </div>
                                 </td>
@@ -352,11 +332,9 @@
         <div class="col-lg-4 mb-4">
             <div class="glass-card p-4">
                 <h5 class="fw-bold mb-3">Client Distribution</h5>
-
                 <div class="chart-container">
                     <canvas id="clientTypeChart"></canvas>
                 </div>
-
                 <div class="client-stats mt-3">
                     {% if analytics_data.client_performance.client_types %}
                     {% for type_data in analytics_data.client_performance.client_types %}
@@ -369,7 +347,6 @@
                 </div>
             </div>
         </div>
-
     </div>
 
     <!-- Blockchain Analytics (if enabled) -->
@@ -381,7 +358,6 @@
                     <i data-feather="shield" class="me-2 text-info"></i>
                     Blockchain Analytics
                 </h5>
-
                 <div class="row">
                     <div class="col-md-3">
                         <div class="blockchain-stat text-center">
@@ -425,7 +401,6 @@
         <div class="col-12">
             <div class="glass-card p-4">
                 <h5 class="fw-bold mb-3">Generate Detailed Reports</h5>
-
                 <div class="row">
                     <div class="col-md-3">
                         <div class="report-card glass-card-sm p-3 text-center">
@@ -436,7 +411,6 @@
                                 onclick="generateReport('monthly')">Generate</button>
                         </div>
                     </div>
-
                     <div class="col-md-3">
                         <div class="report-card glass-card-sm p-3 text-center">
                             <i data-feather="users" size="32" class="text-success mb-2"></i>
@@ -446,7 +420,6 @@
                                 onclick="generateReport('clients')">Generate</button>
                         </div>
                     </div>
-
                     <div class="col-md-3">
                         <div class="report-card glass-card-sm p-3 text-center">
                             <i data-feather="dollar-sign" size="32" class="text-warning mb-2"></i>
@@ -456,7 +429,6 @@
                                 onclick="generateReport('financial')">Generate</button>
                         </div>
                     </div>
-
                     <div class="col-md-3">
                         <div class="report-card glass-card-sm p-3 text-center">
                             <i data-feather="cpu" size="32" class="text-info mb-2"></i>
@@ -474,19 +446,50 @@
 
 {% block scripts %}
 <script>
-    // Define export functions first to ensure they are available to onclick handlers
     function exportAnalyticsToPDF() {
+        showToast('⏳ Generating PDF report...', 'info');
         const urlParams = new URLSearchParams(window.location.search);
         const range = urlParams.get('range') || '12m';
-        showToast('⏳ Generating PDF report...', 'info');
-        window.location.href = `/analytics/export/pdf?range=${range}`;
+
+        fetch(`/analytics/export/pdf?range=${range}`)
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    showToast(`✅ ${data.message}`, 'success');
+                } else {
+                    showToast(`❌ ${data.message}`, 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('PDF Export Error:', error);
+                showToast('❌ Failed to generate PDF report.', 'danger');
+            });
     }
 
     function exportAnalyticsToExcel() {
+        showToast('⏳ Generating Excel report...', 'info');
         const urlParams = new URLSearchParams(window.location.search);
         const range = urlParams.get('range') || '12m';
-        showToast('⏳ Generating Excel report...', 'info');
-        window.location.href = `/analytics/export/excel?range=${range}`;
+
+        fetch(`/analytics/export/excel?range=${range}`)
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    showToast(`✅ ${data.message}`, 'success');
+                } else {
+                    showToast(`❌ ${data.message}`, 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Excel Export Error:', error);
+                showToast('❌ Failed to generate Excel report.', 'danger');
+            });
     }
 
     function generateReport(type) {
@@ -499,7 +502,6 @@
         alert(`Generating ${reportTypes[type]}...`);
     }
 
-    // Toast notification function
     function showToast(message, type = 'success') {
         const container = document.getElementById('toast-container');
         if (!container) return;
@@ -519,8 +521,6 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         initializeCharts();
-
-        // KPI card animations
         const kpiCards = document.querySelectorAll('.kpi-card');
         kpiCards.forEach((card, index) => {
             card.style.animationDelay = `${index * 0.1}s`;
@@ -529,13 +529,14 @@
     });
 
     function initializeCharts() {
-        // Revenue & Profit Trends Chart
-        const revenueProfitCtx = document.getElementById('revenueProfitChart').getContext('2d');
-        const revenueData = {{ (analytics_data.revenue_trends.monthly_data if (analytics_data.revenue_trends and analytics_data.revenue_trends.monthly_data) else[]) | tojson
-    }};
+        console.log('Initializing charts...');
+
+        const revenueProfitCtx = document.getElementById('revenueProfitChart');
+        if (revenueProfitCtx) {
+            const revenueData = {{ (analytics_data.revenue_trends.monthly_data if (analytics_data.revenue_trends and analytics_data.revenue_trends.monthly_data) else []) | tojson }};
     const profitData = {{ (analytics_data.profitability_analysis.monthly_trends if (analytics_data.profitability_analysis and analytics_data.profitability_analysis.monthly_trends) else[]) | tojson }};
 
-    new Chart(revenueProfitCtx, {
+    new Chart(revenueProfitCtx.getContext('2d'), {
         type: 'line',
         data: {
             labels: revenueData.map(item => item.month || ''),
@@ -560,99 +561,59 @@
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
+            plugins: { legend: { display: false } },
             scales: {
                 y: {
                     beginAtZero: true,
-                    grid: {
-                        color: 'rgba(0,0,0,0.1)'
-                    },
-                    ticks: {
-                        callback: function (value) {
-                            return '₹' + value.toLocaleString();
-                        }
-                    }
+                    ticks: { callback: function (value) { return '₹' + value.toLocaleString(); } }
                 },
-                x: {
-                    grid: {
-                        display: false
-                    }
-                }
+                x: { grid: { display: false } }
             }
         }
     });
+        }
 
-    // Payment Status Chart
-    const paymentStatusCtx = document.getElementById('paymentStatusChart').getContext('2d');
-    const paymentData = {{ (analytics_data.payment_analytics.payment_status_distribution if (analytics_data.payment_analytics and analytics_data.payment_analytics.payment_status_distribution) else[]) | tojson }};
-
-    new Chart(paymentStatusCtx, {
+    const paymentStatusCtx = document.getElementById('paymentStatusChart');
+    if (paymentStatusCtx) {
+        const paymentData = {{ (analytics_data.payment_analytics.payment_status_distribution if (analytics_data.payment_analytics and analytics_data.payment_analytics.payment_status_distribution) else []) | tojson }};
+    new Chart(paymentStatusCtx.getContext('2d'), {
         type: 'doughnut',
         data: {
             labels: paymentData.map(item => item.status),
             datasets: [{
                 data: paymentData.map(item => item.amount),
-                backgroundColor: [
-                    'rgba(34, 197, 94, 0.8)',   // Paid - Green
-                    'rgba(239, 68, 68, 0.8)',   // Unpaid - Red
-                    'rgba(245, 158, 11, 0.8)'   // Partially Paid - Yellow
-                ],
+                backgroundColor: ['rgba(34, 197, 94, 0.8)', 'rgba(239, 68, 68, 0.8)', 'rgba(245, 158, 11, 0.8)'],
                 borderWidth: 2,
                 borderColor: '#fff'
             }]
         },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            }
-        }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
     });
+        }
 
-    // Client Type Distribution Chart
-    const clientTypeCtx = document.getElementById('clientTypeChart').getContext('2d');
-    const clientTypeData = {{ (analytics_data.client_performance.client_types if (analytics_data.client_performance and analytics_data.client_performance.client_types) else[]) | tojson }};
-
-    new Chart(clientTypeCtx, {
+    const clientTypeCtx = document.getElementById('clientTypeChart');
+    if (clientTypeCtx) {
+        const clientTypeData = {{ (analytics_data.client_performance.client_types if (analytics_data.client_performance and analytics_data.client_performance.client_types) else []) | tojson }};
+    new Chart(clientTypeCtx.getContext('2d'), {
         type: 'pie',
         data: {
             labels: clientTypeData.map(item => item.type),
             datasets: [{
                 data: clientTypeData.map(item => item.count),
-                backgroundColor: [
-                    'rgba(59, 130, 246, 0.8)',   // Primary
-                    'rgba(34, 197, 94, 0.8)',    // Success
-                    'rgba(245, 158, 11, 0.8)',   // Warning
-                    'rgba(139, 92, 246, 0.8)'    // Purple
-                ],
+                backgroundColor: ['rgba(59, 130, 246, 0.8)', 'rgba(34, 197, 94, 0.8)', 'rgba(245, 158, 11, 0.8)', 'rgba(139, 92, 246, 0.8)'],
                 borderWidth: 2,
                 borderColor: '#fff'
             }]
         },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            }
-        }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
     });
+        }
 
-    // Cash Flow Prediction Chart (if AI data available)
-    {% if analytics_data.ai_predictions and analytics_data.ai_predictions.cash_flow %}
-    const cashFlowCtx = document.getElementById('cashFlowPredictionChart').getContext('2d');
-    const predictionData = {{ analytics_data.ai_predictions.cash_flow.monthly_predictions | tojson }};
-
-    new Chart(cashFlowCtx, {
+    const cashFlowCtx = document.getElementById('cashFlowPredictionChart');
+    if (cashFlowCtx) {
+        {% if analytics_data.ai_predictions and analytics_data.ai_predictions.cash_flow %}
+        const predictionData = {{ analytics_data.ai_predictions.cash_flow.monthly_predictions | tojson }};
+    new Chart(cashFlowCtx.getContext('2d'), {
         type: 'bar',
         data: {
             labels: predictionData.map(item => item.month),
@@ -667,144 +628,129 @@
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
+            plugins: { legend: { display: false } },
             scales: {
                 y: {
                     beginAtZero: true,
-                    ticks: {
-                        callback: function (value) {
-                            return '₹' + value.toLocaleString();
-                        }
-                    }
+                    ticks: { callback: function (value) { return '₹' + value.toLocaleString(); } }
                 }
             }
         }
     });
     {% endif %}
-}
-
-
-
-    // Add CSS animations
-    const style = document.createElement('style');
-    style.textContent = `
-@keyframes slideUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
+        }
     }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.animate-slide-up {
-    animation: slideUp 0.6s ease-out forwards;
-}
-
-.kpi-card {
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.kpi-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-}
-
-.kpi-icon {
-    width: 60px;
-    height: 60px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.chart-legend {
-    display: flex;
-    gap: 15px;
-}
-
-.legend-item {
-    display: flex;
-    align-items: center;
-    font-size: 12px;
-}
-
-.legend-color {
-    width: 12px;
-    height: 12px;
-    border-radius: 2px;
-    margin-right: 6px;
-}
-
-.status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-    margin-right: 8px;
-}
-
-.client-avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    font-weight: bold;
-}
-
-.performance-bar {
-    width: 100px;
-    height: 6px;
-    background: #e9ecef;
-    border-radius: 3px;
-    overflow: hidden;
-}
-
-.performance-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #10b981, #059669);
-    border-radius: 3px;
-    transition: width 0.3s ease;
-}
-
-.ai-insight-card {
-    transition: transform 0.2s ease;
-}
-
-.ai-insight-card:hover {
-    transform: translateY(-2px);
-}
-
-.recommendation-item {
-    display: flex;
-    align-items: center;
-    margin-bottom: 8px;
-}
-
-.report-card {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    cursor: pointer;
-}
-
-.report-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-}
-
-.blockchain-stat {
-    padding: 15px;
-}
-`;
-    document.head.appendChild(style);
 </script>
+
+<style>
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .animate-slide-up {
+        animation: slideUp 0.6s ease-out forwards;
+    }
+
+    .kpi-card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .kpi-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    }
+
+    .kpi-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .chart-legend {
+        display: flex;
+        gap: 15px;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        font-size: 12px;
+    }
+
+    .legend-color {
+        width: 12px;
+        height: 12px;
+        border-radius: 2px;
+        margin-right: 6px;
+    }
+
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 8px;
+    }
+
+    .client-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: bold;
+    }
+
+    .performance-bar {
+        width: 100px;
+        height: 6px;
+        background: #e9ecef;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .performance-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #10b981, #059669);
+        border-radius: 3px;
+        transition: width 0.3s ease;
+    }
+
+    .ai-insight-card {
+        transition: transform 0.2s ease;
+    }
+
+    .ai-insight-card:hover {
+        transform: translateY(-2px);
+    }
+
+    .recommendation-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+
+    .report-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        cursor: pointer;
+    }
+
+    .report-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    }
+</style>
 {% endblock %}

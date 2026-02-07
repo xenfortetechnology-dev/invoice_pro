@@ -973,6 +973,37 @@ def _get_analytics_data_dict(time_range='12m'):
             
     return analytics_data
 
+def _save_buffer_to_downloads(buffer, filename):
+    """Helper to save a memory buffer to the system Downloads folder and open it"""
+    try:
+        downloads_path = os.path.join(os.path.expanduser('~'), 'Downloads')
+        if not os.path.exists(downloads_path):
+            try:
+                os.makedirs(downloads_path)
+            except Exception:
+                # Fallback to current directory if Downloads is somehow unreachable
+                downloads_path = os.getcwd()
+                
+        file_path = os.path.join(downloads_path, filename)
+        
+        # Ensure buffer is at start
+        buffer.seek(0)
+        
+        with open(file_path, 'wb') as f:
+            f.write(buffer.read())
+            
+        # Try to open the file automatically on Windows
+        if os.name == 'nt':
+            try:
+                os.startfile(file_path)
+            except Exception as e:
+                logging.error(f"Could not open file: {e}")
+                
+        return file_path
+    except Exception as e:
+        logging.error(f"Failed to save file to downloads: {e}")
+        return None
+
 @app.route('/analytics')
 @login_required
 def analytics():
@@ -1004,42 +1035,52 @@ def analytics():
 @app.route('/analytics/export/excel')
 @login_required
 def export_analytics_excel():
-    """Export analytics data to Excel"""
+    """Export analytics data to Excel and save to system"""
     try:
         time_range = request.args.get('range', '12m')
         analytics_data = _get_analytics_data_dict(time_range)
         output = report_generator.generate_excel_report(analytics_data)
         
-        return send_file(
-            output,
-            as_attachment=True,
-            download_name=f"Analytics_Report_{datetime.now().strftime('%Y%m%d')}.xlsx",
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
+        filename = f"Analytics_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        file_path = _save_buffer_to_downloads(output, filename)
+        
+        if file_path:
+            return jsonify({
+                "success": True, 
+                "message": f"Excel report saved to Downloads: {filename}",
+                "path": file_path
+            })
+        else:
+            return jsonify({"success": False, "message": "Failed to save file to system."}), 500
+            
     except Exception as e:
         logging.error(f"Excel export failed: {e}")
-        flash('Error generating Excel report.', 'error')
-        return redirect(url_for('analytics'))
+        return jsonify({"success": False, "message": str(e)}), 500
 
 @app.route('/analytics/export/pdf')
 @login_required
 def export_analytics_pdf():
-    """Export analytics data to PDF"""
+    """Export analytics data to PDF and save to system"""
     try:
         time_range = request.args.get('range', '12m')
         analytics_data = _get_analytics_data_dict(time_range)
         output = report_generator.generate_pdf_report(analytics_data)
         
-        return send_file(
-            output,
-            as_attachment=True,
-            download_name=f"Analytics_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
-            mimetype='application/pdf'
-        )
+        filename = f"Analytics_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        file_path = _save_buffer_to_downloads(output, filename)
+        
+        if file_path:
+            return jsonify({
+                "success": True, 
+                "message": f"PDF report saved to Downloads: {filename}",
+                "path": file_path
+            })
+        else:
+            return jsonify({"success": False, "message": "Failed to save file to system."}), 500
+            
     except Exception as e:
         logging.error(f"PDF export failed: {e}")
-        flash('Error generating PDF report.', 'error')
-        return redirect(url_for('analytics'))
+        return jsonify({"success": False, "message": str(e)}), 500
 
 @app.route('/ai_assistant')
 @login_required
