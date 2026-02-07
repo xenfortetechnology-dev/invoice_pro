@@ -36,6 +36,9 @@ from models import Invoice
 
 import ai_services
 import ai_client 
+import requests
+from types import SimpleNamespace
+
 
 # Initialize analytics engine
 analytics_engine = AnalyticsEngine(db.session)
@@ -720,103 +723,81 @@ def bulk_export():
         headers={"Content-Disposition": "attachment;filename=invoices.csv"}
     )
 
-
 @app.route('/clients')
 @login_required
 def client_management():
-    """Advanced client management with AI insights"""
-    search = request.args.get('search', '')
-    client_type = request.args.get('type', '')
-    page = request.args.get('page', 1, type=int)
-    
-    # Build query
-    query = Client.query
-    
-    if search:
-        query = query.filter(
-            or_(
-                Client.name.contains(search),
-                Client.phone.contains(search),
-                Client.email.contains(search),
-                Client.contact_person.contains(search)
-            )
-        )
-    
-    if client_type:
-        query = query.filter(Client.client_type == client_type)
-    
-    # Pagination
-    clients = query.order_by(Client.name).paginate(
-        page=page, per_page=20, error_out=False
-    )
-    
-    # Prepare iterable for template
-    client_list = clients.items if hasattr(clients, 'items') else clients
+    # TEMP: mock data to verify UI listing
+    client_list = [
+        {
+            "id": 1,
+            "name": "Test Client A",
+            "phone": "9876543210",
+            "email": "a@test.com",
+            "city": "Chennai",
+            "blockchain_verified": False
+        },
+        {
+            "id": 2,
+            "name": "Test Client B",
+            "phone": "9999999999",
+            "email": "b@test.com",
+            "city": "Bangalore",
+            "blockchain_verified": True
+        }
+    ]
 
-    # AI insights for clients
-    client_insights = {}
-    if app.config.get("AI_FEATURES_ENABLED") and ai_services.ai_assistant:
-        try:
-            for client in client_list:
-                if client.ai_risk_score > 0:
-                    client_insights[client.id] = {
-                        'risk_level': 'High' if client.ai_risk_score > 0.7 else 'Medium' if client.ai_risk_score > 0.3 else 'Low',
-                        'predicted_ltv': client.predicted_ltv,
-                        'payment_behavior': client.payment_behavior_pattern
-                    }
-        except Exception as e:
-            logging.error(f"Client insights failed: {e}")
-    
+    clients_obj = SimpleNamespace(
+        items=client_list,
+        total=len(client_list),
+        pages=1,
+        has_prev=False,
+        has_next=False,
+        page=1
+    )
+
     return render_template(
         'client_management.html',
-        clients=clients,
+        clients=clients_obj,
         client_list=client_list,
-        search=search,
-        client_type=client_type,
-        client_insights=client_insights
+        search="",
+        client_type="",
+        client_insights={}
     )
+
+
 
 @app.route('/create_client', methods=['GET', 'POST'])
 @login_required
 def create_client():
-    """Create new client with AI enhancements"""
     if request.method == 'POST':
         try:
-            client = Client(
-                name=request.form.get('name'),
-                contact_person=request.form.get('contact_person'),
-                address=request.form.get('address'),
-                city=request.form.get('city'),
-                state=request.form.get('state'),
-                pincode=request.form.get('pincode'),
-                phone=request.form.get('phone'),
-                email=request.form.get('email'),
-                gstin=request.form.get('gstin'),
-                pan=request.form.get('pan'),
-                client_type=request.form.get('client_type', 'Regular'),
-                lead_stage=request.form.get('lead_stage', 'New'),
-                notes=request.form.get('notes', ''),
-                tags=request.form.get('tags', ''),
-                blockchain_verified=request.form.get('blockchain_verified') == 'on'
+            payload = request.form.to_dict()
+
+            # Convert checkbox properly
+            payload['blockchain_verified'] = payload.get('blockchain_verified') == 'on'
+
+            # Send form data to CLOUD API (this replaces Postman)
+            response = requests.post(
+                "http://54.236.29.224:5000/api/clients",
+                json=payload,
+                timeout=5
             )
-            
-            # Set follow-up date if provided
-            follow_up_date = request.form.get('follow_up_date')
-            if follow_up_date:
-                client.follow_up_date = datetime.strptime(follow_up_date, '%Y-%m-%d').date()
-            
-            db.session.add(client)
-            db.session.commit()
-            
-            flash('Client created successfully!', 'success')
-            return redirect(url_for('client_management'))
-            
+
+            if response.status_code in (200, 201):
+                flash('Client created successfully!', 'success')
+                return redirect(url_for('client_management'))
+            else:
+                flash(
+                    f"API error: {response.status_code} - {response.text}",
+                    'error'
+                )
+
         except Exception as e:
-            db.session.rollback()
-            logging.error(f"Client creation failed: {e}")
-            flash(f'Error creating client: {str(e)}', 'error')
-    
+            logging.error(f"API client creation failed: {e}")
+            flash(f'API connection error: {str(e)}', 'error')
+
     return render_template('create_client.html')
+
 
 @app.route('/api/export/clients/excel')
 @login_required
