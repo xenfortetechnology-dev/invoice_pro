@@ -67,12 +67,6 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # --------------------------------------------------
-# Template Configuration (Auto-reload for development)
-# --------------------------------------------------
-app.config["TEMPLATES_AUTO_RELOAD"] = True
-
-
-# --------------------------------------------------
 # Feature Flags & Settings
 # --------------------------------------------------
 app.config["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
@@ -83,16 +77,6 @@ app.config["BLOCKCHAIN_ENABLED"] = os.environ.get(
 app.config["AI_FEATURES_ENABLED"] = os.environ.get(
     "AI_FEATURES_ENABLED", "true"
 ).lower() == "true"
-
-# --------------------------------------------------
-# Email Configuration
-# --------------------------------------------------
-app.config["MAIL_SERVER"] = os.environ.get("MAIL_SERVER", "smtp.gmail.com")
-app.config["MAIL_PORT"] = int(os.environ.get("MAIL_PORT", 465))
-app.config["MAIL_USE_SSL"] = os.environ.get("MAIL_USE_SSL", "true").lower() == "true"
-app.config["MAIL_USERNAME"] = os.environ.get("MAIL_USERNAME")
-app.config["MAIL_PASSWORD"] = os.environ.get("MAIL_PASSWORD")
-app.config["MAIL_DEFAULT_SENDER"] = os.environ.get("MAIL_DEFAULT_SENDER", "noreply@invoicepro.ai")
 
 app.config["UPLOAD_FOLDER"] = resource_path("uploads")
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB
@@ -112,40 +96,14 @@ import smtplib
 from email.message import EmailMessage
 
 def send_invoice_email(invoice, recipient_email):
-    """
-    Send invoice via email using SMTP credentials from environment variables.
-    
-    Required environment variables:
-    - MAIL_USERNAME: Email address for authentication
-    - MAIL_PASSWORD: Email password or app-specific password
-    - MAIL_SERVER: SMTP server (default: smtp.gmail.com)
-    - MAIL_PORT: SMTP port (default: 465)
-    """
-    # Get email credentials from config
-    mail_username = app.config.get("MAIL_USERNAME")
-    mail_password = app.config.get("MAIL_PASSWORD")
-    mail_server = app.config.get("MAIL_SERVER", "smtp.gmail.com")
-    mail_port = app.config.get("MAIL_PORT", 465)
-    
-    # Validate credentials are set
-    if not mail_username or not mail_password:
-        error_msg = (
-            "Email credentials not configured. "
-            "Please set MAIL_USERNAME and MAIL_PASSWORD environment variables."
-        )
-        logging.error(error_msg)
-        raise ValueError(error_msg)
-    
     msg = EmailMessage()
     msg['Subject'] = f"Invoice #{invoice.invoice_number}"
-    msg['From'] = mail_username
+    msg['From'] = "dummail2004@gmail.com"
     msg['To'] = recipient_email
 
     msg.set_content(
         f"Dear {invoice.client.name},\n\n"
-        f"Please find attached Invoice #{invoice.invoice_number}.\n\n"
-        f"Thank you for your business!\n\n"
-        f"Best regards,\nRevolutionary Invoice Systems"
+        f"Please find attached Invoice #{invoice.invoice_number}.\n\nThanks!"
     )
 
     pdf_path = resource_path(f"invoices/invoice_{invoice.id}.pdf")
@@ -159,58 +117,15 @@ def send_invoice_email(invoice, recipient_email):
             subtype='pdf',
             filename=f"Invoice_{invoice.invoice_number}.pdf"
         )
-        logging.info(f"PDF attachment added: {pdf_path}")
     except FileNotFoundError:
-        logging.warning(f"Invoice PDF not found at {pdf_path}, sending without attachment")
+        logging.warning("Invoice PDF not found, sending without attachment")
 
     try:
-        logging.info(f"Attempting to send email via {mail_server}:{mail_port}")
-        
-        # Try with SSL first (port 465)
-        if mail_port == 465:
-            try:
-                with smtplib.SMTP_SSL(mail_server, mail_port, timeout=10) as smtp:
-                    smtp.login(mail_username, mail_password)
-                    smtp.send_message(msg)
-                logging.info(f"Invoice email sent successfully to {recipient_email}")
-                return True
-            except Exception as ssl_error:
-                logging.warning(f"SSL connection failed: {ssl_error}. Trying TLS...")
-                # Fallback to TLS on port 587
-                with smtplib.SMTP(mail_server, 587, timeout=10) as smtp:
-                    smtp.starttls()
-                    smtp.login(mail_username, mail_password)
-                    smtp.send_message(msg)
-                logging.info(f"Invoice email sent successfully to {recipient_email} (via TLS)")
-                return True
-        else:
-            # Use standard SMTP with TLS
-            with smtplib.SMTP(mail_server, mail_port, timeout=10) as smtp:
-                smtp.starttls()
-                smtp.login(mail_username, mail_password)
-                smtp.send_message(msg)
-            logging.info(f"Invoice email sent successfully to {recipient_email}")
-            return True
-            
-    except smtplib.SMTPAuthenticationError as e:
-        error_msg = (
-            f"SMTP Authentication failed: {e}\n"
-            "For Gmail:\n"
-            "1. Enable 2-Factor Authentication: https://myaccount.google.com/security\n"
-            "2. Generate app password: https://myaccount.google.com/apppasswords\n"
-            "3. Use the 16-character password in MAIL_PASSWORD (not your regular password)\n"
-            "4. Restart the application after updating .env"
-        )
-        logging.error(error_msg)
-        raise Exception(error_msg)
-    except smtplib.SMTPException as e:
-        error_msg = f"SMTP error: {e}. Check MAIL_SERVER and MAIL_PORT settings."
-        logging.error(error_msg)
-        raise Exception(error_msg)
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login('your_email@example.com', 'your_app_password')
+            smtp.send_message(msg)
     except Exception as e:
-        error_msg = f"Failed to send email: {e}"
-        logging.error(error_msg)
-        raise Exception(error_msg)
+        raise Exception(f"SMTP failed: {e}")
 
 # --------------------------------------------------
 # Import models & routes AFTER app creation
