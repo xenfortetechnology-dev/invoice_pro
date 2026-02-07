@@ -24,7 +24,7 @@ class AnalyticsReportGenerator:
         payments = safe_dict(analytics_data.get("payment_analytics", {}))
         clients = safe_dict(analytics_data.get("client_performance", {}))
 
-        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
             
             # Revenue Sheet
             revenue_data = revenue.get("monthly_data", [])

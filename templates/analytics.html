@@ -10,7 +10,7 @@
     <!-- Header -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="glass-card p-4">
+            <div class="glass-card p-4" style="position: relative; z-index: 10;">
                 <div class="row align-items-center">
                     <div class="col-md-8">
                         <h1 class="display-6 fw-bold text-primary mb-1">
@@ -28,7 +28,7 @@
                                     data-bs-toggle="dropdown">
                                     <i data-feather="calendar" class="me-1"></i> Time Range
                                 </button>
-                                <ul class="dropdown-menu dropdown-menu-end">
+                                <ul class="dropdown-menu glass-dropdown dropdown-menu-end">
                                     <li><a class="dropdown-item" href="?range=7d">Last 7 Days</a></li>
                                     <li><a class="dropdown-item" href="?range=30d">Last 30 Days</a></li>
                                     <li><a class="dropdown-item" href="?range=90d">Last 3 Months</a></li>
@@ -474,6 +474,49 @@
 
 {% block scripts %}
 <script>
+    // Define export functions first to ensure they are available to onclick handlers
+    function exportAnalyticsToPDF() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const range = urlParams.get('range') || '12m';
+        showToast('⏳ Generating PDF report...', 'info');
+        window.location.href = `/analytics/export/pdf?range=${range}`;
+    }
+
+    function exportAnalyticsToExcel() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const range = urlParams.get('range') || '12m';
+        showToast('⏳ Generating Excel report...', 'info');
+        window.location.href = `/analytics/export/excel?range=${range}`;
+    }
+
+    function generateReport(type) {
+        const reportTypes = {
+            'monthly': 'Monthly Business Report',
+            'clients': 'Client Analysis Report',
+            'financial': 'Financial Summary Report',
+            'ai': 'AI Insights Report'
+        };
+        alert(`Generating ${reportTypes[type]}...`);
+    }
+
+    // Toast notification function
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+        const toast = document.createElement('div');
+        toast.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`;
+        toast.style.cssText = 'min-width: 300px; margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+        toast.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        container.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 150);
+        }, 5000);
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         initializeCharts();
 
@@ -488,9 +531,9 @@
     function initializeCharts() {
         // Revenue & Profit Trends Chart
         const revenueProfitCtx = document.getElementById('revenueProfitChart').getContext('2d');
-        const revenueData = {{ analytics_data.revenue_trends.monthly_data | tojson if analytics_data.revenue_trends and analytics_data.revenue_trends.monthly_data else[]
+        const revenueData = {{ (analytics_data.revenue_trends.monthly_data if (analytics_data.revenue_trends and analytics_data.revenue_trends.monthly_data) else[]) | tojson
     }};
-    const profitData = {{ analytics_data.profitability_analysis.monthly_trends | tojson if analytics_data.profitability_analysis and analytics_data.profitability_analysis.monthly_trends else[] }};
+    const profitData = {{ (analytics_data.profitability_analysis.monthly_trends if (analytics_data.profitability_analysis and analytics_data.profitability_analysis.monthly_trends) else[]) | tojson }};
 
     new Chart(revenueProfitCtx, {
         type: 'line',
@@ -545,7 +588,7 @@
 
     // Payment Status Chart
     const paymentStatusCtx = document.getElementById('paymentStatusChart').getContext('2d');
-    const paymentData = {{ analytics_data.payment_analytics.payment_status_distribution | tojson if analytics_data.payment_analytics and analytics_data.payment_analytics.payment_status_distribution else[] }};
+    const paymentData = {{ (analytics_data.payment_analytics.payment_status_distribution if (analytics_data.payment_analytics and analytics_data.payment_analytics.payment_status_distribution) else[]) | tojson }};
 
     new Chart(paymentStatusCtx, {
         type: 'doughnut',
@@ -575,7 +618,7 @@
 
     // Client Type Distribution Chart
     const clientTypeCtx = document.getElementById('clientTypeChart').getContext('2d');
-    const clientTypeData = {{ analytics_data.client_performance.client_types | tojson if analytics_data.client_performance and analytics_data.client_performance.client_types else[] }};
+    const clientTypeData = {{ (analytics_data.client_performance.client_types if (analytics_data.client_performance and analytics_data.client_performance.client_types) else[]) | tojson }};
 
     new Chart(clientTypeCtx, {
         type: 'pie',
@@ -644,77 +687,11 @@
     {% endif %}
 }
 
-    // Toast notification function
-    function showToast(message, type = 'success') {
-        const container = document.getElementById('toast-container');
-        const toast = document.createElement('div');
-        toast.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`;
-        toast.style.cssText = 'min-width: 300px; margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
-        toast.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
-        container.appendChild(toast);
 
-        // Auto-remove after 5 seconds
-        setTimeout(() => {
-            toast.classList.remove('show');
-            setTimeout(() => toast.remove(), 150);
-        }, 5000);
-    }
-
-    function exportAnalyticsToPDF() {
-        fetch('/analytics/export/pdf')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showToast(`✅ ${data.message}`, 'success');
-                } else {
-                    showToast(`❌ Export failed: ${data.message}`, 'error');
-                }
-            })
-            .catch(error => {
-                showToast(`❌ Error: ${error.message}`, 'error');
-            });
-    }
-
-    function exportAnalyticsToExcel() {
-        fetch('/analytics/export/excel')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showToast(`✅ ${data.message}`, 'success');
-                } else {
-                    showToast(`❌ Export failed: ${data.message}`, 'error');
-                }
-            })
-            .catch(error => {
-                showToast(`❌ Error: ${error.message}`, 'error');
-            });
-    }
-
-
-    function generateReport(type) {
-        const reportTypes = {
-            'monthly': 'Monthly Business Report',
-            'clients': 'Client Analysis Report',
-            'financial': 'Financial Summary Report',
-            'ai': 'AI Insights Report'
-        };
-
-        alert(`Generating ${reportTypes[type]}...`);
-
-        // In a real application, this would make an API call to generate the report
-        // window.location.href = `/api/reports/${type}?format=pdf`;
-    }
 
     // Add CSS animations
     const style = document.createElement('style');
     style.textContent = `
-.dropdown-menu {
-    position: fixed !important;
-    z-index: 9999 !important;
-}
 @keyframes slideUp {
     from {
         opacity: 0;
@@ -826,18 +803,6 @@
 
 .blockchain-stat {
     padding: 15px;
-}
-.glass-card {
-    position: relative;
-}
-
-.row.mb-4:first-of-type .glass-card {
-    z-index: 20;
-}
-
-.kpi-card {
-    position: relative;
-    z-index: 1;
 }
 `;
     document.head.appendChild(style);
