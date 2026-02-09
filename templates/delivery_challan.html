@@ -44,7 +44,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for challan in challans %}
+                        {% for challan in challans.items %}
                         <tr>
                             <td>
                                 {% if challan.status != 'Billed' %}

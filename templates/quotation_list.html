@@ -23,7 +23,7 @@
             </tr>
          </thead>
          <tbody>
-            {% for q in quotations %}
+            {% for q in quotations.items %}
             <tr>
                <td class="ps-3">{{ loop.index }}</td>
                <td class="fw-bold">{{ q.quotation_number }}</td>
