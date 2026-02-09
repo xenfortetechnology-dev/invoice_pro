@@ -36,6 +36,8 @@ from models import Invoice
 
 import ai_services
 import ai_client 
+from types import SimpleNamespace
+import requests
 
 # Initialize analytics engine
 analytics_engine = AnalyticsEngine(db.session)
@@ -89,78 +91,65 @@ def index():
     """Redirect root to dashboard"""
     return redirect(url_for('dashboard_page'))
 
-
 @app.route('/invoices')
 @login_required
 def invoice_management():
-    """Advanced invoice management with AI filtering"""
-    page = request.args.get('page', 1, type=int)
-    search = request.args.get('search', '')
-    status_filter = request.args.get('status', '')
-    client_filter = request.args.get('client_id', '')
-    date_from = request.args.get('date_from', '')
-    date_to = request.args.get('date_to', '')
-    
-    # Build query
-    query = Invoice.query.options(joinedload(Invoice.client))
-    
-    if search:
-        query = query.join(Client).filter(
-            or_(
-                Invoice.invoice_number.contains(search),
-                Client.name.contains(search),
-                Client.phone.contains(search),
-                Client.email.contains(search)
-            )
+    try:
+        response = requests.get(
+            "http://44.208.164.236:5000/api/invoices",
+            timeout=5
         )
-    
-    if status_filter:
-        query = query.filter(Invoice.payment_status == status_filter)
-    
-    if client_filter:
-        query = query.filter(Invoice.client_id == client_filter)
-    
-    if date_from:
-        query = query.filter(Invoice.invoice_date >= datetime.strptime(date_from, '%Y-%m-%d').date())
-    
-    if date_to:
-        query = query.filter(Invoice.invoice_date <= datetime.strptime(date_to, '%Y-%m-%d').date())
-    
-    # Pagination
-    invoices = query.order_by(Invoice.created_at.desc()).paginate(
-        page=page, per_page=20, error_out=False
-    )
-    
-    # Get clients for filter dropdown
-    clients = Client.query.order_by(Client.name).all()
-    
-    # AI insights for invoices
-    ai_invoice_insights = {}
-    if app.config.get("AI_FEATURES_ENABLED") and ai_services.ai_assistant:
-        try:
-            # Get payment delay predictions
-            ai_invoice_insights = analytics_engine.get_ai_invoice_insights(
-                [inv.id for inv in invoices.items]
+
+        if response.status_code == 200:
+            data = response.json()
+        else:
+            flash("Failed to load invoices from API", "error")
+            data = []
+
+    except Exception as e:
+        flash(f"API connection error: {str(e)}", "error")
+        data = []
+
+    invoice_list = []
+
+    for inv in data:
+        invoice_obj = SimpleNamespace(
+            id=inv["id"],
+            invoice_number=inv["invoice_number"],
+            invoice_date=datetime.strptime(
+                inv["invoice_date"], "%Y-%m-%d"
+            ) if inv["invoice_date"] else None,
+            due_date=None,
+            total_amount=inv["total_amount"],
+            amount_paid=0,
+            payment_status=inv["payment_status"],
+            ai_insights=None,
+            client=SimpleNamespace(
+                name=inv.get("client_name")
             )
-        except Exception as e:
-            logging.error(f"AI invoice insights failed: {e}")
-    
-    return render_template('invoice_management.html',
-                         invoices=invoices,
-                         clients=clients,
-                         search=search,
-                         status_filter=status_filter,
-                         client_filter=client_filter,
-                         date_from=date_from,
-                         date_to=date_to,
-                         ai_insights=ai_invoice_insights)
+    )
+        invoice_list.append(invoice_obj)
+
+    invoices_obj = SimpleNamespace(
+        items=invoice_list,
+        total=len(invoice_list),
+        pages=1,
+        has_prev=False,
+        has_next=False,
+        page=1
+    )
+
+    return render_template(
+        "invoice_management.html",
+        invoices=invoices_obj
+    )
+
 @app.route('/create_invoice', methods=['GET', 'POST'])
 @login_required
 def create_invoice():
-    """AI-enhanced invoice creation with voice commands"""
+
     if request.method == 'POST':
         try:
-            # Extract form data
             client_id = request.form.get('client_id')
             invoice_date_str = request.form.get('invoice_date')
             due_date_str = request.form.get('due_date')
@@ -168,153 +157,57 @@ def create_invoice():
             terms_conditions = request.form.get('terms_conditions', '')
             invoice_format = request.form.get("invoice_format", "default")
 
-            # Parse dates
-            invoice_date = datetime.strptime(invoice_date_str, '%Y-%m-%d').date() if invoice_date_str else datetime.now().date()
-            due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date() if due_date_str else None
-
-            # Generate invoice number
             invoice_number = generate_invoice_number()
 
-            # Create invoice
-            invoice = Invoice(
-                invoice_number=invoice_number,
-                client_id=client_id,
-                invoice_date=invoice_date,
-                due_date=due_date,
-                notes=notes,
-                terms_conditions=terms_conditions,
-                invoice_format=invoice_format,
-                ai_generated=request.form.get('ai_generated') == 'true',
-                voice_command_created=request.form.get('voice_created') == 'true'
+            # Process line items
+            line_items_data = json.loads(request.form.get('line_items', '[]'))
+
+            subtotal = 0
+            total_tax = 0
+
+            for item in line_items_data:
+                qty = float(item.get("quantity", 0))
+                price = float(item.get("unit_price", 0))
+                tax = float(item.get("tax_percentage", 0))
+
+                line_total = qty * price
+                tax_amount = (line_total * tax) / 100
+
+                subtotal += line_total
+                total_tax += tax_amount
+
+            total_amount = subtotal + total_tax
+
+            # 🔥 SEND TO CLOUD API
+            response = requests.post(
+                "http://44.208.164.236:5000/api/invoices",
+                json={
+                    "invoice_number": invoice_number,
+                    "client_id": client_id,
+                    "invoice_date": invoice_date_str,
+                    "total_amount": total_amount,
+                    "payment_status": "Unpaid"
+                },
+                timeout=5
             )
 
-            db.session.add(invoice)
-            db.session.commit()
-
-            # Process line items
-            print("RAW line_items:", request.form.get("line_items"))
-
-            line_items_data = json.loads(request.form.get('line_items', '[]'))
-            subtotal = 0
-            total_cgst = 0
-            total_sgst = 0
-            total_igst = 0
-
-            for i, item_data in enumerate(line_items_data, 1):
-                quantity = float(item_data['quantity'])
-                unit_price = float(item_data['unit_price'])
-                
-                # Get individual tax percentages
-                cgst_percentage = float(item_data.get('cgst_percentage', 0.0))
-                sgst_percentage = float(item_data.get('sgst_percentage', 0.0))
-                igst_percentage = float(item_data.get('igst_percentage', 0.0))
-
-                line_total = quantity * unit_price
-                
-                # Calculate individual tax amounts
-                cgst_amount = (line_total * cgst_percentage) / 100
-                sgst_amount = (line_total * sgst_percentage) / 100
-                igst_amount = (line_total * igst_percentage) / 100
-                
-                # Total tax for this line
-                tax_amount = cgst_amount + sgst_amount + igst_amount
-                
-                # For backward compatibility, use total tax percentage
-                tax_percentage = cgst_percentage + sgst_percentage + igst_percentage
-
-                line_item = InvoiceLineItem(
-                    invoice_id=invoice.id,
-                    sr_no=i,
-                    hsn_code=item_data.get('hsn_code', ''),
-                    description=item_data['description'],
-                    quantity=quantity,
-                    unit=item_data.get('unit', 'Nos'),
-                    unit_price=unit_price,
-                    tax_percentage=tax_percentage,
-                    tax_amount=tax_amount,
-                    cgst_percentage=cgst_percentage,
-                    sgst_percentage=sgst_percentage,
-                    igst_percentage=igst_percentage,
-                    cgst_amount=cgst_amount,
-                    sgst_amount=sgst_amount,
-                    igst_amount=igst_amount,
-                    total_amount=line_total + tax_amount,
-                    cost_price=float(item_data.get('cost_price', 0)),
-                    ai_suggested=item_data.get('ai_suggested', False)
-                )
-
-                db.session.add(line_item)
-                subtotal += line_total
-                total_cgst += cgst_amount
-                total_sgst += sgst_amount
-                total_igst += igst_amount
-            db.session.commit()
-
-            # Calculate invoice-level taxes
-            client = Client.query.get(client_id)
-            company = Company.query.first()
-
-            # Set invoice totals based on what was calculated from line items
-            invoice.cgst = total_cgst
-            invoice.sgst = total_sgst
-            invoice.igst = total_igst
-            invoice.subtotal = subtotal
-            invoice.total_amount = subtotal + total_cgst + total_sgst + total_igst
-
-            # Generate QR code
-            invoice.qr_payment_code = generate_payment_qr_code(invoice)
-
-            # AI risk assessment
-            if app.config.get("AI_FEATURES_ENABLED") and ai_services.ai_assistant:
-                try:
-                    risk_assessment = ai_services.ai_assistant.analyze_client_history(client_id)
-                    invoice.ai_risk_assessment = risk_assessment
-                    invoice.predicted_payment_date = predict_payment_date(invoice, risk_assessment)
-                except Exception as e:
-                    logging.error(f"AI risk assessment failed: {e}")
-
-            # Blockchain
-            if app.config.get("BLOCKCHAIN_ENABLED") and blockchain_service:
-                try:
-                    blockchain_hash = blockchain_service.add_invoice_to_blockchain(invoice)
-                    if blockchain_hash:
-                        logging.info(f"Invoice {invoice_number} added to blockchain")
-                except Exception as e:
-                    logging.error(f"Blockchain addition failed: {e}")
-
-            db.session.commit()
-
-            invoice_url = url_for('invoice_detail', id=invoice.id)
-
-            # 🆕 Return JSON if AJAX
-            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                return jsonify(success=True, invoice_url=invoice_url)
-
-            flash('AI-powered invoice created successfully!', 'success')
-            return redirect(invoice_url)
+            if response.status_code == 201:
+                flash("Invoice created successfully (Cloud DB)", "success")
+                return redirect(url_for("invoice_management"))
+            else:
+                flash(f"API Error: {response.text}", "error")
 
         except Exception as e:
-            db.session.rollback()
-            logging.error(f"Invoice creation failed: {e}")
-            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                return jsonify(success=False, error=str(e))
-            flash(f'Error creating invoice: {str(e)}', 'error')
+            flash(f"API connection error: {str(e)}", "error")
 
-    # GET request
+    # GET request (only fetch clients from cloud later if needed)
     clients = Client.query.order_by(Client.name).all()
-    ai_suggestions = {}
-    client_id = request.args.get('client_id')
 
-    if client_id and app.config.get("AI_FEATURES_ENABLED") and ai_services.ai_assistant:
-        try:
-            ai_suggestions = ai_services.ai_assistant.suggest_invoice_items(int(client_id))
-        except Exception as e:
-            logging.error(f"AI suggestions failed: {e}")
-
-    return render_template('create_invoice.html',
-                           clients=clients,
-                           today=datetime.now())
-
+    return render_template(
+        'create_invoice.html',
+        clients=clients,
+        today=datetime.now()
+    )
 
 @app.route('/invoice/preview', methods=['POST'])
 @login_required
@@ -703,98 +596,69 @@ def bulk_export():
 @app.route('/clients')
 @login_required
 def client_management():
-    """Advanced client management with AI insights"""
-    search = request.args.get('search', '')
-    client_type = request.args.get('type', '')
-    page = request.args.get('page', 1, type=int)
-    
-    # Build query
-    query = Client.query
-    
-    if search:
-        query = query.filter(
-            or_(
-                Client.name.contains(search),
-                Client.phone.contains(search),
-                Client.email.contains(search),
-                Client.contact_person.contains(search)
-            )
+    try:
+        response = requests.get(
+            "http://44.208.164.236:5000/api/clients",
+            timeout=5
         )
-    
-    if client_type:
-        query = query.filter(Client.client_type == client_type)
-    
-    # Pagination
-    clients = query.order_by(Client.name).paginate(
-        page=page, per_page=20, error_out=False
-    )
-    
-    # Prepare iterable for template
-    client_list = clients.items if hasattr(clients, 'items') else clients
 
-    # AI insights for clients
-    client_insights = {}
-    if app.config.get("AI_FEATURES_ENABLED") and ai_services.ai_assistant:
-        try:
-            for client in client_list:
-                if client.ai_risk_score > 0:
-                    client_insights[client.id] = {
-                        'risk_level': 'High' if client.ai_risk_score > 0.7 else 'Medium' if client.ai_risk_score > 0.3 else 'Low',
-                        'predicted_ltv': client.predicted_ltv,
-                        'payment_behavior': client.payment_behavior_pattern
-                    }
-        except Exception as e:
-            logging.error(f"Client insights failed: {e}")
-    
+        if response.status_code == 200:
+            client_list = response.json()
+        else:
+            client_list = []
+            flash("Failed to load clients from cloud API", "error")
+
+    except Exception as e:
+        client_list = []
+        flash("Cloud API not reachable", "error")
+
+    clients_obj = SimpleNamespace(
+        items=client_list,
+        total=len(client_list),
+        pages=1,
+        has_prev=False,
+        has_next=False,
+        page=1
+    )
+
     return render_template(
         'client_management.html',
-        clients=clients,
+        clients=clients_obj,
         client_list=client_list,
-        search=search,
-        client_type=client_type,
-        client_insights=client_insights
+        search="",
+        client_type="",
+        client_insights={}
     )
-
 @app.route('/create_client', methods=['GET', 'POST'])
 @login_required
 def create_client():
-    """Create new client with AI enhancements"""
     if request.method == 'POST':
         try:
-            client = Client(
-                name=request.form.get('name'),
-                contact_person=request.form.get('contact_person'),
-                address=request.form.get('address'),
-                city=request.form.get('city'),
-                state=request.form.get('state'),
-                pincode=request.form.get('pincode'),
-                phone=request.form.get('phone'),
-                email=request.form.get('email'),
-                gstin=request.form.get('gstin'),
-                pan=request.form.get('pan'),
-                client_type=request.form.get('client_type', 'Regular'),
-                lead_stage=request.form.get('lead_stage', 'New'),
-                notes=request.form.get('notes', ''),
-                tags=request.form.get('tags', ''),
-                blockchain_verified=request.form.get('blockchain_verified') == 'on'
+            payload = request.form.to_dict()
+
+            # Convert checkbox properly
+            payload['blockchain_verified'] = payload.get('blockchain_verified') == 'on'
+
+            # Send form data to CLOUD API (this replaces Postman)
+            response = requests.post(
+                "http://44.208.164.236:5000/api/clients",
+                json=payload,
+                timeout=5
             )
-            
-            # Set follow-up date if provided
-            follow_up_date = request.form.get('follow_up_date')
-            if follow_up_date:
-                client.follow_up_date = datetime.strptime(follow_up_date, '%Y-%m-%d').date()
-            
-            db.session.add(client)
-            db.session.commit()
-            
-            flash('Client created successfully!', 'success')
-            return redirect(url_for('client_management'))
-            
+
+            if response.status_code in (200, 201):
+                flash('Client created successfully!', 'success')
+                return redirect(url_for('client_management'))
+            else:
+                flash(
+                    f"API error: {response.status_code} - {response.text}",
+                    'error'
+                )
+
         except Exception as e:
-            db.session.rollback()
-            logging.error(f"Client creation failed: {e}")
-            flash(f'Error creating client: {str(e)}', 'error')
-    
+            logging.error(f"API client creation failed: {e}")
+            flash(f'API connection error: {str(e)}', 'error')
+
     return render_template('create_client.html')
 
 @app.route('/api/export/clients/excel')
@@ -1296,8 +1160,66 @@ def create_challan():
 @app.route("/delivery-challan")
 @login_required
 def delivery_challan():
-    challans = DeliveryChallan.query.order_by(DeliveryChallan.created_at.desc()).all()
-    return render_template("delivery_challan.html", challans=challans)
+    try:
+        response = requests.get(
+            "http://44.208.164.236:5000/api/challans",
+            timeout=5
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+        else:
+            flash("Failed to load delivery challans", "error")
+            data = []
+
+    except Exception as e:
+        flash(f"API connection error: {str(e)}", "error")
+        data = []
+
+    challan_list = []
+
+    for c in data:
+        challan_obj = SimpleNamespace(
+            id=c["id"],
+            challan_number=c["challan_number"],
+
+            challan_date=datetime.strptime(
+                c["challan_date"], "%Y-%m-%d"
+            ) if c.get("challan_date") else None,
+
+            delivery_date=datetime.strptime(
+                c["delivery_date"], "%Y-%m-%d"
+            ) if c.get("delivery_date") else None,
+
+            created_at=datetime.fromisoformat(
+                c["created_at"]
+            ) if c.get("created_at") else None,
+
+            client=SimpleNamespace(
+                name=c.get("client_name")
+            ),
+
+            status=c["status"],
+            notes=c["notes"],
+            line_items=c.get("line_items", [])
+        )
+
+        challan_list.append(challan_obj)
+
+    challans_obj = SimpleNamespace(
+        items=challan_list,
+        total=len(challan_list),
+        pages=1,
+        has_prev=False,
+        has_next=False,
+        page=1
+    )
+
+    return render_template(
+        "delivery_challan.html",
+        challans=challans_obj
+    )
+
 
 @app.route('/challan/<int:id>/update_status', methods=['POST'])
 @login_required
@@ -1958,48 +1880,35 @@ def safe_float(value):
 # Save Quotation
 # -------------------------
 @app.route("/quotations/create", methods=["POST"])
+@login_required
 def create_quotation():
-    f = request.form
 
-    quotation_date = datetime.strptime(f["quotation_date"], "%Y-%m-%d")
-    validity_days = int(f["validity_days"])
-    expiry_date = quotation_date + timedelta(days=validity_days)
+    try:
+        payload = {
+            "quotation_date": request.form.get("quotation_date"),
+            "status": request.form.get("status", "Draft"),
+            "grand_total": request.form.get("grand_total", 0)
+        }
 
-    quotation = Quotation(
-    quotation_number=f.get("quotation_number"),
-    quotation_date=quotation_date,
-    validity_days=validity_days,
-    expiry_date=expiry_date,
-    status=f.get("status"),
+        response = requests.post(
+            "http://44.208.164.236:5000/api/quotations",
+            json=payload,
+            timeout=5
+        )
 
-    sales_person = f.get("sales_person"),
-    reference_id=f.get("reference_id"),
+        if response.status_code in (200, 201):
+            flash("Quotation created successfully!", "success")
+            return redirect(url_for("quotation_list"))
+        else:
+            flash(
+                f"API error: {response.status_code} - {response.text}",
+                "error"
+            )
 
-    subtotal=safe_float(f.get("subtotal")),
-    discount=safe_float(f.get("discount")),
-    taxable_value=safe_float(f.get("taxable")),
-    cgst=safe_float(f.get("cgst")),
-    sgst=safe_float(f.get("sgst")),
-    igst=safe_float(f.get("igst")),
-    shipping=safe_float(f.get("shipping")),
-    rounding=safe_float(f.get("rounding")),
-    grand_total=safe_float(f.get("grand_total")),
+    except Exception as e:
+        flash(f"API connection error: {str(e)}", "error")
 
-    delivery_timeline=f.get("delivery_timeline"),
-    project_scope=f.get("project_scope"),
-    milestones=f.get("milestones"),
-    warranty=f.get("warranty"),
-    revision_policy=f.get("revision_policy"),
-    dependencies=f.get("dependencies"),
-    terms=f.get("terms")
-)
-
-    db.session.add(quotation)
-    db.session.commit()
-
-    return redirect(url_for("quotation_preview", qid=quotation.id))
-
-
+    return redirect(url_for("quotation_form"))
 # -------------------------
 # Preview
 # -------------------------
@@ -2013,9 +1922,53 @@ def quotation_preview(qid):
 # List
 # -------------------------
 @app.route("/quotations/list")
+@login_required
 def quotation_list():
-    quotations = Quotation.query.order_by(Quotation.id.desc()).all()
-    return render_template("quotation_list.html", quotations=quotations)
+
+    try:
+        response = requests.get(
+            "http://44.208.164.236:5000/api/quotations",
+            timeout=5
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+        else:
+            flash("Failed to load quotations from API", "error")
+            data = []
+
+    except Exception as e:
+        flash(f"API connection error: {str(e)}", "error")
+        data = []
+
+    quotation_list = []
+
+    for q in data:
+        quotation_obj = SimpleNamespace(
+            id=q["id"],
+            quotation_number=q["quotation_number"],
+            quotation_date=datetime.strptime(
+                q["quotation_date"], "%Y-%m-%d"
+            ) if q.get("quotation_date") else None,
+            status=q.get("status"),
+            grand_total=q.get("grand_total", 0)
+        )
+
+        quotation_list.append(quotation_obj)
+
+    quotations_obj = SimpleNamespace(
+        items=quotation_list,
+        total=len(quotation_list),
+        pages=1,
+        has_prev=False,
+        has_next=False,
+        page=1
+    )
+
+    return render_template(
+        "quotation_list.html",
+        quotations=quotations_obj
+    )
 
 
 # -------------------------
