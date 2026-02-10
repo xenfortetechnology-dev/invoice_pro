@@ -437,6 +437,32 @@ Subject to local jurisdiction only.</textarea>
             row.querySelector('[name="quantity"]').value = suggestion.quantity || 1;
             row.querySelector('[name="unit_price"]').value = suggestion.unit_price || 0;
             row.querySelector('[name="hsn_code"]').value = suggestion.hsn_code || '';
+
+            // Set unit if available
+            if (suggestion.unit) {
+                const unitSelect = row.querySelector('[name="unit"]');
+                if (unitSelect) {
+                    for (let i = 0; i < unitSelect.options.length; i++) {
+                        if (unitSelect.options[i].value === suggestion.unit) {
+                            unitSelect.selectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Set tax percentages if available
+            if (suggestion.cgst_percentage !== undefined) {
+                row.querySelector('[name="cgst_percentage"]').value = suggestion.cgst_percentage;
+            }
+            if (suggestion.sgst_percentage !== undefined) {
+                row.querySelector('[name="sgst_percentage"]').value = suggestion.sgst_percentage;
+            }
+            if (suggestion.igst_percentage !== undefined) {
+                row.querySelector('[name="igst_percentage"]').value = suggestion.igst_percentage;
+            }
+            calculateItemAmount(row);
+            updateInvoiceSummary();
         }
 
         // Add event listeners for calculation

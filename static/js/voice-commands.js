@@ -66,28 +66,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Recognition result handler
-    recognition.onresult = (event) => {
+    recognition.onresult = async (event) => {
         const transcript = event.results[event.results.length - 1][0].transcript.trim();
         console.log("🗣 Spoken:", transcript);
 
         // Show visual feedback
         showVoiceFeedback(transcript);
 
-        // Send to backend
-        fetch("/api/voice-command", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                text: transcript,
-                language: currentLanguage
-            })
-        })
-            .then(res => res.json())
-            .then(handleVoiceResponse)
-            .catch(err => {
-                console.error("Voice API error:", err);
-                showError("Failed to process voice command");
-            });
+        // Process command directly in browser (with cloud DB integration)
+        const response = await processVoiceCommand(transcript, currentLanguage);
+        handleVoiceResponse(response);
     };
 
     recognition.onerror = (event) => {
@@ -116,6 +104,318 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 });
+
+/* =========================
+   Process Voice Command (Client-Side with Cloud DB)
+========================= */
+async function processVoiceCommand(text, language) {
+    const normalized = text.toLowerCase().trim();
+    console.log("🧠 Processing command:", normalized);
+
+    // Pattern 1: Simplified tax - "add HSN 1413 item soap quantity 5 units kg rate 500 tax 9 9 9"
+    // Accepts: HSN/HSM (speech recognition), "tax" followed by 3 numbers (CGST SGST IGST)
+    // Uses non-greedy match for item name to avoid capturing quantity/unit text
+    let match = normalized.match(/(?:add\s+)?(?:hs[nm]\s+([\d\s]+?)\s+)?items?\s+(\w+(?:\s+\w+)?)\s+quantity\s+(\d+)\s+(?:units?\s+)?(\w+)\s+rate\s+(\d+)\s+tax\s+(\d+\.?\d*)\s+(\d+\.?\d*)\s+(\d+\.?\d*)/i);
+    if (match) {
+        const hsn = match[1] ? match[1].replace(/\s+/g, '') : '';
+        const itemName = match[2].trim();
+        const quantity = parseInt(match[3]);
+        const unit = match[4].toUpperCase();
+        const rate = parseInt(match[5]);
+        const cgst = parseFloat(match[6]);
+        const sgst = parseFloat(match[7]);
+        const igst = cgst + sgst; // IGST = CGST + SGST
+
+        return {
+            success: true,
+            intent: "add_item",
+            message: `Adding ${itemName} - HSN: ${hsn || 'N/A'}, Qty: ${quantity} ${unit}, Rate: ₹${rate}, Tax: ${cgst}% + ${sgst}% + ${igst}%`,
+            entities: {
+                item_description: itemName,
+                quantity: quantity,
+                amount: rate,
+                unit: unit,
+                hsn_code: hsn,
+                cgst_percentage: cgst,
+                sgst_percentage: sgst,
+                igst_percentage: igst,
+                tax: cgst + sgst + igst
+            }
+        };
+    }
+
+    // Pattern 1b: Simplified tax fallback - "add HSN 1413 item soap quantity 5 units kg rate 500 tax 99"
+    // Handles when speech recognition combines numbers: "99" -> split to "9" and "9" for CGST and SGST
+    match = normalized.match(/(?:add\s+)?(?:hs[nm]\s+([\d\s]+?)\s+)?items?\s+(\w+(?:\s+\w+)?)\s+quantity\s+(\d+)\s+(?:units?\s+)?(\w+)\s+rate\s+(\d+)\s+tax\s+(\d{2})/i);
+    if (match) {
+        const hsn = match[1] ? match[1].replace(/\s+/g, '') : '';
+        const itemName = match[2].trim();
+        const quantity = parseInt(match[3]);
+        const unit = match[4].toUpperCase();
+        const rate = parseInt(match[5]);
+        const taxDigits = match[6]; // e.g., "99"
+        // Split into two digits: first digit for CGST, second for SGST
+        const cgst = parseInt(taxDigits[0]);
+        const sgst = parseInt(taxDigits[1]);
+        const igst = cgst + sgst; // IGST = CGST + SGST
+
+        return {
+            success: true,
+            intent: "add_item",
+            message: `Adding ${itemName} - HSN: ${hsn || 'N/A'}, Qty: ${quantity} ${unit}, Rate: ₹${rate}, Tax: ${cgst}% + ${sgst}% (from "${taxDigits}")`,
+            entities: {
+                item_description: itemName,
+                quantity: quantity,
+                amount: rate,
+                unit: unit,
+                hsn_code: hsn,
+                cgst_percentage: cgst,
+                sgst_percentage: sgst,
+                igst_percentage: igst,
+                tax: cgst + sgst + igst
+            }
+        };
+    }
+
+    // Pattern 2: Detailed tax - "HSN 1413 item soap quantity 5 units kg rate 500 cgst 9 sgst 9 igst 0"
+    // Accepts: HSN/HSM, "item" or "items", "IGST" or "GST"
+    match = normalized.match(/(?:hs[nm]\s+([\d\s]+?)\s+)?items?\s+(.+?)\s+quantity\s+(?:(\d+)|by|five|for|to)\s+(?:units?\s+)?(\w+)\s+rate\s+(\d+)(?:\s+cgst\s+(\d+\.?\d*))?(?:\s+sgst\s+(\d+\.?\d*))?(?:\s+(?:i?gst)\s+(\d+\.?\d*))?/i);
+    if (match) {
+        // Remove spaces from HSN code (handles "14 13" -> "1413")
+        const hsn = match[1] ? match[1].replace(/\s+/g, '') : '';
+        const itemName = match[2].trim();
+        // If quantity is missing (said "by" instead of number), default to 1
+        const quantity = match[3] ? parseInt(match[3]) : 1;
+        const unit = match[4].toUpperCase();
+        const rate = parseInt(match[5]);
+        const cgst = match[6] ? parseFloat(match[6]) : 9;
+        const sgst = cgst ? parseFloat(match[7]) : 9;
+        const igst = cgst + sgst; // IGST = CGST + SGST (auto-calculated)
+
+        return {
+            success: true,
+            intent: "add_item",
+            message: `Adding ${itemName} - HSN: ${hsn || 'N/A'}, Qty: ${quantity} ${unit}, Rate: ₹${rate}, CGST: ${cgst}%, SGST: ${sgst}%, IGST: ${igst}%`,
+            entities: {
+                item_description: itemName,
+                quantity: quantity,
+                amount: rate,
+                unit: unit,
+                hsn_code: hsn,
+                cgst_percentage: cgst,
+                sgst_percentage: sgst,
+                igst_percentage: igst,
+                tax: cgst + sgst + igst
+            }
+        };
+    }
+
+    // Pattern: Add item - "add pen quantity 2 price 10"
+    match = normalized.match(/add\s+(.+?)\s+quantity\s+(\d+)\s+(?:price|rate)\s+(\d+)/i);
+    if (match) {
+        return {
+            success: true,
+            intent: "add_item",
+            message: `Adding ${match[1]} - Qty: ${match[2]}, Price: ₹${match[3]}`,
+            entities: {
+                item_description: match[1],
+                quantity: parseInt(match[2]),
+                amount: parseInt(match[3]),
+                unit: "Nos",
+                tax: 18
+            }
+        };
+    }
+
+    // Pattern: Add item - "add pen 2 nos at 10"
+    match = normalized.match(/add\s+(.+?)\s+(\d+)\s+(?:nos|kg|liters?|pieces?)\s+(?:at|rate|price)\s+(\d+)/i);
+    if (match) {
+        return {
+            success: true,
+            intent: "add_item",
+            message: `Adding ${match[1]} - Qty: ${match[2]}, Price: ₹${match[3]}`,
+            entities: {
+                item_description: match[1],
+                quantity: parseInt(match[2]),
+                amount: parseInt(match[3]),
+                unit: "Nos",
+                tax: 18
+            }
+        };
+    }
+
+    // Pattern: Add item - "add pen 10 rupees" (qty=1)
+    match = normalized.match(/add\s+(.+?)\s+(\d+)\s+(?:rupees?|rs)/i);
+    if (match) {
+        return {
+            success: true,
+            intent: "add_item",
+            message: `Adding ${match[1]} - Price: ₹${match[2]}`,
+            entities: {
+                item_description: match[1],
+                quantity: 1,
+                amount: parseInt(match[2]),
+                unit: "Nos",
+                tax: 18
+            }
+        };
+    }
+
+    // Pattern: Save invoice
+    if (normalized.match(/save\s+invoice|save\s+this|finish\s+invoice|complete\s+invoice/i)) {
+        return {
+            success: true,
+            intent: "save_invoice",
+            message: "Saving invoice..."
+        };
+    }
+
+    // Pattern: Calculate total
+    if (normalized.match(/calculate\s+total|total\s+amount|show\s+total|what'?s?\s+(?:the\s+)?total/i)) {
+        return {
+            success: true,
+            intent: "calculate_total",
+            message: "Calculating total..."
+        };
+    }
+
+    // Pattern: Create invoice - "create invoice for [client]" - WITH CLOUD DB LOOKUP
+    match = normalized.match(/(?:create|new|make|start)\s+invoice\s+for\s+(.+)/i);
+    if (match) {
+        const clientName = match[1].trim();
+
+        try {
+            // Fetch clients via local proxy (avoids CORS)
+            const response = await fetch("/api/proxy/clients", {
+                method: "GET",
+                headers: { "Content-Type": "application/json" }
+            });
+
+            if (response.ok) {
+                const clients = await response.json();
+
+                // Search for matching client (case-insensitive)
+                const matchedClient = clients.find(c =>
+                    c.name.toLowerCase().includes(clientName.toLowerCase())
+                );
+
+                if (matchedClient) {
+                    return {
+                        success: true,
+                        intent: "create_invoice",
+                        message: `Creating invoice for ${matchedClient.name}`,
+                        client_id: matchedClient.id,
+                        client_name: matchedClient.name
+                    };
+                } else {
+                    // Try partial match
+                    const partialMatches = clients.filter(c =>
+                        c.name.toLowerCase().includes(clientName.toLowerCase().split(' ')[0])
+                    );
+
+                    if (partialMatches.length > 0) {
+                        const names = partialMatches.map(c => c.name).join(", ");
+                        return {
+                            success: false,
+                            intent: "create_invoice",
+                            message: `Client '${clientName}' not found. Did you mean: ${names}?`,
+                            suggestions: partialMatches.map(c => `Create invoice for ${c.name}`)
+                        };
+                    } else {
+                        return {
+                            success: false,
+                            intent: "create_invoice",
+                            message: `Client '${clientName}' not found in cloud database. Please check the name.`,
+                            suggestions: ["Try saying the full client name", "Check client list first"]
+                        };
+                    }
+                }
+            } else {
+                return {
+                    success: false,
+                    intent: "create_invoice",
+                    message: "Could not connect to cloud database. Please try again.",
+                    error: "Cloud API unavailable"
+                };
+            }
+        } catch (error) {
+            console.error("Cloud DB error:", error);
+            return {
+                success: false,
+                intent: "create_invoice",
+                message: "Error connecting to cloud database. Please check your internet connection.",
+                error: error.message
+            };
+        }
+    }
+
+    // Pattern: Search client - WITH CLOUD DB LOOKUP
+    match = normalized.match(/(?:find|search)\s+(?:client\s+)?(.+)/i);
+    if (match) {
+        const clientName = match[1].trim();
+
+        try {
+            const response = await fetch("/api/proxy/clients", {
+                method: "GET",
+                headers: { "Content-Type": "application/json" }
+            });
+
+            if (response.ok) {
+                const clients = await response.json();
+
+                const matches = clients.filter(c =>
+                    c.name.toLowerCase().includes(clientName.toLowerCase())
+                );
+
+                if (matches.length === 1) {
+                    const client = matches[0];
+                    return {
+                        success: true,
+                        intent: "search_client",
+                        message: `Found: ${client.name} - Email: ${client.email || 'N/A'}, Phone: ${client.phone || 'N/A'}`,
+                        client: client
+                    };
+                } else if (matches.length > 1) {
+                    const names = matches.map(c => c.name).join(", ");
+                    return {
+                        success: true,
+                        intent: "search_client",
+                        message: `Found ${matches.length} clients: ${names}`,
+                        clients: matches
+                    };
+                } else {
+                    return {
+                        success: false,
+                        intent: "search_client",
+                        message: `No clients found matching '${clientName}' in cloud database`
+                    };
+                }
+            }
+        } catch (error) {
+            console.error("Cloud DB error:", error);
+            return {
+                success: false,
+                intent: "search_client",
+                message: "Error searching cloud database",
+                error: error.message
+            };
+        }
+    }
+
+    // Unknown command
+    return {
+        success: false,
+        intent: "unknown",
+        message: "I didn't understand that command. Try: 'Add pen quantity 2 price 10' or 'Save invoice'",
+        suggestions: [
+            "Add pen quantity 2 price 10",
+            "Add notebook 5 nos at 50",
+            "Calculate total",
+            "Save invoice",
+            "Create invoice for [client name]"
+        ]
+    };
+}
 
 /* =========================
    Handle Voice Response
@@ -189,7 +489,26 @@ function handleVoiceResponse(data) {
                         if (taxInput) taxInput.value = data.entities.tax;
                     }
 
-                    // Update summary
+                    // Set individual tax fields (CGST, SGST, IGST)
+                    if (data.entities.cgst_percentage !== undefined) {
+                        const cgstInput = row.querySelector('[name="cgst_percentage"]');
+                        if (cgstInput) cgstInput.value = data.entities.cgst_percentage;
+                    }
+
+                    if (data.entities.sgst_percentage !== undefined) {
+                        const sgstInput = row.querySelector('[name="sgst_percentage"]');
+                        if (sgstInput) sgstInput.value = data.entities.sgst_percentage;
+                    }
+
+                    if (data.entities.igst_percentage !== undefined) {
+                        const igstInput = row.querySelector('[name="igst_percentage"]');
+                        if (igstInput) igstInput.value = data.entities.igst_percentage;
+                    }
+
+                    // Calculate item amount and update summary
+                    if (typeof calculateItemAmount === "function") {
+                        calculateItemAmount(row);
+                    }
                     if (typeof updateInvoiceSummary === "function") {
                         updateInvoiceSummary();
                     }

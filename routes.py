@@ -44,6 +44,71 @@ analytics_engine = AnalyticsEngine(db.session)
 from report_generator import AnalyticsReportGenerator
 report_generator = AnalyticsReportGenerator()
 
+# ===== CLOUD API HELPER FUNCTIONS =====
+CLOUD_API_BASE = "http://44.208.164.236:5000/api"
+
+def fetch_cloud_clients():
+    """Fetch all clients from cloud database"""
+    try:
+        response = requests.get(f"{CLOUD_API_BASE}/clients", timeout=5)
+        if response.status_code == 200:
+            return response.json()
+        logging.warning(f"Cloud API returned status {response.status_code}")
+        return []
+    except Exception as e:
+        logging.error(f"Cloud API error (clients): {e}")
+        return []
+
+def fetch_cloud_client_by_id(client_id):
+    """Fetch single client from cloud database by ID"""
+    try:
+        # First fetch all clients, then filter by ID
+        clients = fetch_cloud_clients()
+        for client in clients:
+            if client.get('id') == int(client_id):
+                return client
+        return None
+    except Exception as e:
+        logging.error(f"Cloud API error (client by ID): {e}")
+        return None
+
+def fetch_cloud_invoices():
+    """Fetch all invoices from cloud database"""
+    try:
+        response = requests.get(f"{CLOUD_API_BASE}/invoices", timeout=5)
+        if response.status_code == 200:
+            return response.json()
+        logging.warning(f"Cloud API returned status {response.status_code}")
+        return []
+    except Exception as e:
+        logging.error(f"Cloud API error (invoices): {e}")
+        return []
+
+def fetch_cloud_invoice_by_id(invoice_id):
+    """Fetch single invoice from cloud database by ID"""
+    try:
+        # First fetch all invoices, then filter by ID
+        invoices = fetch_cloud_invoices()
+        for invoice in invoices:
+            if invoice.get('id') == int(invoice_id):
+                return invoice
+        return None
+    except Exception as e:
+        logging.error(f"Cloud API error (invoice by ID): {e}")
+        return None
+
+def fetch_cloud_challans():
+    """Fetch all delivery challans from cloud database"""
+    try:
+        response = requests.get(f"{CLOUD_API_BASE}/challans", timeout=5)
+        if response.status_code == 200:
+            return response.json()
+        logging.warning(f"Cloud API returned status {response.status_code}")
+        return []
+    except Exception as e:
+        logging.error(f"Cloud API error (challans): {e}")
+        return []
+
 def login_required(f):
     """Decorator to require login for routes"""
     from functools import wraps
@@ -200,8 +265,9 @@ def create_invoice():
         except Exception as e:
             flash(f"API connection error: {str(e)}", "error")
 
-    # GET request (only fetch clients from cloud later if needed)
-    clients = Client.query.order_by(Client.name).all()
+    # GET request - fetch clients from cloud database
+    client_list = fetch_cloud_clients()
+    clients = [SimpleNamespace(**c) for c in client_list]
 
     return render_template(
         'create_invoice.html',
@@ -222,10 +288,12 @@ def preview_invoice():
         terms_conditions = request.form.get('terms_conditions', '')
         invoice_format = request.form.get("invoice_format", "default")
 
-        # Create ephemeral objects
-        client = Client.query.get(client_id)
-        if not client:
+        # Fetch client from cloud database
+        client_data = fetch_cloud_client_by_id(client_id)
+        if not client_data:
              return "Client not found", 404
+        
+        client = SimpleNamespace(**client_data)
 
         invoice_date = datetime.strptime(invoice_date_str, '%Y-%m-%d').date() if invoice_date_str else datetime.now().date()
         
@@ -508,7 +576,8 @@ def edit_invoice(id):
         return redirect(url_for('invoice_management'))
 
     # GET request — show edit form
-    clients = Client.query.order_by(Client.name).all()
+    client_list = fetch_cloud_clients()
+    clients = [SimpleNamespace(**c) for c in client_list]
     
     # Always return a response
     return render_template('edit_invoice.html', invoice=invoice, clients=clients)
@@ -1153,7 +1222,8 @@ def create_challan():
             logging.error(f"Error creating challan: {e}")
             flash(f"Error creating challan: {e}", 'error')
     
-    clients = Client.query.order_by(Client.name).all()
+    client_list = fetch_cloud_clients()
+    clients = [SimpleNamespace(**c) for c in client_list]
     return render_template("create_challan.html", clients=clients, today=datetime.now())
 
 
@@ -1473,22 +1543,23 @@ def inject_globals():
 def api_get_clients_data():
     """Get real client data for client-side AI processing"""
     try:
-        clients = Client.query.all()
+        # Fetch from cloud database
+        clients_list = fetch_cloud_clients()
         
         clients_data = {
-            'total': len(clients),
-            'active': len([c for c in clients if c.total_business and c.total_business > 0]),
-            'inactive': len([c for c in clients if not c.total_business or c.total_business == 0]),
+            'total': len(clients_list),
+            'active': len([c for c in clients_list if c.get('total_business') and c.get('total_business') > 0]),
+            'inactive': len([c for c in clients_list if not c.get('total_business') or c.get('total_business') == 0]),
             'clients': [{
-                'id': c.id,
-                'name': c.name,
-                'email': c.email,
-                'phone': c.phone,
-                'total_business': float(c.total_business) if c.total_business else 0,
-                'created_at': c.created_at.strftime('%Y-%m-%d') if c.created_at else None,
-                'gstin': c.gstin,
-                'pan': c.pan
-            } for c in clients]
+                'id': c.get('id'),
+                'name': c.get('name'),
+                'email': c.get('email'),
+                'phone': c.get('phone'),
+                'total_business': float(c.get('total_business', 0)),
+                'created_at': c.get('created_at'),
+                'gstin': c.get('gstin'),
+                'pan': c.get('pan')
+            } for c in clients_list]
         }
         
         return jsonify(clients_data)
@@ -1501,28 +1572,40 @@ def api_get_clients_data():
 def api_get_invoices_data():
     """Get real invoice data for client-side AI processing"""
     try:
-        invoices = Invoice.query.all()
+        # Fetch from cloud database
+        invoices_list = fetch_cloud_invoices()
         
         invoices_data = {
-            'total': len(invoices),
-            'paid': len([i for i in invoices if i.payment_status == 'Paid']),
-            'unpaid': len([i for i in invoices if i.payment_status == 'Unpaid']),
-            'partial': len([i for i in invoices if i.payment_status == 'Partially Paid']),
+            'total': len(invoices_list),
+            'paid': len([i for i in invoices_list if i.get('payment_status') == 'Paid']),
+            'unpaid': len([i for i in invoices_list if i.get('payment_status') == 'Unpaid']),
+            'partial': len([i for i in invoices_list if i.get('payment_status') == 'Partially Paid']),
             'invoices': [{
-                'id': i.id,
-                'invoice_number': i.invoice_number,
-                'client_name': i.client.name if i.client else 'Unknown',
-                'total_amount': float(i.total_amount) if i.total_amount else 0,
-                'amount_paid': float(i.amount_paid) if i.amount_paid else 0,
-                'payment_status': i.payment_status,
-                'invoice_date': i.invoice_date.strftime('%Y-%m-%d') if i.invoice_date else None,
-                'due_date': i.due_date.strftime('%Y-%m-%d') if i.due_date else None
-            } for i in invoices]
+                'id': i.get('id'),
+                'invoice_number': i.get('invoice_number'),
+                'client_name': i.get('client_name', 'Unknown'),
+                'total_amount': float(i.get('total_amount', 0)),
+                'amount_paid': float(i.get('amount_paid', 0)),
+                'payment_status': i.get('payment_status'),
+                'invoice_date': i.get('invoice_date'),
+                'due_date': i.get('due_date')
+            } for i in invoices_list]
         }
         
         return jsonify(invoices_data)
     except Exception as e:
         logging.error(f"Error fetching invoices data: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/proxy/clients', methods=['GET'])
+@login_required
+def api_proxy_clients():
+    """Proxy endpoint for voice commands to fetch clients (avoids CORS)"""
+    try:
+        clients_list = fetch_cloud_clients()
+        return jsonify(clients_list)
+    except Exception as e:
+        logging.error(f"Error proxying clients: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/data/stats', methods=['GET'])
