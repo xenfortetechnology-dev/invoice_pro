@@ -254,24 +254,25 @@
     </nav>
     {% endif %}
 
+    <!-- Flash Messages (Fixed Overlay) -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show glass-card"
+        role="alert"
+        style="position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 99999; max-width: 600px; width: 90%;">
+        <i data-feather="{% if category == 'success' %}check-circle{% elif category == 'error' %}alert-circle{% else %}info{% endif %}"
+            class="me-2"></i>
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
     <!-- Main Content -->
     <main class="content d-flex flex-column min-vh-100">
         <div class="flex-grow-1">
-            {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-            <div class="container mt-3">
-                {% for category, message in messages %}
-                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show glass-card"
-                    role="alert">
-                    <i data-feather="{% if category == 'success' %}check-circle{% elif category == 'error' %}alert-circle{% else %}info{% endif %}"
-                        class="me-2"></i>
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-            {% endwith %}
 
             {% block content %}{% endblock %}
         </div>
@@ -330,8 +331,8 @@
     {% endif %}
     <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
     <script>
-    const API_BASE_URL = "http://44.208.164.236:5000/api";
-</script>
+        const API_BASE_URL = "http://44.208.164.236:5000/api";
+    </script>
 
     {% block scripts %}{% endblock %}
 
@@ -342,18 +343,29 @@
 
         const savedTheme = localStorage.getItem("theme") || "light";
         root.setAttribute("data-theme", savedTheme);
-        themeIcon.setAttribute("data-feather", savedTheme === "dark" ? "moon" : "sun");
+        if (themeIcon) {
+            themeIcon.setAttribute("data-feather", savedTheme === "dark" ? "moon" : "sun");
+        }
         feather.replace();
 
-        themeToggle.addEventListener("click", () => {
-            const currentTheme = root.getAttribute("data-theme") || "light";
-            const newTheme = currentTheme === "light" ? "dark" : "light";
+        if (themeToggle) {
+            themeToggle.addEventListener("click", () => {
+                const currentTheme = root.getAttribute("data-theme") || "light";
+                const newTheme = currentTheme === "light" ? "dark" : "light";
 
-            root.setAttribute("data-theme", newTheme);
-            localStorage.setItem("theme", newTheme);
+                root.setAttribute("data-theme", newTheme);
+                localStorage.setItem("theme", newTheme);
 
-            themeIcon.setAttribute("data-feather", newTheme === "dark" ? "moon" : "sun");
-            feather.replace();
+                themeIcon.setAttribute("data-feather", newTheme === "dark" ? "moon" : "sun");
+                feather.replace();
+            });
+        }
+
+        // Ensure feather icons in alerts are rendered
+        document.addEventListener("DOMContentLoaded", () => {
+            setTimeout(() => {
+                feather.replace();
+            }, 100);
         });
     </script>
 </body>

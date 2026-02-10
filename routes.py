@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 from flask import render_template, request, redirect, url_for, flash, jsonify, send_file, session, abort, Flask
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import func, and_, or_, extract, desc
 from sqlalchemy.orm import joinedload
 
@@ -115,7 +116,7 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
-            flash('Please log in to access this page.', 'error')
+            # Redirect to login without flash message (to avoid alert on automatic redirects)
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -126,6 +127,11 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
+        
+        # Validate empty fields
+        if not username or not password:
+            flash('Please enter both username and password.', 'error')
+            return render_template('login.html')
         
         user = User.query.filter_by(username=username).first()
         if user and check_password_hash(user.password_hash, password):
