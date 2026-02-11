@@ -29,7 +29,7 @@
                                 {% for client in clients %}
                                 <option value="{{ client.id }}" data-address="{{ client.address or '' }}"
                                     data-city="{{ client.city or '' }}" data-phone="{{ client.phone or '' }}">
-                                    {{ client.name }} - {{ client.phone or 'No Phone' }}
+                                    {{ client.name }}
                                 </option>
 
                                 {% endfor %}
@@ -375,17 +375,21 @@
         // 2. Populate Hidden Input
         document.getElementById('line_items').value = JSON.stringify(items);
 
-        // 3. Change Form Action & Submit
+        // 3. Show Modal
+        const previewModal = new bootstrap.Modal(document.getElementById('previewModal'));
+        previewModal.show();
+
+        // 4. Change Form Action & Submit to Iframe
         const form = document.getElementById('challanForm');
         const originalAction = form.action;
         const originalTarget = form.target;
 
         form.action = "{{ url_for('preview_challan') }}";
-        form.target = "_blank"; // Open in new tab
+        form.target = "previewFrame"; // Target the iframe
 
         form.submit();
 
-        // 4. Reset Form (after short delay)
+        // 5. Reset Form (after short delay)
         setTimeout(() => {
             form.action = originalAction;
             form.target = originalTarget;
@@ -438,4 +442,20 @@
     });
 
 </script>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="previewModalLabel">Challan Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <iframe name="previewFrame" id="previewFrame" style="width: 100%; height: 80vh; border: none;"></iframe>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
