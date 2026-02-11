@@ -122,6 +122,18 @@ import config
 def send_invoice_email(invoice, recipient_email):
     """Send invoice via email with PDF attachment"""
     from pdf_generator import generate_invoice_pdf
+    import os
+    
+    # Check for development/mock mode
+    MOCK_EMAIL_MODE = os.environ.get("MOCK_EMAIL_MODE", "true").lower() == "true"
+    
+    if MOCK_EMAIL_MODE:
+        # Mock mode - skip actual email sending
+        logging.info(f"📧 [MOCK MODE] Email would be sent to {recipient_email}")
+        logging.info(f"📧 [MOCK MODE] Invoice: {invoice.invoice_number}")
+        logging.info(f"📧 [MOCK MODE] Amount: ₹{invoice.total_amount:,.2f}")
+        logging.info(f"✅ [MOCK MODE] Email sending simulated successfully!")
+        return True
     
     # Check if email credentials are configured
     if not config.MAIL_USERNAME or not config.MAIL_PASSWORD:
@@ -228,6 +240,7 @@ def send_invoice_email(invoice, recipient_email):
     except Exception as e:
         logging.error(f"Email sending failed: {e}")
         raise
+
 
 
 def generate_challan_number():
