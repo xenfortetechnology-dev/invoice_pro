@@ -262,7 +262,7 @@ def create_invoice():
                 timeout=5
             )
 
-            if response.status_code == 201:
+            if response.status_code in (200, 201):
                 flash("Invoice created successfully (Cloud DB)", "success")
                 return redirect(url_for("invoice_management"))
             else:
@@ -299,7 +299,16 @@ def preview_invoice():
         if not client_data:
              return "Client not found", 404
         
-        client = SimpleNamespace(**client_data)
+        # Create client object with all required fields
+        client = SimpleNamespace(
+            id=client_data.get('id'),
+            name=client_data.get('name', 'N/A'),
+            email=client_data.get('email', ''),
+            phone=client_data.get('phone', ''),
+            address='',
+            gstin='',
+            pan=''
+        )
 
         invoice_date = datetime.strptime(invoice_date_str, '%Y-%m-%d').date() if invoice_date_str else datetime.now().date()
         
@@ -328,8 +337,8 @@ def preview_invoice():
             
             tax_amount = cgst_amount + sgst_amount + igst_amount
             
-            # Create transient object
-            li = InvoiceLineItem(
+            # Create SimpleNamespace object instead of InvoiceLineItem model
+            li = SimpleNamespace(
                 sr_no=i,
                 hsn_code=item_data.get('hsn_code', ''),
                 description=item_data.get('description', ''),
@@ -352,10 +361,11 @@ def preview_invoice():
             total_sgst += sgst_amount
             total_igst += igst_amount
 
-        # Create transient invoice
-        invoice = Invoice(
+        # Create SimpleNamespace invoice instead of Invoice model
+        invoice = SimpleNamespace(
             invoice_number="PREVIEW",
             invoice_date=invoice_date,
+            due_date=None,
             client=client,
             notes=notes,
             terms_conditions=terms_conditions,
@@ -364,10 +374,10 @@ def preview_invoice():
             sgst=total_sgst,
             igst=total_igst,
             total_amount=subtotal + total_cgst + total_sgst + total_igst,
-            invoice_format=invoice_format
+            invoice_format=invoice_format,
+            line_items=line_items,
+            payment_status='Unpaid'
         )
-        # Manually attach line items for Jinja loop
-        invoice.line_items = line_items 
         
         company = Company.query.first()
         bank = BankDetails.query.first()
@@ -397,35 +407,57 @@ def preview_invoice():
 @app.route('/invoice/<int:id>')
 @login_required
 def invoice_detail(id):
-    """Detailed invoice view with blockchain verification"""
-    invoice = Invoice.query.get_or_404(id)
- 
-    # Blockchain verification
-    blockchain_verification = {}
-    if app.config.get("BLOCKCHAIN_ENABLED") and blockchain_service and invoice.blockchain_hash:
-        try:
-            blockchain_verification = blockchain_service.verify_invoice_integrity(id)
-        except Exception as e:
-            logging.error(f"Blockchain verification failed: {e}")
+    """Detailed invoice view (fetch from cloud)"""
+    # Fetch invoice from cloud API
+    invoice_data = fetch_cloud_invoice_by_id(id)
+    if not invoice_data:
+        flash('Invoice not found', 'error')
+        return redirect(url_for('invoice_management'))
     
-    # AI insights for this invoice
+    # Fetch client data from cloud API
+    client_data = fetch_cloud_client_by_id(invoice_data.get('client_id'))
+    if not client_data:
+        flash('Client not found', 'error')
+        return redirect(url_for('invoice_management'))
+    
+    # Create invoice object with all required fields
+    invoice = SimpleNamespace(
+        id=invoice_data.get('id'),
+        invoice_number=invoice_data.get('invoice_number', 'N/A'),
+        invoice_date=datetime.strptime(invoice_data.get('invoice_date'), '%Y-%m-%d').date() if invoice_data.get('invoice_date') else datetime.now().date(),
+        due_date=None,
+        total_amount=invoice_data.get('total_amount', 0),
+        payment_status=invoice_data.get('payment_status', 'Unpaid'),
+        notes='',
+        terms_conditions='',
+        line_items=[],
+        subtotal=invoice_data.get('total_amount', 0),
+        cgst=0,
+        sgst=0,
+        igst=0,
+        invoice_format='default'
+    )
+    
+    invoice.client = SimpleNamespace(
+        name=client_data.get('name', 'N/A'),
+        email=client_data.get('email', ''),
+        phone=client_data.get('phone', ''),
+        address='',
+        gstin='',
+        pan=''
+    )
+ 
+    # Blockchain verification (skip for cloud data)
+    blockchain_verification = {}
+    
+    # AI insights (skip for cloud data)
     ai_insights = {}
-    if app.config.get("AI_FEATURES_ENABLED") and ai_services.ai_assistant:
-        try:
-            client_analysis = ai_services.ai_assistant.analyze_client_history(invoice.client_id)
-            ai_insights = {
-                'payment_prediction': client_analysis.get('risk_assessment', {}),
-                'similar_invoices': analytics_engine.find_similar_invoices(id)
-            }
-        except Exception as e:
-            logging.error(f"AI insights failed: {e}")
 
-    # 🔹 FORMAT SWITCH LOGIC (THIS IS THE ONLY ADDITION)
+    # Select template
     template_map = {
     "default": "invoice_detail.html",
     "excel_customer_A": "invoice_excel_customer_A.html"
     }
-
 
     template_name = template_map.get(
         invoice.invoice_format,
@@ -434,7 +466,6 @@ def invoice_detail(id):
    
     company = Company.query.first()
     bank = BankDetails.query.first()
-
 
     return render_template(
         template_name,
@@ -449,10 +480,51 @@ def invoice_detail(id):
 @app.route('/invoice/<int:id>/download-pdf')
 @login_required
 def download_invoice_pdf(id):
-    """Download PDF directly to user's Downloads folder"""
+    """Download PDF directly to user's Downloads folder (fetch from cloud)"""
     try:
-        invoice = Invoice.query.get_or_404(id)
-        logging.info(f"Generating PDF for invoice {id}: {invoice.invoice_number}")
+        # Fetch invoice from cloud API
+        invoice_data = fetch_cloud_invoice_by_id(id)
+        if not invoice_data:
+            return jsonify({'success': False, 'error': 'Invoice not found'}), 404
+        
+        # Fetch client data
+        client_data = fetch_cloud_client_by_id(invoice_data.get('client_id'))
+        if not client_data:
+            return jsonify({'success': False, 'error': 'Client not found'}), 404
+        
+        # Create invoice object for PDF generation with all required fields
+        invoice = SimpleNamespace(
+            id=invoice_data.get('id'),
+            invoice_number=invoice_data.get('invoice_number', 'N/A'),
+            invoice_date=datetime.strptime(invoice_data.get('invoice_date'), '%Y-%m-%d').date() if invoice_data.get('invoice_date') else datetime.now().date(),
+            due_date=None,
+            total_amount=invoice_data.get('total_amount', 0),
+            payment_status=invoice_data.get('payment_status', 'Unpaid'),
+            notes='',
+            terms_conditions='',
+            line_items=[],
+            subtotal=invoice_data.get('total_amount', 0),
+            cgst=0,
+            sgst=0,
+            igst=0,
+            invoice_type='Invoice',  # Required by PDF generator
+            blockchain_hash=None  # Required by PDF generator
+        )
+        
+        invoice.client = SimpleNamespace(
+            name=client_data.get('name', 'N/A'),
+            email=client_data.get('email', ''),
+            phone=client_data.get('phone', ''),
+            address='',
+            city='',
+            state='',
+            pincode='',
+            gstin='',
+            pan='',
+            contact_person=''  # Required by PDF generator
+        )
+        
+        logging.info(f"Generating PDF for invoice {id}: {invoice_data.get('invoice_number')}")
         
         pdf_buffer = generate_invoice_pdf(invoice)
         pdf_buffer.seek(0)
@@ -463,7 +535,7 @@ def download_invoice_pdf(id):
         downloads_folder.mkdir(exist_ok=True)
         
         # Create filename and save
-        filename = f'Invoice_{invoice.invoice_number}.pdf'
+        filename = f'Invoice_{invoice_data.get("invoice_number")}.pdf'
         filepath = downloads_folder / filename
         
         # Write PDF to file
@@ -514,10 +586,20 @@ def invoice_pdf(id):
 @app.route('/invoice/<int:id>/delete', methods=['POST'])
 @login_required
 def delete_invoice(id):
-    invoice = Invoice.query.get_or_404(id)
-    db.session.delete(invoice)
-    db.session.commit()
-    flash('Invoice deleted successfully.', 'success')
+    """Delete invoice from cloud database"""
+    try:
+        response = requests.delete(
+            f"{CLOUD_API_BASE}/invoices/{id}",
+            timeout=5
+        )
+        if response.status_code in (200, 204):
+            flash('Invoice deleted successfully.', 'success')
+        else:
+            flash(f'Failed to delete invoice: {response.text}', 'error')
+    except Exception as e:
+        logging.error(f"Cloud API delete error: {e}")
+        flash(f'API connection error: {str(e)}', 'error')
+    
     return redirect(url_for('invoice_management'))
 
 @app.route('/invoices/bulk_delete', methods=['POST'])
@@ -533,13 +615,21 @@ def bulk_delete_invoices():
 @app.route('/invoices/<int:id>', methods=['DELETE'])
 @login_required
 def delete_invoice1(id):
-    invoice = Invoice.query.get_or_404(id)
+    """Delete invoice from cloud database (REST endpoint)"""
     try:
-        db.session.delete(invoice)
-        db.session.commit()
-        return jsonify({'success': True})
+        response = requests.delete(
+            f"{CLOUD_API_BASE}/invoices/{id}",
+            timeout=5
+        )
+        if response.status_code in (200, 204):
+            return jsonify({'success': True})
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Cloud API error: {response.text}'
+            }), response.status_code
     except Exception as e:
-        db.session.rollback()
+        logging.error(f"Delete error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -550,42 +640,69 @@ def delete_invoice1(id):
 @app.route('/invoice/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_invoice(id):
-    invoice = Invoice.query.get_or_404(id)
-
+    """Edit invoice from cloud database"""
+    
     if request.method == 'POST':
         action = request.form.get('action', 'update')
-
-        # Update fields from the form
-        invoice.notes = request.form.get('notes', invoice.notes)
-        invoice.terms_conditions = request.form.get('terms_conditions', invoice.terms_conditions)
         
-        # Update client if changed
-        client_id = request.form.get('client_id')
-        if client_id:
-            invoice.client_id = int(client_id)
-            
+        # Prepare update data
+        update_data = {}
+        
         # Handle specific actions
         if action == 'mark_paid':
-            invoice.payment_status = 'Paid'
-            flash('Invoice marked as Paid!', 'success')
+            update_data['payment_status'] = 'Paid'
+            flash_msg = 'Invoice marked as Paid!'
         elif action == 'mark_unpaid':
-            invoice.payment_status = 'Unpaid'
-            flash('Invoice marked as Unpaid!', 'success')
+            update_data['payment_status'] = 'Unpaid'
+            flash_msg = 'Invoice marked as Unpaid!'
         else:
-            flash('Invoice updated successfully!', 'success')
-
-        # You can update other invoice fields here as needed
-
-        db.session.commit()
+            # Regular update
+            if request.form.get('notes'):
+                update_data['notes'] = request.form.get('notes')
+            if request.form.get('terms_conditions'):
+                update_data['terms_conditions'] = request.form.get('terms_conditions')
+            if request.form.get('client_id'):
+                update_data['client_id'] = int(request.form.get('client_id'))
+            flash_msg = 'Invoice updated successfully!'
         
-        # Always return a response after POST
+        # Send update to cloud API
+        try:
+            response = requests.put(
+                f"{CLOUD_API_BASE}/invoices/{id}",
+                json=update_data,
+                timeout=5
+            )
+            if response.status_code in (200, 204):
+                flash(flash_msg, 'success')
+            else:
+                flash(f'Failed to update invoice: {response.text}', 'error')
+        except Exception as e:
+            logging.error(f"Cloud API update error: {e}")
+            flash(f'API connection error: {str(e)}', 'error')
+        
         return redirect(url_for('invoice_management'))
 
-    # GET request — show edit form
+    # GET request — fetch invoice from cloud and show edit form
+    invoice_data = fetch_cloud_invoice_by_id(id)
+    if not invoice_data:
+        flash('Invoice not found', 'error')
+        return redirect(url_for('invoice_management'))
+    
+    # Create invoice object with all fields needed by edit form
+    invoice = SimpleNamespace(
+        id=invoice_data.get('id'),
+        invoice_number=invoice_data.get('invoice_number', 'N/A'),
+        invoice_date=invoice_data.get('invoice_date'),
+        client_id=invoice_data.get('client_id'),
+        total_amount=invoice_data.get('total_amount', 0),
+        payment_status=invoice_data.get('payment_status', 'Unpaid'),
+        notes=invoice_data.get('notes', ''),
+        terms_conditions=invoice_data.get('terms_conditions', '')
+    )
+    
     client_list = fetch_cloud_clients()
     clients = [SimpleNamespace(**c) for c in client_list]
     
-    # Always return a response
     return render_template('edit_invoice.html', invoice=invoice, clients=clients)
 
 
@@ -617,19 +734,59 @@ def duplicate_invoice(id):
 @app.route('/invoice/<int:id>/send', methods=['POST'])
 @login_required
 def send_invoice(id):
-    """Send invoice via email to client"""
+    """Send invoice via email to client (fetch from cloud)"""
     try:
-        invoice = Invoice.query.get_or_404(id)
-        recipient_email = invoice.client.email
+        # Fetch invoice from cloud API
+        invoice_data = fetch_cloud_invoice_by_id(id)
+        if not invoice_data:
+            return jsonify({"success": False, "message": "❌ Invoice not found."}), 404
+        
+        # Fetch client data from cloud API
+        client_data = fetch_cloud_client_by_id(invoice_data.get('client_id'))
+        if not client_data:
+            return jsonify({"success": False, "message": "❌ Client not found."}), 404
+        
+        recipient_email = client_data.get('email')
 
         if not recipient_email:
             return jsonify({"success": False, "message": "❌ Client has no email address set."}), 400
 
+        # Create invoice object for email sending with all required fields
+        invoice = SimpleNamespace(
+            id=invoice_data.get('id'),
+            invoice_number=invoice_data.get('invoice_number', 'N/A'),
+            invoice_date=datetime.strptime(invoice_data.get('invoice_date'), '%Y-%m-%d').date() if invoice_data.get('invoice_date') else datetime.now().date(),
+            due_date=None,
+            total_amount=invoice_data.get('total_amount', 0),
+            payment_status=invoice_data.get('payment_status', 'Unpaid'),
+            notes='',
+            terms_conditions='',
+            line_items=[],
+            subtotal=invoice_data.get('total_amount', 0),
+            cgst=0,
+            sgst=0,
+            igst=0,
+            invoice_type='Invoice',  # Required by PDF generator
+            blockchain_hash=None  # Required by PDF generator
+        )
+        
+        invoice.client = SimpleNamespace(
+            name=client_data.get('name', 'N/A'),
+            email=client_data.get('email', ''),
+            phone=client_data.get('phone', ''),
+            address='',
+            city='',
+            state='',
+            pincode='',
+            gstin='',
+            pan='',
+            contact_person=''  # Required by PDF generator
+        )
+        
         # Send the email
         send_invoice_email(invoice, recipient_email)
         
-        # Log the activity
-        logging.info(f"Invoice {invoice.invoice_number} sent to {recipient_email}")
+        logging.info(f"Invoice {invoice_data.get('invoice_number')} sent to {recipient_email}")
         
         return jsonify({
             "success": True, 
