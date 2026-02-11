@@ -828,70 +828,332 @@ def bulk_export():
 @app.route('/clients')
 @login_required
 def client_management():
+    search = request.args.get('search', '').lower()
+    client_type = request.args.get('type', '')
+    lead_stage = request.args.get('lead_stage', '')
+    risk_level_filter = request.args.get('risk_level', '')
+    
+    client_list = []
+    client_insights = {}
+    today = datetime.utcnow().date()
+
+    # --- 1. Fetch Cloud Data ---
+    cloud_clients = []
+    cloud_invoices = []
     try:
-        response = requests.get(
-            "http://44.208.164.236:5000/api/clients",
-            timeout=5
-        )
-
-        if response.status_code == 200:
-            client_list = response.json()
-        else:
-            client_list = []
-            flash("Failed to load clients from cloud API", "error")
-
+        # Fetch Clients
+        r_c = requests.get("http://44.208.164.236:5000/api/clients", timeout=3)
+        if r_c.status_code == 200:
+            cloud_clients = r_c.json()
+        
+        # Fetch Invoices for metrics
+        r_i = requests.get("http://44.208.164.236:5000/api/invoices", timeout=3)
+        if r_i.status_code == 200:
+            cloud_invoices = r_i.json()
+            
     except Exception as e:
-        client_list = []
-        flash("Cloud API not reachable", "error")
+        print(f"Cloud fetch error: {e}")
+        flash("Could not fetch some cloud data, showing local only.", "warning")
 
+    # Process Cloud Clients
+    for c in cloud_clients:
+        # Create a hybrid object
+        # Metric Calculation
+        c_invoices = [inv for inv in cloud_invoices if inv.get('client_id') == c['id']]
+        total_business = sum(inv.get('total_amount', 0) for inv in c_invoices)
+        
+        # Risk Logic
+        is_high_risk = False
+        for inv in c_invoices:
+            if inv.get('payment_status') != 'Paid':
+                inv_date_str = inv.get('invoice_date')
+                if inv_date_str:
+                    try:
+                        inv_date = datetime.strptime(inv_date_str, '%Y-%m-%d').date()
+                        if (today - inv_date).days > 60:
+                            is_high_risk = True
+                            break
+                    except:
+                        pass
+        
+        risk_level = "High" if is_high_risk else "Low"
+        is_high_value = total_business > 100000
+
+        # Create unified object
+        # Use string ID with prefix to avoid collision
+        client_obj = SimpleNamespace(
+            id=f"c_{c['id']}",
+            real_id=c['id'],
+            source='cloud',
+            name=c.get('name'),
+            email=c.get('email'),
+            phone=c.get('phone'),
+            contact_person=c.get('name'), # Default
+            client_type='Regular', # Default for cloud
+            lead_stage='New', # Default for cloud
+            total_business=total_business,
+            gstin="N/A",
+            pan="N/A",
+            risk_level=risk_level,
+            high_value=is_high_value,
+            created_at=datetime.utcnow() # Mock
+        )
+        
+        client_insights[client_obj.id] = {
+            'risk_level': risk_level,
+            'predicted_ltv': total_business,
+            'high_value': is_high_value
+        }
+        
+        client_list.append(client_obj)
+
+    # --- 2. Fetch Local Data ---
+    local_clients = Client.query.all()
+    for lc in local_clients:
+        # Calculate local metrics
+        l_total = lc.total_business or 0
+        l_risk = "Low" # Default
+        # Check local invoices if any (assuming logic exists)
+        # For now use stored or simple logic
+        l_high_value = l_total > 100000
+        
+        # Local Risk Check (reusing logic from previous turn if needed, or simple)
+        is_local_risk = False
+        for inv in lc.invoices:
+             if inv.payment_status != 'Paid' and inv.invoice_date:
+                if (today - inv.invoice_date).days > 60:
+                    is_local_risk = True
+        
+        l_risk = "High" if is_local_risk else "Low"
+
+        # Unique ID is just str(id) for local vs c_id for cloud
+        # But to be safe let's keep local as just ID (int) or str without prefix? 
+        # Frontend expects ID. If I use int, it might mismatch the "c_" string.
+        # Let's use string "l_{id}" for consistency? Or just keep raw ID and handle in template?
+        # Template uses `client.id`.
+        # If I use `c_1` and `1`, they are distinct.
+        
+        lc_obj = SimpleNamespace(
+            id=lc.id, # Keep original INT id for local to avoid breaking other things?
+            real_id=lc.id,
+            source='local',
+            name=lc.name,
+            email=lc.email,
+            phone=lc.phone,
+            contact_person=lc.contact_person,
+            client_type=lc.client_type,
+            lead_stage=lc.lead_stage,
+            total_business=l_total,
+            gstin=lc.gstin,
+            pan=lc.pan,
+            risk_level=l_risk,
+            high_value=l_high_value,
+            created_at=lc.created_at
+        )
+        
+        client_insights[lc.id] = {
+            'risk_level': l_risk,
+            'predicted_ltv': l_total,
+            'high_value': l_high_value
+        }
+        
+        client_list.append(lc_obj)
+
+
+    # --- 3. Filtering ---
+    filtered_list = []
+    
+    for c in client_list:
+        # Search
+        if search:
+            s = search
+            if not (s in (c.name or '').lower() or 
+                    s in (c.email or '').lower() or 
+                    s in (c.phone or '').lower()):
+                continue
+                
+        # Type
+        if client_type and c.client_type != client_type:
+            continue
+            
+        # Lead Stage
+        if lead_stage and c.lead_stage != lead_stage:
+            continue
+            
+        # Risk Level
+        if risk_level_filter:
+            c_risk = client_insights[c.id]['risk_level']
+            if risk_level_filter == 'High' and c_risk != 'High':
+                continue
+            if risk_level_filter == 'Low' and c_risk != 'Low':
+                continue
+
+        filtered_list.append(c)
+
+    # Sort
+    filtered_list.sort(key=lambda x: str(x.name))
+
+    # --- 4. Pagination ---
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+    total = len(filtered_list)
+    start = (page - 1) * per_page
+    end = start + per_page
+    
+    paginated_items = filtered_list[start:end]
+    
     clients_obj = SimpleNamespace(
-        items=client_list,
-        total=len(client_list),
-        pages=1,
-        has_prev=False,
-        has_next=False,
-        page=1
+        items=paginated_items,
+        total=total,
+        pages=(total + per_page - 1) // per_page,
+        has_prev=page > 1,
+        has_next=end < total,
+        page=page,
+        prev_num=page - 1,
+        next_num=page + 1,
+        iter_pages=lambda **kwargs: range(1, (total + per_page - 1) // per_page + 1)
     )
 
     return render_template(
         'client_management.html',
         clients=clients_obj,
-        client_list=client_list,
-        search="",
-        client_type="",
-        client_insights={}
+        client_list=paginated_items,
+        search=search,
+        client_type=client_type,
+        client_insights=client_insights
     )
+
 @app.route('/create_client', methods=['GET', 'POST'])
 @login_required
 def create_client():
     if request.method == 'POST':
         try:
-            payload = request.form.to_dict()
-            
-            # Convert checkbox to boolean (checkbox only sends value if checked)
-            payload['set_reminder'] = payload.get('set_reminder') == 'on'
-
-            # Send form data to CLOUD API
-            response = requests.post(
-                "http://44.208.164.236:5000/api/clients",
-                json=payload,
-                timeout=5
+            # Create local Client object (Persist all details)
+            new_client = Client(
+                name=request.form.get('name'),
+                contact_person=request.form.get('contact_person'),
+                phone=request.form.get('phone'),
+                email=request.form.get('email'),
+                client_type=request.form.get('client_type', 'Regular'),
+                address=request.form.get('address'),
+                city=request.form.get('city'),
+                state=request.form.get('state'),
+                pincode=request.form.get('pincode'),
+                gstin=request.form.get('gstin'),
+                pan=request.form.get('pan'),
+                notes=request.form.get('notes'),
+                lead_stage=request.form.get('lead_stage', 'New'),
+                tags=request.form.get('tags'),
+                follow_up_date=datetime.strptime(request.form.get('follow_up_date'), '%Y-%m-%d') if request.form.get('follow_up_date') else None,
+                created_at=datetime.utcnow()
             )
-
-            if response.status_code in (200, 201):
-                flash('Client created successfully!', 'success')
-                return redirect(url_for('client_management'))
-            else:
-                flash(
-                    f"API error: {response.status_code} - {response.text}",
-                    'error'
-                )
+            
+            db.session.add(new_client)
+            db.session.commit()
+            
+            flash('Client created locally!', 'success')
+            return redirect(url_for('client_management'))
 
         except Exception as e:
-            logging.error(f"API client creation failed: {e}")
-            flash(f'API connection error: {str(e)}', 'error')
+            logging.error(f"Client creation failed: {e}")
+            db.session.rollback()
+            flash(f'Error creating client: {str(e)}', 'error')
 
     return render_template('create_client.html')
+
+@app.route('/api/client/<client_id>')
+@login_required
+def api_client_details(client_id):
+    # Determine source
+    is_cloud = str(client_id).startswith('c_')
+    
+    data = {}
+    recent_activity = []
+    
+    if is_cloud:
+        # Fetch from Cloud
+        real_id = int(str(client_id).replace('c_', ''))
+        try:
+            # Fetch Client
+            # Cloud API doesn't have single fetch? Use list for now or hope query works
+            # Helper function from before or manual fetch
+            r = requests.get(f"http://44.208.164.236:5000/api/clients", timeout=3)
+            # Find in list (inefficient but works for 32 items)
+            found = None
+            if r.status_code == 200:
+                for c in r.json():
+                    if c['id'] == real_id:
+                        found = c
+                        break
+            
+            if found:
+                # Get invoices for stats
+                r_i = requests.get("http://44.208.164.236:5000/api/invoices", timeout=3)
+                c_invoices = []
+                pending_amount = 0
+                total_business = 0
+                if r_i.status_code == 200:
+                    all_inv = r_i.json()
+                    c_invoices = [inv for inv in all_inv if inv.get('client_id') == real_id]
+                    total_business = sum(inv.get('total_amount', 0) for inv in c_invoices)
+                    pending_amount = sum(inv.get('total_amount', 0) for inv in c_invoices if inv.get('payment_status') != 'Paid')
+                
+                # Format Activity
+                for inv in sorted(c_invoices, key=lambda x: x.get('invoice_date', ''), reverse=True)[:5]:
+                    recent_activity.append({
+                        'description': f"Invoice #{inv.get('invoice_number')} ({inv.get('payment_status')})",
+                        'date': inv.get('invoice_date') or 'Recent'
+                    })
+
+                data = {
+                    'name': found.get('name'),
+                    'email': found.get('email'),
+                    'phone': found.get('phone'),
+                    'address': "Cloud Record (Address N/A)", 
+                    'gstin': "N/A",
+                    'pan': "N/A",
+                    'total_business': total_business,
+                    'pending_amount': pending_amount,
+                    'contact_person': found.get('name'),
+                    'recent_activity': recent_activity
+                }
+            else:
+                 return jsonify({'error': 'Cloud client not found'}), 404
+                 
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+            
+    else:
+        # Local Fetch
+        try:
+            client = Client.query.get_or_404(int(client_id))
+            # Calculate stats
+            total_invoices = len(client.invoices)
+            pending_amount = sum(inv.total_amount - inv.amount_paid for inv in client.invoices if inv.payment_status != 'Paid')
+            
+            # Recent activity
+            for inv in sorted(client.invoices, key=lambda x: x.created_at, reverse=True)[:5]:
+                recent_activity.append({
+                    'description': f"Invoice #{inv.invoice_number} generated",
+                    'date': inv.created_at.strftime('%Y-%m-%d') if inv.created_at else 'Recent'
+                })
+                
+            data = {
+                'name': client.name,
+                'email': client.email,
+                'phone': client.phone,
+                'address': client.address,
+                'gstin': client.gstin,
+                'pan': client.pan,
+                'total_business': client.total_business or 0,
+                'pending_amount': pending_amount,
+                'contact_person': client.contact_person,
+                'recent_activity': recent_activity
+            }
+        except Exception as e:
+             return jsonify({'error': str(e)}), 500
+
+    return jsonify(data)
 
 @app.route('/api/export/clients/excel')
 @login_required
