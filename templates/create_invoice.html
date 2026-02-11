@@ -42,7 +42,7 @@
     </div>
 
     <!-- Invoice Form -->
-    <form method="POST" id="invoiceForm" target="_blank">
+    <form method="POST" id="invoiceForm">
         <div class="row">
             <!-- Left Column - Invoice Details -->
             <div class="col-lg-9">
@@ -792,13 +792,11 @@ Subject to local jurisdiction only.</textarea>
         // Change form action to preview and submit
         const form = document.getElementById('invoiceForm');
         const originalAction = form.action;
-        const originalTarget = form.target;
 
         form.action = "{{ url_for('preview_invoice') }}";
-        form.target = "_blank"; // Always open preview in new tab
         form.submit();
 
-        // Restore form
+        // Restore original action
         setTimeout(() => {
             form.action = originalAction;
         }, 100);
