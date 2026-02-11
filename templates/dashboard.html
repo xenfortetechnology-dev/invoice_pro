@@ -44,7 +44,7 @@
                     </div>
                     <div>
                         <p class="text-muted mb-1 small">Total Revenue</p>
-                        <h3 class="fw-bold mb-0">
+                        <h3 class="fw-bold mb-0 text-body">
                             ₹{{ "%.2f"|format(monthly_revenue_total or 0) }}
                         </h3>
 
@@ -63,7 +63,7 @@
                     <div>
                         <p class="text-muted mb-1 small">Outstanding Amount</p>
 
-                        <h3 class="fw-bold mb-0 text-dark">
+                        <h3 class="fw-bold mb-0 text-body">
                             ₹{{ "%.2f"|format(outstanding_amount or 0) }}
                         </h3>
                     </div>
@@ -84,7 +84,7 @@
                     </div>
                     <div>
                         <p class="text-muted mb-1 small">Total Invoices</p>
-                        <h3 class="fw-bold mb-0">{{ total_invoices }}</h3>
+                        <h3 class="fw-bold mb-0 text-body">{{ total_invoices }}</h3>
                         <small class="text-warning">
                             <i data-feather="file" size="14"></i> {{ recent_invoices|length }} recent
                         </small>
@@ -101,7 +101,7 @@
                     </div>
                     <div>
                         <p class="text-muted mb-1 small">Active Clients</p>
-                        <h3 class="fw-bold mb-0">{{ total_clients }}</h3>
+                        <h3 class="fw-bold mb-0 text-body">{{ total_clients }}</h3>
                         <small class="text-danger">
                             <i data-feather="user-check" size="14"></i> All verified
                         </small>

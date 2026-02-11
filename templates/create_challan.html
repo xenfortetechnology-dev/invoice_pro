@@ -23,30 +23,28 @@
                     <div class="card-body">
                         <div class="mb-3">
                             <label for="client_id" class="form-label">Select Client *</label>
-                                <select class="form-select" id="client_id" name="client_id" required>
+                            <select class="form-select" id="client_id" name="client_id" required>
                                 <option value="">Choose a client...</option>
 
                                 {% for client in clients %}
-                                 <option value="{{ client.id }}"
-                                 data-address="{{ client.address or '' }}"
-                                 data-city="{{ client.city or '' }}"
-                                 data-phone="{{ client.phone or '' }}">
-                                 {{ client.name }} - {{ client.phone or 'No Phone' }}
+                                <option value="{{ client.id }}" data-address="{{ client.address or '' }}"
+                                    data-city="{{ client.city or '' }}" data-phone="{{ client.phone or '' }}">
+                                    {{ client.name }}
                                 </option>
 
                                 {% endfor %}
-                                </select>
+                            </select>
 
+                        </div>
+                        <div id="clientDetails" class="d-none mt-3">
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <p><strong>Address:</strong> <span id="clientAddress"></span></p>
+                                    <p><strong>City:</strong> <span id="clientCity"></span></p>
+                                    <p><strong>Phone:</strong> <span id="clientPhone"></span></p>
                                 </div>
-<div id="clientDetails" class="d-none mt-3">
-    <div class="row">
-        <div class="col-md-12">
-            <p><strong>Address:</strong> <span id="clientAddress"></span></p>
-            <p><strong>City:</strong> <span id="clientCity"></span></p>
-            <p><strong>Phone:</strong> <span id="clientPhone"></span></p>
-        </div>
-    </div>
-</div>
+                            </div>
+                        </div>
 
 
 
@@ -64,8 +62,8 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="challan_date" class="form-label">Challan Date *</label>
-                                <input type="date" class="form-control" id="challan_date" name="challan_date" 
-                                       value="{{ today.strftime('%Y-%m-%d') }}" required>
+                                <input type="date" class="form-control" id="challan_date" name="challan_date"
+                                    value="{{ today.strftime('%Y-%m-%d') }}" required>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="delivery_date" class="form-label">Delivery Date</label>
@@ -88,14 +86,14 @@
 
                         <div class="mb-3">
                             <label for="vehicle_number" class="form-label">Vehicle Number</label>
-                            <input type="text" class="form-control" id="vehicle_number" name="vehicle_number" 
-                                   placeholder="Enter vehicle registration number">
+                            <input type="text" class="form-control" id="vehicle_number" name="vehicle_number"
+                                placeholder="Enter vehicle registration number">
                         </div>
 
                         <div class="mb-3">
                             <label for="notes" class="form-label">Notes</label>
-                            <textarea class="form-control" id="notes" name="notes" rows="2" 
-                                      placeholder="Any special delivery instructions..."></textarea>
+                            <textarea class="form-control" id="notes" name="notes" rows="2"
+                                placeholder="Any special delivery instructions..."></textarea>
                         </div>
                     </div>
                 </div>
@@ -218,48 +216,48 @@
 
 
 <script>
- 
-document.addEventListener("DOMContentLoaded", function () {
 
-    const clientSelect = document.getElementById("client_id");
-    const detailsBox = document.getElementById("clientDetails");
+    document.addEventListener("DOMContentLoaded", function () {
 
-    clientSelect.addEventListener("change", function () {
+        const clientSelect = document.getElementById("client_id");
+        const detailsBox = document.getElementById("clientDetails");
 
-        const selected = this.options[this.selectedIndex];
+        clientSelect.addEventListener("change", function () {
 
-        if (!selected.value) {
-            detailsBox.classList.add("d-none");
-            return;
-        }
+            const selected = this.options[this.selectedIndex];
 
-        document.getElementById("clientAddress").innerText =
-            selected.dataset.address || "N/A";
+            if (!selected.value) {
+                detailsBox.classList.add("d-none");
+                return;
+            }
 
-        document.getElementById("clientCity").innerText =
-            selected.dataset.city || "N/A";
+            document.getElementById("clientAddress").innerText =
+                selected.dataset.address || "N/A";
 
-        document.getElementById("clientPhone").innerText =
-            selected.dataset.phone || "N/A";
+            document.getElementById("clientCity").innerText =
+                selected.dataset.city || "N/A";
 
-        // ✅ SHOW DETAILS BOX
-        detailsBox.classList.remove("d-none");
+            document.getElementById("clientPhone").innerText =
+                selected.dataset.phone || "N/A";
+
+            // ✅ SHOW DETAILS BOX
+            detailsBox.classList.remove("d-none");
+        });
+
     });
 
-});
- 
 
 
 
-//let challanItemCounter = 0;
-//let challanItems = [];
-let challanItemCounter = 1;
+    //let challanItemCounter = 0;
+    //let challanItems = [];
+    let challanItemCounter = 1;
 
-function addChallanItem() {
-    challanItemCounter++;
-    const tbody = document.getElementById('challanItemsBody');
-    const row = document.createElement('tr');
-    row.innerHTML = `
+    function addChallanItem() {
+        challanItemCounter++;
+        const tbody = document.getElementById('challanItemsBody');
+        const row = document.createElement('tr');
+        row.innerHTML = `
         <td>${challanItemCounter}</td>
         <td><input type="text" class="form-control form-control-sm hsn-input" placeholder="HSN Code"></td>
         <td><input type="text" class="form-control form-control-sm desc-input" placeholder="Item description" required></td>
@@ -278,121 +276,186 @@ function addChallanItem() {
         <td class="total-cell">₹0.00</td>
         <td><button type="button" class="btn btn-danger btn-sm" onclick="removeChallanItem(this)"><i class="fas fa-trash"></i></button></td>
     `;
-    tbody.appendChild(row);
-    
-    // Add event listeners
-    const qtyInput = row.querySelector('.qty-input');
-    const priceInput = row.querySelector('.price-input');
-    
-    [qtyInput, priceInput].forEach(input => {
-        input.addEventListener('input', calculateChallanTotals);
-    });
-}
+        tbody.appendChild(row);
 
-function removeChallanItem(button) {
-    button.closest('tr').remove();
-    calculateChallanTotals();
-    renumberChallanItems();
-}
+        // Add event listeners
+        const qtyInput = row.querySelector('.qty-input');
+        const priceInput = row.querySelector('.price-input');
 
-function calculateChallanTotals() {
-    let totalQty = 0;
-    let totalValue = 0;
-    
-    document.querySelectorAll('#challanItemsBody tr').forEach(row => {
-        const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
-        const price = parseFloat(row.querySelector('.price-input').value) || 0;
-        const total = qty * price;
-        
-        row.querySelector('.total-cell').textContent = `₹${total.toFixed(2)}`;
-        totalQty += qty;
-        totalValue += total;
-    });
-    
-    document.getElementById('totalQuantity').textContent = totalQty.toFixed(2);
-    document.getElementById('totalValue').textContent = `₹${totalValue.toFixed(2)}`;
-}
-
-function renumberChallanItems() {
-    document.querySelectorAll('#challanItemsBody tr').forEach((row, index) => {
-        row.querySelector('td:first-child').textContent = index + 1;
-    });
-}
-
-function importFromInvoice() {
-    const clientId = document.getElementById('client_id').value;
-    if (!clientId) {
-        alert('Please select a client first');
-        return;
+        [qtyInput, priceInput].forEach(input => {
+            input.addEventListener('input', calculateChallanTotals);
+        });
     }
-    new bootstrap.Modal(document.getElementById('importModal')).show();
-}
 
-function loadClientInvoices(clientId) {
-    // This would typically fetch from the server
-    // For now, we'll simulate with placeholder data
-    const importSelect = document.getElementById('importInvoiceSelect');
-    importSelect.innerHTML = '<option value="">Loading invoices...</option>';
-    
-    // Simulate API call
-    setTimeout(() => {
-        importSelect.innerHTML = `
+    function removeChallanItem(button) {
+        button.closest('tr').remove();
+        calculateChallanTotals();
+        renumberChallanItems();
+    }
+
+    function calculateChallanTotals() {
+        let totalQty = 0;
+        let totalValue = 0;
+
+        document.querySelectorAll('#challanItemsBody tr').forEach(row => {
+            const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
+            const price = parseFloat(row.querySelector('.price-input').value) || 0;
+            const total = qty * price;
+
+            row.querySelector('.total-cell').textContent = `₹${total.toFixed(2)}`;
+            totalQty += qty;
+            totalValue += total;
+        });
+
+        document.getElementById('totalQuantity').textContent = totalQty.toFixed(2);
+        document.getElementById('totalValue').textContent = `₹${totalValue.toFixed(2)}`;
+    }
+
+    function renumberChallanItems() {
+        document.querySelectorAll('#challanItemsBody tr').forEach((row, index) => {
+            row.querySelector('td:first-child').textContent = index + 1;
+        });
+    }
+
+    function importFromInvoice() {
+        const clientId = document.getElementById('client_id').value;
+        if (!clientId) {
+            alert('Please select a client first');
+            return;
+        }
+        new bootstrap.Modal(document.getElementById('importModal')).show();
+    }
+
+    function loadClientInvoices(clientId) {
+        // This would typically fetch from the server
+        // For now, we'll simulate with placeholder data
+        const importSelect = document.getElementById('importInvoiceSelect');
+        importSelect.innerHTML = '<option value="">Loading invoices...</option>';
+
+        // Simulate API call
+        setTimeout(() => {
+            importSelect.innerHTML = `
             <option value="">Choose an invoice to import items...</option>
             <option value="1">Invoice #2025-00001 - ₹25,000</option>
             <option value="2">Invoice #2025-00002 - ₹15,000</option>
         `;
-    }, 1000);
-}
+        }, 1000);
+    }
 
-function previewChallan() {
-    // Collect form data and show preview
-    alert('Challan preview functionality would be implemented here');
-}
-document.getElementById('challanForm').addEventListener('submit', function(e) {
-    e.preventDefault();  // Prevent default submit first
 
-    const items = [];
-    document.querySelectorAll('#challanItemsBody tr').forEach((row, index) => {
-        const item = {
-            sr_no: index + 1,
-            hsn_code: row.querySelector('.hsn-input').value,
-            description: row.querySelector('.desc-input').value,
-            quantity: parseFloat(row.querySelector('.qty-input').value) || 0,
-            unit: row.querySelector('.unit-input').value,
-            unit_price: parseFloat(row.querySelector('.price-input').value) || 0
-        };
+    function previewChallan() {
+        const clientId = document.getElementById('client_id').value;
+        if (!clientId) {
+            alert('Please select a client to preview challan');
+            return;
+        }
 
-        if (item.description && item.quantity > 0) {
-            items.push(item);
+        // 1. Gather Items
+        const items = [];
+        document.querySelectorAll('#challanItemsBody tr').forEach((row, index) => {
+            const item = {
+                sr_no: index + 1,
+                hsn_code: row.querySelector('.hsn-input').value,
+                description: row.querySelector('.desc-input').value,
+                quantity: parseFloat(row.querySelector('.qty-input').value) || 0,
+                unit: row.querySelector('.unit-input').value,
+                unit_price: parseFloat(row.querySelector('.price-input').value) || 0
+            };
+
+            if (item.description && item.quantity > 0) {
+                items.push(item);
+            }
+        });
+
+        if (items.length === 0) {
+            alert('Please add at least one item to preview');
+            return;
+        }
+
+        // 2. Populate Hidden Input
+        document.getElementById('line_items').value = JSON.stringify(items);
+
+        // 3. Show Modal
+        const previewModal = new bootstrap.Modal(document.getElementById('previewModal'));
+        previewModal.show();
+
+        // 4. Change Form Action & Submit to Iframe
+        const form = document.getElementById('challanForm');
+        const originalAction = form.action;
+        const originalTarget = form.target;
+
+        form.action = "{{ url_for('preview_challan') }}";
+        form.target = "previewFrame"; // Target the iframe
+
+        form.submit();
+
+        // 5. Reset Form (after short delay)
+        setTimeout(() => {
+            form.action = originalAction;
+            form.target = originalTarget;
+        }, 1000);
+    }
+    document.getElementById('challanForm').addEventListener('submit', function (e) {
+        e.preventDefault();  // Prevent default submit first
+
+        const items = [];
+        document.querySelectorAll('#challanItemsBody tr').forEach((row, index) => {
+            const item = {
+                sr_no: index + 1,
+                hsn_code: row.querySelector('.hsn-input').value,
+                description: row.querySelector('.desc-input').value,
+                quantity: parseFloat(row.querySelector('.qty-input').value) || 0,
+                unit: row.querySelector('.unit-input').value,
+                unit_price: parseFloat(row.querySelector('.price-input').value) || 0
+            };
+
+            if (item.description && item.quantity > 0) {
+                items.push(item);
+            }
+        });
+
+        if (items.length === 0) {
+            alert('Please add at least one item to the challan');
+            return;
+        }
+
+        document.getElementById('line_items').value = JSON.stringify(items);
+        console.log('Line Items:', document.getElementById('line_items').value);
+        // ✅ Manually submit the form after setting the hidden field
+        this.submit();
+    });
+
+
+    // Initialize with one empty row
+    window.addEventListener('load', function () {
+        addChallanItem();
+    });
+
+
+
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const modalEl = document.getElementById('importModal');
+        if (modalEl) {
+            new bootstrap.Modal(modalEl); // safely initialize only if exists
         }
     });
 
-    if (items.length === 0) {
-        alert('Please add at least one item to the challan');
-        return;
-    }
-
-    document.getElementById('line_items').value = JSON.stringify(items);
-    console.log('Line Items:', document.getElementById('line_items').value);
-    // ✅ Manually submit the form after setting the hidden field
-    this.submit();
-});
-
-
-// Initialize with one empty row
-window.addEventListener('load', function() {
-    addChallanItem();
-});
-
-
-
-
-document.addEventListener('DOMContentLoaded', () => {
-    const modalEl = document.getElementById('importModal');
-    if (modalEl) {
-        new bootstrap.Modal(modalEl); // safely initialize only if exists
-    }
-});
-
 </script>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="previewModalLabel">Challan Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <iframe name="previewFrame" id="previewFrame" style="width: 100%; height: 80vh; border: none;"></iframe>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}

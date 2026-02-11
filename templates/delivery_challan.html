@@ -5,11 +5,14 @@
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/fix_flickering.css') }}">
 <div class="container-fluid py-4">
-    <div class="row">
-        <div class="col-12">
+    <div class="row mb-3">
+        <div class="col-12 d-flex justify-content-between align-items-center">
             <h1 class="display-6 fw-bold text-primary mb-1">
                 <i class="fas fa-truck me-2"></i>Delivery Challan Management
-            </h1><br>
+            </h1>
+            <a href="{{ url_for('create_challan') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back
+            </a>
         </div>
     </div>
 
