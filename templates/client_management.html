@@ -63,7 +63,8 @@
                     </div>
                     <div>
 
-                        <h3 class="fw-bold mb-0">Showing {{ client_list|length }} of {{ clients.total }} clients
+                        <h3 class="fw-bold mb-0 text-body">Showing {{ client_list|length }} of {{ clients.total }}
+                            clients
                         </h3>
                         <p class="text-muted mb-0 small">Total Clients</p>
                     </div>
@@ -78,7 +79,7 @@
                         <i data-feather="trending-up" size="24"></i>
                     </div>
                     <div>
-                        <h3 class="fw-bold mb-0">{{
+                        <h3 class="fw-bold mb-0 text-body">{{
                             client_insights.values()|map(attribute='predicted_ltv')|select('greaterthan', 0)|list|length
                             if client_insights else 0 }}</h3>
                         <p class="text-muted mb-0 small">High Value Clients</p>
@@ -94,7 +95,8 @@
                         <i data-feather="alert-triangle" size="24"></i>
                     </div>
                     <div>
-                        <h3 class="fw-bold mb-0">{{ client_insights.values()|selectattr('risk_level', 'equalto',
+                        <h3 class="fw-bold mb-0 text-body">{{ client_insights.values()|selectattr('risk_level',
+                            'equalto',
                             'High')|list|length if client_insights else 0 }}</h3>
                         <p class="text-muted mb-0 small">High Risk</p>
                     </div>
@@ -109,7 +111,7 @@
                         <i data-feather="user-check" size="24"></i>
                     </div>
                     <div>
-                        <h3 class="fw-bold mb-0">{{ clients.items|selectattr('blockchain_verified', 'equalto',
+                        <h3 class="fw-bold mb-0 text-body">{{ clients.items|selectattr('blockchain_verified', 'equalto',
                             True)|list|length if clients.items else 0 }}</h3>
                         <p class="text-muted mb-0 small">Verified</p>
                     </div>
