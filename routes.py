@@ -710,11 +710,11 @@ def create_client():
     if request.method == 'POST':
         try:
             payload = request.form.to_dict()
+            
+            # Convert checkbox to boolean (checkbox only sends value if checked)
+            payload['set_reminder'] = payload.get('set_reminder') == 'on'
 
-            # Convert checkbox properly
-            payload['blockchain_verified'] = payload.get('blockchain_verified') == 'on'
-
-            # Send form data to CLOUD API (this replaces Postman)
+            # Send form data to CLOUD API
             response = requests.post(
                 "http://44.208.164.236:5000/api/clients",
                 json=payload,
