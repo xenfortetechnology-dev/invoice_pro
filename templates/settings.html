@@ -982,22 +982,25 @@ Subject to local jurisdiction only.</textarea>
     });
 
     function initializeSettings() {
-        const themeDropdown = document.getElementById('themePreference');
-        let theme = themeDropdown.value;
-
-        // ✅ FORCE LIGHT IF EMPTY OR AUTO
-        if (!theme || theme === "auto") {
-            theme = "light";
-            themeDropdown.value = "light";
-        }
-
-        applyTheme(theme);
-
         // Setup form validation
         setupFormValidation();
 
-        // Load saved settings
+        // Load saved settings first (so we can override theme if needed)
         loadUserPreferences();
+
+        const themeDropdown = document.getElementById('themePreference');
+
+        // Sync with global theme setting (Source of Truth)
+        let savedTheme = localStorage.getItem('theme');
+
+        // Default to light if not set or invalid
+        if (!savedTheme || (savedTheme !== 'dark' && savedTheme !== 'light')) {
+            savedTheme = 'light';
+            localStorage.setItem('theme', 'light');
+        }
+
+        themeDropdown.value = savedTheme;
+        applyTheme(savedTheme);
     }
 
     function setupEventListeners() {
@@ -1194,23 +1197,25 @@ Subject to local jurisdiction only.</textarea>
     function applyTheme(theme) {
         const html = document.documentElement;
 
-        if (theme === 'dark') {
-            html.setAttribute('data-theme', 'dark');
-        } else if (theme === 'light') {
-            html.setAttribute('data-theme', 'light');
-        } else {
-            // Auto theme - use system preference
-            html.setAttribute('data-theme', 'auto');
+        // Force 'light' for auto or empty, consistent with request
+        if (theme === 'auto' || !theme || theme !== 'dark') {
+            theme = 'light';
+        }
 
-            // Listen for system theme changes
-            if (window.matchMedia) {
-                const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-                mediaQuery.addEventListener('change', function (e) {
-                    if (document.getElementById('themePreference').value === 'auto') {
-                        html.setAttribute('data-theme', e.matches ? 'dark' : 'light');
-                    }
-                });
-            }
+        html.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme); // Global persistence
+
+        // Update the dropdown if it exists (in case called from elsewhere)
+        const themeDropdown = document.getElementById('themePreference');
+        if (themeDropdown && themeDropdown.value !== theme) {
+            themeDropdown.value = theme;
+        }
+
+        // Update global icon if it exists (in base.html sidebar)
+        const themeIcon = document.getElementById("themeIcon");
+        if (themeIcon) {
+            themeIcon.setAttribute("data-feather", theme === "dark" ? "moon" : "sun");
+            if (window.feather) feather.replace();
         }
     }
 

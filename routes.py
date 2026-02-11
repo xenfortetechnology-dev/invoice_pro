@@ -1232,6 +1232,102 @@ def create_challan():
     clients = [SimpleNamespace(**c) for c in client_list]
     return render_template("create_challan.html", clients=clients, today=datetime.now())
 
+@app.route('/challan/preview', methods=['POST'])
+@login_required
+def preview_challan():
+    """Preview delivery challan without saving"""
+    try:
+        # 1. Collect Form Data
+        client_id = request.form.get('client_id')
+        challan_date_str = request.form.get('challan_date')
+        delivery_date_str = request.form.get('delivery_date')
+        vehicle_number = request.form.get('vehicle_number')
+        transport_mode = request.form.get('transport_mode')
+        notes = request.form.get('notes', '')
+        line_items_json = request.form.get('line_items', '[]')
+
+        # 2. validation (basic)
+        if not client_id:
+             return "Client is required for preview", 400
+
+        # 3. Create Transient Client (or fetch)
+        # We need client details for the PDF.
+        client_data = fetch_cloud_client_by_id(client_id)
+        if not client_data:
+             return "Client not found", 404
+        
+        # SimpleNamespace to mimic object access in PDF generator
+        client = SimpleNamespace(**client_data)
+
+        # 4. Create Transient Challan Object
+        # Use a dummy number or "PREVIEW"
+        challan_number = "PREVIEW"
+        
+        # Parse dates
+        challan_date = datetime.strptime(challan_date_str, '%Y-%m-%d').date() if challan_date_str else datetime.now().date()
+        delivery_date = datetime.strptime(delivery_date_str, '%Y-%m-%d').date() if delivery_date_str else None
+
+        # Prepare notes with transport info
+        meta_notes = []
+        if transport_mode: meta_notes.append(f"Mode: {transport_mode}")
+        if vehicle_number: meta_notes.append(f"Vehicle: {vehicle_number}")
+        
+        full_notes = notes
+        if meta_notes:
+            full_notes = (full_notes or "") + "\n" + " | ".join(meta_notes)
+
+        # Create transient Challan object
+        challan = DeliveryChallan(
+            challan_number=challan_number,
+            client_id=int(client_id),
+            challan_date=challan_date,
+            delivery_date=delivery_date,
+            notes=full_notes,
+            status='Draft' 
+        )
+        # Manually attach client object for PDF generator which expects challan.client
+        # USE A DIFFERENT ATTRIBUTE NAME to avoid SQLAlchemy relationship validation error
+        challan.preview_client = client 
+
+        # 5. Parse Line Items
+        line_items = []
+        if line_items_json:
+            try:
+                items_data = json.loads(line_items_json)
+                for item in items_data:
+                     # Create Transient Line Item
+                     li = ChallanLineItem(
+                         sr_no=int(item.get('sr_no', 0)),
+                         hsn_code=item.get('hsn_code', ''),
+                         description=item.get('description', ''),
+                         quantity=float(item.get('quantity', 0)),
+                         unit=item.get('unit', ''),
+                         unit_price=float(item.get('unit_price', 0)),
+                         total_amount=float(item.get('quantity', 0)) * float(item.get('unit_price', 0))
+                     )
+                     line_items.append(li)
+            except json.JSONDecodeError:
+                logging.error("Failed to parse line items JSON")
+        
+        challan.line_items = line_items
+
+        # 6. Generate PDF
+        # We use the existing function. 
+        pdf_buffer = generate_challan_pdf(challan)
+        pdf_buffer.seek(0)
+        
+        # 7. Return PDF Inline
+        return send_file(
+            pdf_buffer,
+            mimetype='application/pdf',
+            as_attachment=False,
+            download_name='challan_preview.pdf'
+        )
+
+    except Exception as e:
+        logging.error(f"Challan preview failed: {e}")
+        return f"Error creating preview: {str(e)}", 500
+
 
 @app.route("/delivery-challan")
 @login_required

@@ -323,7 +323,7 @@ def generate_challan_pdf(challan):
         styles = getSampleStyleSheet()
         content = []
 
-        # Title
+        # Custom styles (reused/adapted)
         title_style = ParagraphStyle(
             name='ChallanTitle',
             fontSize=18,
@@ -333,11 +333,165 @@ def generate_challan_pdf(challan):
             spaceAfter=20
         )
         
+        header_style = ParagraphStyle(
+            name='Header',
+            fontSize=12,
+            fontName='Helvetica-Bold',
+            textColor=colors.HexColor('#1f2937')
+        )
+        
+        normal_style = ParagraphStyle(
+            name='Normal',
+            fontSize=10,
+            fontName='Helvetica',
+            textColor=colors.HexColor('#374151')
+        )
+
         content.append(Paragraph("DELIVERY CHALLAN", title_style))
+        content.append(Spacer(1, 10))
+
+        # Company Header (similar to invoice)
+        company = Company.query.first()
+        if not company:
+            company = type('Company', (), {
+                'name': config.COMPANY_NAME,
+                'address': config.COMPANY_ADDRESS,
+                'city': config.COMPANY_CITY,
+                'state': config.COMPANY_STATE,
+                'pincode': config.COMPANY_PINCODE,
+                'phone': config.COMPANY_PHONE,
+                'email': config.COMPANY_EMAIL,
+                'gstin': config.GSTIN
+            })()
+
+        # Challan Details
+        # Try to get client from preview_client (transient) or standard relationship
+        client = getattr(challan, 'preview_client', None) or challan.client
+        
+        # Fallback if client is missing (should not happen in preview flow)
+        if not client:
+             client = type('Client', (), {
+                'name': 'Unknown Client',
+                'address': '',
+                'city': '', 
+                'state': '',
+                'pincode': '',
+                'phone': '',
+                'email': ''
+            })()
+
+        header_data = [
+            [
+                Paragraph(f"<b>Challan No:</b> {challan.challan_number}<br/>"
+                          f"<b>Date:</b> {challan.challan_date.strftime('%d-%m-%Y')}<br/>"
+                          f"<b>Delivery Date:</b> {challan.delivery_date.strftime('%d-%m-%Y') if challan.delivery_date else 'N/A'}", 
+                          normal_style),
+                Paragraph(f"<b>{company.name}</b><br/>"
+                          f"{company.address}<br/>"
+                          f"{company.city}, {company.state} - {company.pincode}<br/>"
+                          f"Phone: {company.phone}", 
+                          normal_style)
+            ]
+        ]
+        
+        header_table = Table(header_data, colWidths=[3.5 * inch, 3.5 * inch])
+        header_table.setStyle(TableStyle([
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f9fafb')),
+            ('LEFTPADDING', (0, 0), (-1, -1), 12),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        content.append(header_table)
         content.append(Spacer(1, 20))
 
-        # Rest of the challan generation logic similar to invoice
-        # ... (implement based on challan requirements)
+        # Ship To / Bill To
+        client_details = (
+            f"<b>{getattr(client, 'name', 'Unknown Client')}</b><br/>"
+            f"{getattr(client, 'contact_person', '')}<br/>"
+            f"{getattr(client, 'address', '')}<br/>"
+            f"{getattr(client, 'city', '')}, {getattr(client, 'state', '')} - {getattr(client, 'pincode', '')}<br/>"
+            f"Phone: {getattr(client, 'phone', '')}"
+        )
+
+        ship_data = [
+            [
+                Paragraph("<b>Ship To</b>", header_style),
+                Paragraph("<b>Vehicle / Transport Details</b>", header_style)
+            ],
+            [
+                Paragraph(client_details, normal_style),
+                Paragraph(challan.notes or "No specific instructions", normal_style)
+            ]
+        ]
+        
+        ship_table = Table(ship_data, colWidths=[3.5 * inch, 3.5 * inch])
+        ship_table.setStyle(TableStyle([
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('BACKGROUND', (0, 0), (1, 0), colors.HexColor('#dc2626')), # Red theme for challan
+            ('TEXTCOLOR', (0, 0), (1, 0), colors.white),
+            ('LEFTPADDING', (0, 0), (-1, -1), 12),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        content.append(ship_table)
+        content.append(Spacer(1, 20))
+
+        # Items Table
+        items_data = [['S.No', 'HSN', 'Description', 'Qty', 'Unit']]
+        
+        for item in challan.line_items:
+            items_data.append([
+                str(item.sr_no),
+                item.hsn_code or '',
+                Paragraph(item.description, normal_style),
+                f"{item.quantity:g}",
+                item.unit
+            ])
+
+        # Fill empty rows
+        while len(items_data) < 10:
+            items_data.append(['', '', '', '', ''])
+
+        items_table = Table(items_data, colWidths=[
+            0.5*inch, 1*inch, 4*inch, 0.8*inch, 0.7*inch
+        ])
+        
+        items_table.setStyle(TableStyle([
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dc2626')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (2, 1), (2, -1), 'LEFT'), # Description left align
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        content.append(items_table)
+        content.append(Spacer(1, 30))
+
+        # Footer / Signatures
+        signature_data = [
+            ['', f"For {company.name}"],
+            ['', ''],
+            ['', ''],
+            ['Receiver\'s Signature', 'Authorized Signatory']
+        ]
+        
+        signature_table = Table(signature_data, colWidths=[3.5*inch, 3.5*inch])
+        signature_table.setStyle(TableStyle([
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('LINEABOVE', (0, -1), (-1, -1), 0.5, colors.HexColor('#6b7280')),
+        ]))
+        content.append(signature_table)
 
         doc.build(content)
         buffer.seek(0)
