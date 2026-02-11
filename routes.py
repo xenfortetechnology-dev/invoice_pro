@@ -710,11 +710,11 @@ def create_client():
     if request.method == 'POST':
         try:
             payload = request.form.to_dict()
+            
+            # Convert checkbox to boolean (checkbox only sends value if checked)
+            payload['set_reminder'] = payload.get('set_reminder') == 'on'
 
-            # Convert checkbox properly
-            payload['blockchain_verified'] = payload.get('blockchain_verified') == 'on'
-
-            # Send form data to CLOUD API (this replaces Postman)
+            # Send form data to CLOUD API
             response = requests.post(
                 "http://44.208.164.236:5000/api/clients",
                 json=payload,
@@ -2067,12 +2067,33 @@ def safe_float(value):
 @app.route("/quotations/create", methods=["POST"])
 @login_required
 def create_quotation():
-
     try:
+        # Capture all possible fields from the form
         payload = {
+            "quotation_number": request.form.get("quotation_number"),
             "quotation_date": request.form.get("quotation_date"),
+            "validity_days": request.form.get("validity_days"),
             "status": request.form.get("status", "Draft"),
-            "grand_total": request.form.get("grand_total", 0)
+            "sales_person": request.form.get("sales_person"),
+            "reference_id": request.form.get("reference_id"),
+            
+            "subtotal": request.form.get("subtotal", 0),
+            "discount": request.form.get("discount", 0),
+            "taxable_value": request.form.get("taxable", 0),
+            "cgst": request.form.get("cgst", 0),
+            "sgst": request.form.get("sgst", 0),
+            "igst": request.form.get("igst", 0),
+            "shipping": request.form.get("shipping", 0),
+            "rounding": request.form.get("rounding", 0),
+            "grand_total": request.form.get("grand_total", 0),
+            
+            "delivery_timeline": request.form.get("delivery_timeline"),
+            "project_scope": request.form.get("project_scope"),
+            "milestones": request.form.get("milestones"),
+            "warranty": request.form.get("warranty"),
+            "revision_policy": request.form.get("revision_policy"),
+            "dependencies": request.form.get("dependencies"),
+            "terms": request.form.get("terms")
         }
 
         response = requests.post(
@@ -2099,8 +2120,51 @@ def create_quotation():
 # -------------------------
 @app.route("/quotations/preview/<int:qid>")
 def quotation_preview(qid):
-    q = Quotation.query.get_or_404(qid)
-    return render_template("quotation_preview.html", q=q)
+    try:
+        response = requests.get(
+            f"http://44.208.164.236:5000/api/quotations/{qid}",
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            q_data = response.json()
+            q = SimpleNamespace(
+                id=q_data["id"],
+                quotation_number=q_data["quotation_number"],
+                quotation_date=datetime.strptime(
+                    q_data["quotation_date"], "%Y-%m-%d"
+                ) if q_data.get("quotation_date") else None,
+                status=q_data.get("status"),
+                grand_total=q_data.get("grand_total", 0),
+                sales_person=q_data.get("sales_person", ""),
+                reference_id=q_data.get("reference_id", ""),
+                subtotal=q_data.get("subtotal", 0),
+                discount=q_data.get("discount", 0),
+                taxable_value=q_data.get("taxable_value", 0),
+                cgst=q_data.get("cgst", 0),
+                sgst=q_data.get("sgst", 0),
+                igst=q_data.get("igst", 0),
+                shipping=q_data.get("shipping", 0),
+                rounding=q_data.get("rounding", 0),
+                validity_days=q_data.get("validity_days"),
+                expiry_date=datetime.strptime(
+                    q_data["expiry_date"], "%Y-%m-%d"
+                ) if q_data.get("expiry_date") else None,
+                delivery_timeline=q_data.get("delivery_timeline", ""),
+                project_scope=q_data.get("project_scope", ""),
+                milestones=q_data.get("milestones", ""),
+                warranty=q_data.get("warranty", ""),
+                revision_policy=q_data.get("revision_policy", ""),
+                dependencies=q_data.get("dependencies", ""),
+                terms=q_data.get("terms", "")
+            )
+            return render_template("quotation_preview.html", q=q)
+        else:
+            flash("Quotation not found", "error")
+            return redirect(url_for("quotation_list"))
+    except Exception as e:
+        flash(f"Error loading quotation: {str(e)}", "error")
+        return redirect(url_for("quotation_list"))
 
 
 # -------------------------
@@ -2161,39 +2225,60 @@ def quotation_list():
 # -------------------------
 @app.route("/quotations/duplicate/<int:qid>")
 def duplicate_quotation(qid):
-    q = Quotation.query.get_or_404(qid)
-
-    new = Quotation(
-        quotation_number=generate_quotation_number(),
-        quotation_date=q.quotation_date,
-        validity_days=q.validity_days,
-        expiry_date=q.expiry_date,
-        status="Draft",
-        sales_person=q.sales_person,
-        reference_id=q.reference_id,
-
-        subtotal=q.subtotal,
-        discount=q.discount,
-        taxable_value=q.taxable_value,
-        cgst=q.cgst,
-        sgst=q.sgst,
-        igst=q.igst,
-        shipping=q.shipping,
-        rounding=q.rounding,
-        grand_total=q.grand_total,
-
-        delivery_timeline=q.delivery_timeline,
-        project_scope=q.project_scope,
-        milestones=q.milestones,
-        warranty=q.warranty,
-        revision_policy=q.revision_policy,
-        dependencies=q.dependencies,
-        terms=q.terms
-    )
-
-    db.session.add(new)
-    db.session.commit()
-    return redirect(url_for("quotation_preview", qid=new.id))
+    try:
+        # Fetch original quotation from API
+        response = requests.get(
+            f"http://44.208.164.236:5000/api/quotations/{qid}",
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            q_data = response.json()
+            
+            # Create duplicate via API
+            new_payload = {
+                "quotation_date": q_data.get("quotation_date"),
+                "validity_days": q_data.get("validity_days"),
+                "expiry_date": q_data.get("expiry_date"),
+                "status": "Draft",
+                "sales_person": q_data.get("sales_person"),
+                "reference_id": q_data.get("reference_id"),
+                "subtotal": q_data.get("subtotal"),
+                "discount": q_data.get("discount"),
+                "taxable_value": q_data.get("taxable_value"),
+                "cgst": q_data.get("cgst"),
+                "sgst": q_data.get("sgst"),
+                "igst": q_data.get("igst"),
+                "shipping": q_data.get("shipping"),
+                "rounding": q_data.get("rounding"),
+                "grand_total": q_data.get("grand_total"),
+                "delivery_timeline": q_data.get("delivery_timeline"),
+                "project_scope": q_data.get("project_scope"),
+                "milestones": q_data.get("milestones"),
+                "warranty": q_data.get("warranty"),
+                "revision_policy": q_data.get("revision_policy"),
+                "dependencies": q_data.get("dependencies"),
+                "terms": q_data.get("terms")
+            }
+            
+            create_response = requests.post(
+                "http://44.208.164.236:5000/api/quotations",
+                json=new_payload,
+                timeout=5
+            )
+            
+            if create_response.status_code in (200, 201):
+                new_q = create_response.json()
+                flash("Quotation duplicated successfully!", "success")
+                return redirect(url_for("quotation_preview", qid=new_q["id"]))
+            else:
+                flash("Failed to duplicate quotation", "error")
+        else:
+            flash("Original quotation not found", "error")
+    except Exception as e:
+        flash(f"Error duplicating quotation: {str(e)}", "error")
+    
+    return redirect(url_for("quotation_list"))
 
 
 # -------------------------
@@ -2201,70 +2286,168 @@ def duplicate_quotation(qid):
 # -------------------------
 @app.route("/quotations/cancel/<int:qid>")
 def cancel_quotation(qid):
-    q = Quotation.query.get_or_404(qid)
-    q.status = "Cancelled"
-    db.session.commit()
-    flash("Quotation has been cancelled.", "warning")
-    return redirect(url_for("quotation_preview", qid=q.id))
+    try:
+        response = requests.put(
+            f"http://44.208.164.236:5000/api/quotations/{qid}",
+            json={"status": "Cancelled"},
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            flash("Quotation has been cancelled.", "warning")
+            return redirect(url_for("quotation_preview", qid=qid))
+        else:
+            flash("Failed to cancel quotation", "error")
+    except Exception as e:
+        flash(f"Error cancelling quotation: {str(e)}", "error")
+    
+    return redirect(url_for("quotation_list"))
 
 
 @app.route("/quotations/<int:qid>/delete")
 def delete_quotation(qid):
-    q = Quotation.query.get_or_404(qid)
-    db.session.delete(q)
-    db.session.commit()
-    flash("Quotation deleted successfully!", "success")
+    try:
+        response = requests.delete(
+            f"http://44.208.164.236:5000/api/quotations/{qid}",
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            flash("Quotation deleted successfully!", "success")
+        else:
+            flash("Failed to delete quotation", "error")
+    except Exception as e:
+        flash(f"Error deleting quotation: {str(e)}", "error")
+    
     return redirect(url_for("quotation_list"))
 
 @app.route("/quotations/<int:qid>/pdf")
 def quotation_pdf(qid):
-    quotation = Quotation.query.get_or_404(qid)
-    pdf_buffer = generate_quotation_pdf(quotation)
-
-    filename = f"Quotation_{quotation.quotation_number.replace('-', '_')}.pdf"
-    filepath = _save_buffer_to_downloads(pdf_buffer, filename)
-    
-    if filepath:
-        return jsonify({
-            'success': True,
-            'message': f'Quotation PDF generated and saved to Downloads: {filename}',
-            'filename': filename
-        })
-    else:
+    try:
+        # Fetch quotation from API
+        response = requests.get(
+            f"http://44.208.164.236:5000/api/quotations/{qid}",
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            q_data = response.json()
+            
+            # Convert API data to SimpleNamespace for PDF generator
+            quotation = SimpleNamespace(
+                id=q_data["id"],
+                quotation_number=q_data["quotation_number"],
+                quotation_date=datetime.strptime(
+                    q_data["quotation_date"], "%Y-%m-%d"
+                ) if q_data.get("quotation_date") else None,
+                status=q_data.get("status"),
+                grand_total=q_data.get("grand_total", 0),
+                sales_person=q_data.get("sales_person", ""),
+                reference_id=q_data.get("reference_id", ""),
+                subtotal=q_data.get("subtotal", 0),
+                discount=q_data.get("discount", 0),
+                taxable_value=q_data.get("taxable_value", 0),
+                cgst=q_data.get("cgst", 0),
+                sgst=q_data.get("sgst", 0),
+                igst=q_data.get("igst", 0),
+                shipping=q_data.get("shipping", 0),
+                rounding=q_data.get("rounding", 0),
+                validity_days=q_data.get("validity_days"),
+                expiry_date=datetime.strptime(
+                    q_data["expiry_date"], "%Y-%m-%d"
+                ) if q_data.get("expiry_date") else None,
+                delivery_timeline=q_data.get("delivery_timeline", ""),
+                project_scope=q_data.get("project_scope", ""),
+                milestones=q_data.get("milestones", ""),
+                warranty=q_data.get("warranty", ""),
+                revision_policy=q_data.get("revision_policy", ""),
+                dependencies=q_data.get("dependencies", ""),
+                terms=q_data.get("terms", "")
+            )
+            
+            pdf_buffer = generate_quotation_pdf(quotation)
+            filename = f"Quotation_{quotation.quotation_number.replace('-', '_')}.pdf"
+            filepath = _save_buffer_to_downloads(pdf_buffer, filename)
+            
+            if filepath:
+                return jsonify({
+                    'success': True,
+                    'message': f'Quotation PDF generated and saved to Downloads: {filename}',
+                    'filename': filename
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': 'Failed to save PDF to system Downloads folder.'
+                }), 500
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Quotation not found in API'
+            }), 404
+    except Exception as e:
         return jsonify({
             'success': False,
-            'message': 'Failed to save PDF to system Downloads folder.'
+            'message': f'Error generating PDF: {str(e)}'
         }), 500
 
 
 @app.route("/quotations/<int:qid>/convert")
 def convert_to_invoice(qid):
-    quotation = Quotation.query.get_or_404(qid)
-
-    quotation.status = "Converted to Invoice"
-    db.session.commit()
-
-    flash("Quotation converted to Invoice successfully!", "success")
+    try:
+        response = requests.put(
+            f"http://44.208.164.236:5000/api/quotations/{qid}",
+            json={"status": "Converted to Invoice"},
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            flash("Quotation converted to Invoice successfully!", "success")
+        else:
+            flash("Failed to convert quotation", "error")
+    except Exception as e:
+        flash(f"Error converting quotation: {str(e)}", "error")
+    
     return redirect(url_for("quotation_list"))
 @app.route("/quotations/<int:qid>/send-email")
 def send_email(qid):
-    q = Quotation.query.get_or_404(qid)
-
-    # TEMP DEMO (replace with real email later)
-    print("Sending email for quotation:", q.quotation_number)
-
-    flash("Email sent successfully (demo).")
+    try:
+        response = requests.get(
+            f"http://44.208.164.236:5000/api/quotations/{qid}",
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            q_data = response.json()
+            # TEMP DEMO (replace with real email later)
+            print("Sending email for quotation:", q_data["quotation_number"])
+            flash("Email sent successfully (demo).", "success")
+        else:
+            flash("Quotation not found", "error")
+    except Exception as e:
+        flash(f"Error sending email: {str(e)}", "error")
+    
     return redirect(url_for("quotation_list"))
 
 
 @app.route("/quotations/<int:qid>/send-whatsapp")
 def send_whatsapp(qid):
-    q = Quotation.query.get_or_404(qid)
-
-    # TEMP DEMO
-    print("Sending WhatsApp for quotation:", q.quotation_number)
-
-    flash("WhatsApp sent successfully (demo).")
+    try:
+        response = requests.get(
+            f"http://44.208.164.236:5000/api/quotations/{qid}",
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            q_data = response.json()
+            # TEMP DEMO
+            print("Sending WhatsApp for quotation:", q_data["quotation_number"])
+            flash("WhatsApp sent successfully (demo).", "success")
+        else:
+            flash("Quotation not found", "error")
+    except Exception as e:
+        flash(f"Error sending WhatsApp: {str(e)}", "error")
+    
     return redirect(url_for("quotation_list"))
 
 

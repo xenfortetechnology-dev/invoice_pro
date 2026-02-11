@@ -25,8 +25,9 @@
                             <button class="btn btn-success glass-btn" id="voiceCreateBtn">
                                 <i data-feather="mic" class="me-1"></i> Voice Assist
                             </button>
-                            <button class="btn btn-info glass-btn" data-bs-toggle="modal"
-                                data-bs-target="#documentScannerModal">
+                            <button class="btn btn-outline-secondary glass-btn" data-bs-toggle="modal"
+                                data-bs-target="#documentScannerModal" disabled
+                                style="opacity: 0.3; cursor: not-allowed; pointer-events: none;">
                                 <i data-feather="camera" class="me-1"></i> Scan Document
                             </button>
                             {% endif %}
@@ -125,7 +126,9 @@ Subject to local jurisdiction only.</textarea>
                         </h5>
                         <div class="d-flex gap-2">
                             {% if ai_enabled %}
-                            <button type="button" class="btn btn-info btn-sm glass-btn" id="aiSuggestionsBtn">
+                            <button type="button" class="btn btn-outline-secondary btn-sm glass-btn"
+                                id="aiSuggestionsBtn" disabled
+                                style="opacity: 0.3; cursor: not-allowed; pointer-events: none;">
                                 <i data-feather="cpu" class="me-1"></i> AI Suggestions
                             </button>
                             {% endif %}
