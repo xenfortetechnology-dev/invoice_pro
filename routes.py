@@ -19,7 +19,11 @@ from ocr_service import ocr_processor, receipt_processor
 from voice_service import get_voice_processor, get_voice_session
 from analytics_engine import AnalyticsEngine
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
+from reportlab.lib.pagesizes import letter, landscape
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
 import io
 import csv
 from flask import Response, request, render_template_string
@@ -1058,108 +1062,141 @@ def export_clients_excel():
 @app.route('/api/export/clients/pdf')
 @login_required
 def export_clients_pdf():
-    search = request.args.get('search', '')
+    # --- 1. Fetch Hybrid Data (Copy logic from client_management) ---
+    search = request.args.get('search', '').lower()
     client_type = request.args.get('type', '')
     
-    # Build query with filters
-    query = Client.query
-    if search:
-        query = query.filter(
-            or_(
-                Client.name.contains(search),
-                Client.phone.contains(search),
-                Client.email.contains(search),
-                Client.contact_person.contains(search)
-            )
-        )
-    if client_type:
-        query = query.filter(Client.client_type == client_type)
+    client_list = []
+    today = datetime.utcnow().date()
+
+    # Cloud Fetch
+    try:
+        r_c = requests.get("http://44.208.164.236:5000/api/clients", timeout=3)
+        cloud_clients = r_c.json() if r_c.status_code == 200 else []
         
-    clients = query.order_by(Client.name).all()
-    
+        r_i = requests.get("http://44.208.164.236:5000/api/invoices", timeout=3)
+        cloud_invoices = r_i.json() if r_i.status_code == 200 else []
+        
+        for c in cloud_clients:
+            c_invs = [inv for inv in cloud_invoices if inv.get('client_id') == c['id']]
+            total_biz = sum(inv.get('total_amount', 0) for inv in c_invs)
+            
+            client_dict = {
+                'name': c.get('name', ''),
+                'email': c.get('email', ''),
+                'phone': c.get('phone', ''),
+                'type': 'Regular', # Cloud default
+                'gstin': 'N/A', # Cloud default
+                'business_value': total_biz
+            }
+            client_list.append(client_dict)
+    except Exception as e:
+        print(f"Cloud fetch error in export: {e}")
+
+    # Local Fetch
+    local_clients = Client.query.all()
+    for lc in local_clients:
+        client_dict = {
+            'name': lc.name,
+            'email': lc.email,
+            'phone': lc.phone,
+            'type': lc.client_type,
+            'gstin': lc.gstin or 'N/A',
+            'business_value': lc.total_business or 0
+        }
+        client_list.append(client_dict)
+
+    # Filter
+    filtered = []
+    for c in client_list:
+        if search:
+            if not (search in c['name'].lower() or search in c['email'].lower() or search in c['phone'].lower()):
+                continue
+        if client_type and c['type'] != client_type:
+            continue
+        filtered.append(c)
+        
+    filtered.sort(key=lambda x: x['name'])
+
+    # --- 2. Generate PDF ---
     buffer = io.BytesIO()
-    p = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=18)
+    elements = []
+    styles = getSampleStyleSheet()
 
-    PAGE_MARGIN = 20
-
-    def draw_page_border():
-        p.setStrokeColorRGB(0, 0, 0)
-        p.setLineWidth(1)
-        p.rect(PAGE_MARGIN, PAGE_MARGIN, width - PAGE_MARGIN*2, height - PAGE_MARGIN*2)
-
-    draw_page_border()
-    p.setFont("Helvetica-Bold", 18)
-    p.drawCentredString(width / 2, height - 50, "Client Directory Report")
+    # Header
+    title_style = ParagraphStyle(
+        'Title',
+        parent=styles['Heading1'],
+        fontSize=24,
+        alignment=1, # Center
+        spaceAfter=20,
+        textColor=colors.black
+    )
+    elements.append(Paragraph("Client Directory Report", title_style))
     
-    p.setStrokeColorRGB(0.7, 0.7, 0.7)
-    p.line(40, height - 65, width - 40, height - 65)
-
-    y = height - 100
-    col_x = [60, width / 2 + 10]
-    col = 0
-    block_height = 130
-
-    for c in clients:
-        if y - block_height < 60:
-            if col == 0:
-                col = 1
-                y = height - 100
-            else:
-                p.showPage()
-                draw_page_border()
-                col = 0
-                y = height - 100
-
-        x = col_x[col]
-        box_width = width / 2 - 70
-
-        p.setFillColorRGB(0.97, 0.98, 1)
-        p.roundRect(x, y - block_height, box_width, block_height, 6, fill=1)
-        
-        p.setStrokeColorRGB(0.8, 0.8, 0.9)
-        p.roundRect(x, y - block_height, box_width, block_height, 6, fill=0)
-
-        p.setFillColorRGB(0, 0, 0)
-        curr_y = y - 25
-        
-        p.setFont("Helvetica-Bold", 12)
-        p.drawString(x + 15, curr_y, c.name or "N/A")
-        curr_y -= 20
-        
-        p.setFont("Helvetica", 10)
-        p.drawString(x + 15, curr_y, f"Email: {c.email or 'N/A'}")
-        curr_y -= 15
-        p.drawString(x + 15, curr_y, f"Phone: {c.phone or 'N/A'}")
-        curr_y -= 15
-        p.drawString(x + 15, curr_y, f"Type: {c.client_type or 'Regular'}")
-        curr_y -= 15
-        p.drawString(x + 15, curr_y, f"Business: ₹{c.total_business:,.2f}" if c.total_business else "Business: ₹0.00")
-        curr_y -= 15
-        p.drawString(x + 15, curr_y, f"GSTIN: {c.gstin or 'N/A'}")
-
-        y -= block_height + 20
-
-    p.setFont("Helvetica-Oblique", 8)
-    p.drawCentredString(width/2, 35, f"Generated: {datetime.now().strftime('%d-%m-%Y %H:%M')}")
+    # Org Details (Hardcoded for now or fetch from settings if available)
+    org_style = ParagraphStyle('Org', parent=styles['Normal'], fontSize=10, spaceAfter=20)
+    user_org = "Revolutionary Invoice System" # Placeholder
+    gen_date = datetime.now().strftime("%d-%b-%Y")
     
-    p.save()
+    elements.append(Paragraph(f"<b>Organization Name:</b> {user_org}", org_style))
+    elements.append(Paragraph(f"<b>Generated On:</b> {gen_date}", org_style))
+    elements.append(Spacer(1, 10))
+    elements.append(Paragraph("<b>Client Information Structure</b>", styles['Heading3']))
+    elements.append(Spacer(1, 10))
+
+    # Table Info
+    # Data structure for Table: Header row + Data rows
+    table_data = [['Client Name', 'Email Address', 'Phone Number', 'Client Type', 'Business Value', 'GSTIN']]
+    
+    for c in filtered:
+        row = [
+            c['name'][:20], # Truncate long names
+            c['email'][:25], 
+            c['phone'], 
+            c['type'], 
+            f"Rs. {c['business_value']:,.2f}", 
+            c['gstin']
+        ]
+        table_data.append(row)
+
+    # Create Table
+    # Column widths
+    col_widths = [2.0*inch, 2.5*inch, 1.2*inch, 1.0*inch, 1.5*inch, 1.5*inch]
+    t = Table(table_data, colWidths=col_widths)
+
+    # Styling
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    
+    elements.append(t)
+    doc.build(elements)
+    
     buffer.seek(0)
+    filename = f"Client_Directory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     
-    filename = f"client_directory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     filepath = _save_buffer_to_downloads(buffer, filename)
     
     if filepath:
         return jsonify({
             'success': True,
-            'message': f'PDF report generated and saved to Downloads: {filename}',
+            'message': f'PDF report generated: {filename}',
             'filename': filename
         })
     else:
-        return jsonify({
-            'success': False,
-            'message': 'Failed to save PDF to system Downloads folder.'
-        }), 500
+        return jsonify({'success': False, 'message': 'Failed to save PDF'}), 500
 
 
 def _get_analytics_data_dict(time_range='12m'):
@@ -2993,6 +3030,9 @@ def challan_pdf(id):
         logging.error(f"Challan PDF generation failed: {e}")
         flash(f'Error generating PDF: {str(e)}', 'error')
         return redirect(url_for('delivery_challan'))
+
+
+
 
 
 
