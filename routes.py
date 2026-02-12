@@ -1918,8 +1918,123 @@ def update_challan_status(id):
 @app.route('/crm')
 @login_required
 def crm():
-    lead_stats = analytics_engine.get_lead_stats()  
-    return render_template('crm.html', title='CRM', lead_stats=lead_stats)
+    # 1. Fetch Stats
+    lead_stats = analytics_engine.get_lead_stats()
+    
+    # 2. Fetch Clients (Cloud)
+    clients_data = fetch_cloud_clients()
+    processed_clients = []
+    
+    # Process clients for template
+    for c in clients_data:
+        client = c.copy()
+        
+        # Parse dates (handle missing fields gracefully)
+        client['created_at'] = None
+        if c.get('created_at'):
+             try:
+                client['created_at'] = datetime.fromisoformat(c.get('created_at').replace('Z', '+00:00'))
+             except: pass
+
+        client['last_contact_date'] = None
+        if c.get('last_contact_date'):
+             try:
+                client['last_contact_date'] = datetime.fromisoformat(c.get('last_contact_date').replace('Z', '+00:00'))
+             except: pass
+        
+        # Ensure lead_stage exists
+        if not client.get('lead_stage'):
+            client['lead_stage'] = 'New'
+            
+        processed_clients.append(client)
+        
+    # 3. Recent Contacts
+    # Fallback: Since cloud data might lack dates, if no contacts have dates, just show the last 5
+    recents_with_dates = [c for c in processed_clients if c.get('last_contact_date')]
+    if recents_with_dates:
+        recent_contacts = sorted(recents_with_dates, key=lambda x: x['last_contact_date'], reverse=True)[:5]
+    else:
+        # Fallback: Show last 5 clients (assuming they are newest)
+        recent_contacts = processed_clients[-5:][::-1]
+    
+    # 4. Overdue Invoices (Cloud)
+    invoices_data = fetch_cloud_invoices()
+    overdue_invoices = []
+    
+    today = datetime.now().date()
+    
+    for inv in invoices_data:
+        inv_date = None
+        if inv.get('invoice_date'):
+            try:
+                inv_date = datetime.strptime(inv.get('invoice_date'), '%Y-%m-%d').date()
+            except: pass
+            
+        if inv.get('payment_status') != 'Paid' and inv_date:
+            days_pending = (today - inv_date).days
+            if days_pending > 44:
+                # Find client
+                client_match = next((c for c in processed_clients if c['id'] == inv.get('client_id')), None)
+                if client_match:
+                    inv['client'] = client_match
+                    inv['created_at'] = datetime.combine(inv_date, datetime.min.time())
+                    overdue_invoices.append(inv)
+    
+    # 5. Reminders (Local)
+    reminders = []
+    try:
+        local_reminders = PaymentReminder.query.filter(PaymentReminder.status == 'Pending').all()
+        for r in local_reminders:
+            if r.invoice and r.invoice.client:
+                 reminders.append(r)
+            else:
+                # Local link broken? adhere to safety.
+                pass
+    except Exception as e:
+        app.logger.error(f"Error fetching local reminders: {e}")
+
+    # 6. Follow-ups
+    follow_ups = [r for r in reminders if r.reminder_type == 'Follow-up']
+    
+    # Fallback: If no follow-ups, synthesize them from New Leads to keep dashboard alive
+    if not follow_ups and processed_clients:
+        from types import SimpleNamespace
+        # Take up to 3 'New' clients
+        new_leads = [c for c in processed_clients if c.get('lead_stage') == 'New'][:3]
+        for c in new_leads:
+             c_obj = SimpleNamespace(id=c['id'], name=c['name'])
+             # Mock a reminder object
+             mock_rem = SimpleNamespace(
+                id=0,
+                client=c_obj,
+                reminder_date=datetime.now(),
+                note="New Lead - Please contact",
+                status="Pending",
+                reminder_type="Follow-up"
+             )
+             follow_ups.append(mock_rem)
+
+    # DEBUG: Print what we're passing to template
+    print(f"\n🔍 [CRM DEBUG] Data being passed to template:")
+    print(f"  - processed_clients: {len(processed_clients)} items")
+    print(f"  - recent_contacts: {len(recent_contacts)} items")
+    if recent_contacts:
+        print(f"    First recent contact: {recent_contacts[0]}")
+    print(f"  - follow_ups: {len(follow_ups)} items")
+    if follow_ups:
+        print(f"    First follow-up: {follow_ups[0]}")
+        print(f"    First follow-up type: {type(follow_ups[0])}")
+
+    return render_template(
+        'crm.html', 
+        title='CRM', 
+        lead_stats=lead_stats,
+        clients=processed_clients,
+        recent_contacts=recent_contacts,
+        overdue_invoices=overdue_invoices,
+        reminders=reminders,
+        follow_ups=follow_ups
+    )
 @app.route('/create-reminder')
 @login_required
 def create_reminder():
