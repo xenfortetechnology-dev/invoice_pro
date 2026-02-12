@@ -25,11 +25,11 @@
                             <button class="btn btn-success glass-btn" id="voiceCreateBtn">
                                 <i data-feather="mic" class="me-1"></i> Voice Assist
                             </button>
-                            <button class="btn btn-outline-secondary glass-btn" data-bs-toggle="modal"
+                            <!-- <button class="btn btn-outline-secondary glass-btn" data-bs-toggle="modal"
                                 data-bs-target="#documentScannerModal" disabled
                                 style="opacity: 0.3; cursor: not-allowed; pointer-events: none;">
                                 <i data-feather="camera" class="me-1"></i> Scan Document
-                            </button>
+                            </button> -->
                             {% endif %}
                             <a href="{{ url_for('invoice_management') }}" class="btn btn-outline-secondary glass-btn">
                                 <i data-feather="arrow-left" class="me-1"></i> Back
@@ -126,11 +126,11 @@ Subject to local jurisdiction only.</textarea>
                         </h5>
                         <div class="d-flex gap-2">
                             {% if ai_enabled %}
-                            <button type="button" class="btn btn-outline-secondary btn-sm glass-btn"
+                            <!-- <button type="button" class="btn btn-outline-secondary btn-sm glass-btn"
                                 id="aiSuggestionsBtn" disabled
                                 style="opacity: 0.3; cursor: not-allowed; pointer-events: none;">
                                 <i data-feather="cpu" class="me-1"></i> AI Suggestions
-                            </button>
+                            </button> -->
                             {% endif %}
                             <button type="button" class="btn btn-primary btn-sm glass-btn" id="addItemBtn">
                                 <i data-feather="plus" class="me-1"></i> Add Item
