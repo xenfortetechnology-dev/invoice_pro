@@ -186,9 +186,142 @@ def invoice_management():
         flash(f"API connection error: {str(e)}", "error")
         data = []
 
+    # Get list of unique client IDs from ALL invoice data (before filtering)
+    client_ids = list(set(int(inv["client_id"]) for inv in data if inv.get("client_id")))
+    
+    # Fetch local client data for risk scores and names
+    local_clients = Client.query.filter(Client.id.in_(client_ids)).all()
+    client_risk_map = {c.id: c.ai_risk_score for c in local_clients}
+    client_name_map = {c.id: c.name for c in local_clients} # Use local names if available
+
+    # --- FILTERING LOGIC ---
+    search_query = request.args.get('search', '').lower().strip()
+    status_filter = request.args.get('status')
+    if not status_filter:
+        status_filter = 'All Status'
+
+    client_filter = request.args.get('client_id')
+    if not client_filter:
+        client_filter = 'All Clients'
+
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
+
+    # DEBUG LOGGING TO FILE
+    try:
+        with open('debug_log.txt', 'w') as f:
+            f.write(f"TIMESTAMP: {datetime.now()}\n")
+            f.write(f"FILTERS: Search='{search_query}', Status='{status_filter}', Client='{client_filter}', From='{date_from}', To='{date_to}'\n")
+            f.write(f"TOTAL INVOICES FETCHED: {len(data)}\n")
+            
+            filtered_data = []
+            
+            for index, inv in enumerate(data):
+                inv_number = str(inv.get('invoice_number', '')).lower()
+                
+                # Handle client_name safely
+                raw_client_name = inv.get('client_name')
+                if raw_client_name and str(raw_client_name).lower() != 'none':
+                    client_name = str(raw_client_name).lower()
+                else:
+                     # Fallback to local map if Cloud data is missing name or is "None"
+                    client_name = client_name_map.get(int(inv.get('client_id', 0)), '').lower()
+                
+                # Log first 5 invoices or if 'seenu' is involved
+                should_log = index < 5 or 'seenu' in client_name or 'seenu' in inv_number or search_query == 'seenu'
+                
+                if should_log:
+                    f.write(f"INV [{index}]: Num='{inv_number}', Client='{client_name}', ID='{inv.get('id')}'\n")
+
+                # 1. Search Filter
+                if search_query:
+                    if search_query not in inv_number and search_query not in client_name:
+                        if should_log: f.write(f"  -> SKIPPED by Search ('{search_query}' not in '{inv_number}' or '{client_name}')\n")
+                        continue
+
+                # 2. Status Filter
+                if status_filter != 'All Status' and inv.get('payment_status') != status_filter:
+                    if should_log: f.write("  -> SKIPPED by Status\n")
+                    continue
+
+                # 3. Client Filter
+                if client_filter != 'All Clients' and str(inv.get('client_id')) != client_filter:
+                    if should_log: f.write(f"  -> SKIPPED by Client ({inv.get('client_id')} != {client_filter})\n")
+                    continue
+
+                # 4. Date Range Filter
+                if date_from or date_to:
+                    inv_date_str = inv.get('invoice_date')
+                    if inv_date_str:
+                        try:
+                            # Parse invoice date (assuming YYYY-MM-DD from API)
+                            inv_date = datetime.strptime(inv_date_str, '%Y-%m-%d').date()
+                            
+                            if date_from:
+                                d_from = datetime.strptime(date_from, '%Y-%m-%d').date()
+                                if inv_date < d_from:
+                                    if should_log: f.write(f"  -> SKIPPED by Date From ({inv_date} < {d_from})\n")
+                                    continue
+                            if date_to:
+                                d_to = datetime.strptime(date_to, '%Y-%m-%d').date()
+                                if inv_date > d_to:
+                                    if should_log: f.write(f"  -> SKIPPED by Date To ({inv_date} > {d_to})\n")
+                                    continue
+                        except ValueError as e:
+                            if should_log: f.write(f"  -> Date Parsing Error: {e}\n")
+                            pass 
+
+                if should_log: f.write("  -> MATCHED!\n")
+                filtered_data.append(inv)
+            
+            f.write(f"FINAL RESULT COUNT: {len(filtered_data)}\n")
+            
+    except Exception as e:
+        app.logger.error(f"Debug log error: {e}")
+        # Fallback to original logic if logging fails, but we need to ensure flow continues
+        pass
+    
+    app.logger.info(f"SEARCH DEBUG: Result count {len(filtered_data)}")
+
+    ai_insights = {}
+
     invoice_list = []
 
-    for inv in data:
+    for inv in filtered_data:
+        # Determine risk level based on local data
+        risk_score = client_risk_map.get(int(inv.get("client_id", 0)), 0.0)
+        risk_level = "High" if risk_score > 0.7 else "Medium" if risk_score > 0.3 else "Low"
+        
+        # High Value & Overdue Calculations
+        try:
+            total_amount = float(inv.get("total_amount", 0))
+        except (ValueError, TypeError):
+            total_amount = 0.0
+            
+        is_high_value = total_amount > 100000
+        
+        is_overdue_risk = False
+        if inv.get("invoice_date") and inv.get("payment_status") != "Paid":
+            try:
+                inv_date = datetime.strptime(inv["invoice_date"], "%Y-%m-%d").date()
+                days_diff = (datetime.now().date() - inv_date).days
+                if days_diff > 60:
+                    is_overdue_risk = True
+            except ValueError:
+                pass
+
+        # Override risk level if overdue
+        if is_overdue_risk:
+            risk_level = "High"
+
+        # Populate ai_insights for the template
+        ai_insights[inv["id"]] = {
+            "payment_risk": risk_level,
+            "high_value": is_high_value,
+            "overdue_risk": is_overdue_risk,
+            "predicted_payment_date": None
+        }
+
         invoice_obj = SimpleNamespace(
             id=inv["id"],
             invoice_number=inv["invoice_number"],
@@ -199,11 +332,13 @@ def invoice_management():
             total_amount=inv["total_amount"],
             amount_paid=0,
             payment_status=inv["payment_status"],
-            ai_insights=None,
+            ai_insights=None, # This is used in the loop but overridden by the separate dict passed to template
+            # invoice_obj doesn't have the ai_insights dict attached directly in the template loop 
+            # (template uses ai_insights[invoice.id]), so this is fine.
             client=SimpleNamespace(
                 name=inv.get("client_name")
             )
-    )
+        )
         invoice_list.append(invoice_obj)
 
     invoices_obj = SimpleNamespace(
@@ -217,7 +352,15 @@ def invoice_management():
 
     return render_template(
         "invoice_management.html",
-        invoices=invoices_obj
+        invoices=invoices_obj,
+        ai_enabled=True,
+        ai_insights=ai_insights,
+        search=search_query,
+        status_filter=status_filter,
+        client_filter=client_filter,
+        clients=local_clients, # Ensure this is passed for the dropdown
+        date_from=date_from,
+        date_to=date_to
     )
 
 @app.route('/create_invoice', methods=['GET', 'POST'])
@@ -849,30 +992,26 @@ def client_management():
     client_insights = {}
     today = datetime.utcnow().date()
 
-    # --- 1. Fetch Cloud Data ---
-    cloud_clients = []
-    cloud_invoices = []
+    # --- 1. Fetch Cloud Data Only ---
     try:
         # Fetch Clients
-        r_c = requests.get("http://44.208.164.236:5000/api/clients", timeout=3)
-        if r_c.status_code == 200:
-            cloud_clients = r_c.json()
+        cloud_clients = fetch_cloud_clients()
         
         # Fetch Invoices for metrics
-        r_i = requests.get("http://44.208.164.236:5000/api/invoices", timeout=3)
-        if r_i.status_code == 200:
-            cloud_invoices = r_i.json()
+        cloud_invoices = fetch_cloud_invoices()
             
     except Exception as e:
         print(f"Cloud fetch error: {e}")
-        flash("Could not fetch some cloud data, showing local only.", "warning")
+        flash("Could not fetch cloud data.", "error")
+        cloud_clients = []
+        cloud_invoices = []
 
     # Process Cloud Clients
     for c in cloud_clients:
-        # Create a hybrid object
+        # Create a unified object
         # Metric Calculation
         c_invoices = [inv for inv in cloud_invoices if inv.get('client_id') == c['id']]
-        total_business = sum(inv.get('total_amount', 0) for inv in c_invoices)
+        total_business = sum(float(inv.get('total_amount', 0)) for inv in c_invoices)
         
         # Risk Logic
         is_high_risk = False
@@ -891,10 +1030,9 @@ def client_management():
         risk_level = "High" if is_high_risk else "Low"
         is_high_value = total_business > 100000
 
-        # Create unified object
-        # Use string ID with prefix to avoid collision
+        # Use simple ID (integer) as we are only using cloud now
         client_obj = SimpleNamespace(
-            id=f"c_{c['id']}",
+            id=c['id'],
             real_id=c['id'],
             source='cloud',
             name=c.get('name'),
@@ -919,60 +1057,7 @@ def client_management():
         
         client_list.append(client_obj)
 
-    # --- 2. Fetch Local Data ---
-    local_clients = Client.query.all()
-    for lc in local_clients:
-        # Calculate local metrics
-        l_total = lc.total_business or 0
-        l_risk = "Low" # Default
-        # Check local invoices if any (assuming logic exists)
-        # For now use stored or simple logic
-        l_high_value = l_total > 100000
-        
-        # Local Risk Check (reusing logic from previous turn if needed, or simple)
-        is_local_risk = False
-        for inv in lc.invoices:
-             if inv.payment_status != 'Paid' and inv.invoice_date:
-                if (today - inv.invoice_date).days > 60:
-                    is_local_risk = True
-        
-        l_risk = "High" if is_local_risk else "Low"
-
-        # Unique ID is just str(id) for local vs c_id for cloud
-        # But to be safe let's keep local as just ID (int) or str without prefix? 
-        # Frontend expects ID. If I use int, it might mismatch the "c_" string.
-        # Let's use string "l_{id}" for consistency? Or just keep raw ID and handle in template?
-        # Template uses `client.id`.
-        # If I use `c_1` and `1`, they are distinct.
-        
-        lc_obj = SimpleNamespace(
-            id=lc.id, # Keep original INT id for local to avoid breaking other things?
-            real_id=lc.id,
-            source='local',
-            name=lc.name,
-            email=lc.email,
-            phone=lc.phone,
-            contact_person=lc.contact_person,
-            client_type=lc.client_type,
-            lead_stage=lc.lead_stage,
-            total_business=l_total,
-            gstin=lc.gstin,
-            pan=lc.pan,
-            risk_level=l_risk,
-            high_value=l_high_value,
-            created_at=lc.created_at
-        )
-        
-        client_insights[lc.id] = {
-            'risk_level': l_risk,
-            'predicted_ltv': l_total,
-            'high_value': l_high_value
-        }
-        
-        client_list.append(lc_obj)
-
-
-    # --- 3. Filtering ---
+    # --- 2. Filtering ---
     filtered_list = []
     
     for c in client_list:
@@ -1005,7 +1090,7 @@ def client_management():
     # Sort
     filtered_list.sort(key=lambda x: str(x.name))
 
-    # --- 4. Pagination ---
+    # --- 3. Pagination ---
     page = request.args.get('page', 1, type=int)
     per_page = 10
     total = len(filtered_list)
@@ -1041,35 +1126,29 @@ def client_management():
 def create_client():
     if request.method == 'POST':
         try:
-            # Create local Client object (Persist all details)
-            new_client = Client(
-                name=request.form.get('name'),
-                contact_person=request.form.get('contact_person'),
-                phone=request.form.get('phone'),
-                email=request.form.get('email'),
-                client_type=request.form.get('client_type', 'Regular'),
-                address=request.form.get('address'),
-                city=request.form.get('city'),
-                state=request.form.get('state'),
-                pincode=request.form.get('pincode'),
-                gstin=request.form.get('gstin'),
-                pan=request.form.get('pan'),
-                notes=request.form.get('notes'),
-                lead_stage=request.form.get('lead_stage', 'New'),
-                tags=request.form.get('tags'),
-                follow_up_date=datetime.strptime(request.form.get('follow_up_date'), '%Y-%m-%d') if request.form.get('follow_up_date') else None,
-                created_at=datetime.utcnow()
+            # Create Client in Cloud API
+            client_data = {
+                "name": request.form.get('name'),
+                "email": request.form.get('email'),
+                "phone": request.form.get('phone'),
+                # Add other fields if Cloud API supports them, otherwise they are lost or need local storage map
+                # For now assuming basic fields supported by the provided API
+            }
+            
+            response = requests.post(
+                f"{CLOUD_API_BASE}/clients",
+                json=client_data,
+                timeout=5
             )
-            
-            db.session.add(new_client)
-            db.session.commit()
-            
-            flash('Client created locally!', 'success')
-            return redirect(url_for('client_management'))
+
+            if response.status_code in (200, 201):
+                flash('Client created successfully in Cloud!', 'success')
+                return redirect(url_for('client_management'))
+            else:
+                 flash(f'Error creating client: {response.text}', 'error')
 
         except Exception as e:
             logging.error(f"Client creation failed: {e}")
-            db.session.rollback()
             flash(f'Error creating client: {str(e)}', 'error')
 
     return render_template('create_client.html')
@@ -1077,96 +1156,50 @@ def create_client():
 @app.route('/api/client/<client_id>')
 @login_required
 def api_client_details(client_id):
-    # Determine source
-    is_cloud = str(client_id).startswith('c_')
-    
-    data = {}
-    recent_activity = []
-    
-    if is_cloud:
+    # Only support Cloud IDs (which come as simple integers now, or strings from template)
+    try:
+        # Strip 'c_' prefix if it still persists in some cache/url, though we removed it from listing
+        if str(client_id).startswith('c_'):
+            real_id = int(str(client_id).replace('c_', ''))
+        else:
+            real_id = int(client_id)
+            
         # Fetch from Cloud
-        real_id = int(str(client_id).replace('c_', ''))
-        try:
-            # Fetch Client
-            # Cloud API doesn't have single fetch? Use list for now or hope query works
-            # Helper function from before or manual fetch
-            r = requests.get(f"http://44.208.164.236:5000/api/clients", timeout=3)
-            # Find in list (inefficient but works for 32 items)
-            found = None
-            if r.status_code == 200:
-                for c in r.json():
-                    if c['id'] == real_id:
-                        found = c
-                        break
+        found = fetch_cloud_client_by_id(real_id)
+        
+        if found:
+            # Get invoices for stats
+            invoices = fetch_cloud_invoices()
+            c_invoices = [inv for inv in invoices if inv.get('client_id') == real_id]
+            total_business = sum(float(inv.get('total_amount', 0)) for inv in c_invoices)
+            pending_amount = sum(float(inv.get('total_amount', 0)) for inv in c_invoices if inv.get('payment_status') != 'Paid')
             
-            if found:
-                # Get invoices for stats
-                r_i = requests.get("http://44.208.164.236:5000/api/invoices", timeout=3)
-                c_invoices = []
-                pending_amount = 0
-                total_business = 0
-                if r_i.status_code == 200:
-                    all_inv = r_i.json()
-                    c_invoices = [inv for inv in all_inv if inv.get('client_id') == real_id]
-                    total_business = sum(inv.get('total_amount', 0) for inv in c_invoices)
-                    pending_amount = sum(inv.get('total_amount', 0) for inv in c_invoices if inv.get('payment_status') != 'Paid')
-                
-                # Format Activity
-                for inv in sorted(c_invoices, key=lambda x: x.get('invoice_date', ''), reverse=True)[:5]:
-                    recent_activity.append({
-                        'description': f"Invoice #{inv.get('invoice_number')} ({inv.get('payment_status')})",
-                        'date': inv.get('invoice_date') or 'Recent'
-                    })
-
-                data = {
-                    'name': found.get('name'),
-                    'email': found.get('email'),
-                    'phone': found.get('phone'),
-                    'address': "Cloud Record (Address N/A)", 
-                    'gstin': "N/A",
-                    'pan': "N/A",
-                    'total_business': total_business,
-                    'pending_amount': pending_amount,
-                    'contact_person': found.get('name'),
-                    'recent_activity': recent_activity
-                }
-            else:
-                 return jsonify({'error': 'Cloud client not found'}), 404
-                 
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-            
-    else:
-        # Local Fetch
-        try:
-            client = Client.query.get_or_404(int(client_id))
-            # Calculate stats
-            total_invoices = len(client.invoices)
-            pending_amount = sum(inv.total_amount - inv.amount_paid for inv in client.invoices if inv.payment_status != 'Paid')
-            
-            # Recent activity
-            for inv in sorted(client.invoices, key=lambda x: x.created_at, reverse=True)[:5]:
+            # Format Activity
+            recent_activity = []
+            for inv in sorted(c_invoices, key=lambda x: x.get('invoice_date', ''), reverse=True)[:5]:
                 recent_activity.append({
-                    'description': f"Invoice #{inv.invoice_number} generated",
-                    'date': inv.created_at.strftime('%Y-%m-%d') if inv.created_at else 'Recent'
+                    'description': f"Invoice #{inv.get('invoice_number')} ({inv.get('payment_status')})",
+                    'date': inv.get('invoice_date') or 'Recent'
                 })
-                
+
             data = {
-                'name': client.name,
-                'email': client.email,
-                'phone': client.phone,
-                'address': client.address,
-                'gstin': client.gstin,
-                'pan': client.pan,
-                'total_business': client.total_business or 0,
+                'name': found.get('name'),
+                'email': found.get('email'),
+                'phone': found.get('phone'),
+                'address': "Cloud Record (Address N/A)", 
+                'gstin': "N/A",
+                'pan': "N/A",
+                'total_business': total_business,
                 'pending_amount': pending_amount,
-                'contact_person': client.contact_person,
+                'contact_person': found.get('name'),
                 'recent_activity': recent_activity
             }
-        except Exception as e:
-             return jsonify({'error': str(e)}), 500
-
-    return jsonify(data)
+            return jsonify(data)
+        else:
+             return jsonify({'error': 'Cloud client not found'}), 404
+             
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/export/clients/excel')
 @login_required
@@ -1175,33 +1208,48 @@ def export_clients_excel():
     client_type = request.args.get('type', '')
     
     # Build query with filters
-    query = Client.query
-    if search:
-        query = query.filter(
-            or_(
-                Client.name.contains(search),
-                Client.phone.contains(search),
-                Client.email.contains(search),
-                Client.contact_person.contains(search)
-            )
-        )
-    if client_type:
-        query = query.filter(Client.client_type == client_type)
-        
-    clients = query.order_by(Client.name).all()
+    # Build list from Cloud
+    try:
+        clients_list = fetch_cloud_clients()
+        invoices_list = fetch_cloud_invoices()
+    except Exception as e:
+        logging.error(f"Cloud fetch error in excel export: {e}")
+        return jsonify({'success': False, 'message': 'Failed to fetch cloud data'}), 500
 
-    client_data = [{
-        'Name': c.name or 'N/A',
-        'Email': c.email or 'N/A',
-        'Phone': c.phone or 'N/A',
-        'Type': c.client_type or 'Regular',
-        'Lead Stage': c.lead_stage or 'N/A',
-        'Total Business': c.total_business if c.total_business else 0,
-        'Risk Score': c.ai_risk_score if c.ai_risk_score else 0,
-        'GST No': c.gstin or 'N/A',
-        'PAN No': c.pan or 'N/A',
-        'Created Date': c.created_at.strftime('%d-%m-%Y') if c.created_at else 'N/A'
-    } for c in clients]
+    # Filter
+    filtered_clients = []
+    for c in clients_list:
+        if search:
+             if not (search in (c.get('name') or '').lower() or 
+                     search in (c.get('email') or '').lower() or 
+                     search in (c.get('phone') or '').lower()):
+                continue
+        # Client type filter - not in basic cloud model, so skip or assume 'Regular'
+        if client_type and client_type != 'Regular':
+             continue
+        
+        filtered_clients.append(c)
+
+    filtered_clients.sort(key=lambda x: x.get('name', ''))
+
+    client_data = []
+    for c in filtered_clients:
+         # Calculate business
+         c_invs = [inv for inv in invoices_list if inv.get('client_id') == c.get('id')]
+         total_business = sum(float(inv.get('total_amount', 0)) for inv in c_invs)
+         
+         client_data.append({
+            'Name': c.get('name') or 'N/A',
+            'Email': c.get('email') or 'N/A',
+            'Phone': c.get('phone') or 'N/A',
+            'Type': 'Regular',
+            'Lead Stage': 'New',
+            'Total Business': total_business,
+            'Risk Score': 0, # Placeholder
+            'GST No': c.get('gstin') or 'N/A',
+            'PAN No': c.get('pan') or 'N/A',
+            'Created Date': c.get('created_at') or 'N/A'
+        })
 
     df = pd.DataFrame(client_data)
     output = io.BytesIO()
@@ -1237,15 +1285,12 @@ def export_clients_pdf():
 
     # Cloud Fetch
     try:
-        r_c = requests.get("http://44.208.164.236:5000/api/clients", timeout=3)
-        cloud_clients = r_c.json() if r_c.status_code == 200 else []
-        
-        r_i = requests.get("http://44.208.164.236:5000/api/invoices", timeout=3)
-        cloud_invoices = r_i.json() if r_i.status_code == 200 else []
+        cloud_clients = fetch_cloud_clients()
+        cloud_invoices = fetch_cloud_invoices()
         
         for c in cloud_clients:
             c_invs = [inv for inv in cloud_invoices if inv.get('client_id') == c['id']]
-            total_biz = sum(inv.get('total_amount', 0) for inv in c_invs)
+            total_biz = sum(float(inv.get('total_amount', 0)) for inv in c_invs)
             
             client_dict = {
                 'name': c.get('name', ''),
@@ -1256,21 +1301,12 @@ def export_clients_pdf():
                 'business_value': total_biz
             }
             client_list.append(client_dict)
+            
     except Exception as e:
         print(f"Cloud fetch error in export: {e}")
+        return jsonify({'success': False, 'message': 'Cloud fetch error'}), 500
 
-    # Local Fetch
-    local_clients = Client.query.all()
-    for lc in local_clients:
-        client_dict = {
-            'name': lc.name,
-            'email': lc.email,
-            'phone': lc.phone,
-            'type': lc.client_type,
-            'gstin': lc.gstin or 'N/A',
-            'business_value': lc.total_business or 0
-        }
-        client_list.append(client_dict)
+    # Local Fetch - REMOVED
 
     # Filter
     filtered = []

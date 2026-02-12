@@ -7,6 +7,10 @@ from collections import defaultdict
 
 from app import db
 from models import Client, Invoice, InvoiceLineItem, User, AIInteraction, ExpenseTracking, InventoryItem
+import requests
+import os
+
+CLOUD_API_BASE = os.environ.get("CLOUD_API_BASE", "http://44.208.164.236:5000/api")
 
 class AnalyticsEngine:
     """Advanced analytics engine with AI-powered insights"""
@@ -750,25 +754,35 @@ class AnalyticsEngine:
             return 0.0
 
     def get_lead_stats(self):
-        
- 
-        results = (
-            self.db_session.query(Client.lead_stage, func.count(Client.id))
-            .group_by(Client.lead_stage)
-            .all()
-        )
+        """Get lead statistics from Cloud API"""
+        try:
+            # Fetch clients from Cloud API
+            response = requests.get(f"{CLOUD_API_BASE}/clients", timeout=5)
+            if response.status_code == 200:
+                clients = response.json()
+            else:
+                logging.warning(f"Cloud API returned status {response.status_code} for clients")
+                clients = []
+        except Exception as e:
+            logging.error(f"Cloud API error in get_lead_stats: {e}")
+            clients = []
 
         stats = {"new": 0, "discussion": 0, "quoted": 0, "closed": 0}
 
-        for stage, count in results:
+        for client in clients:
+            # Cloud API client object structure inspection (from previous checks)
+            # It seems 'lead_stage' might not be populate in the cloud mock/real data or defaults to something?
+            # If not present, we assume 'New'
+            stage = client.get('lead_stage', 'New') 
+            
             stage_lower = stage.lower() if stage else "new"
             if "new" in stage_lower:
-                stats["new"] = count
+                stats["new"] += 1
             elif "discussion" in stage_lower:
-                stats["discussion"] = count
-            elif "quote" in stage_lower:
-                stats["quoted"] = count
-            elif "closed" in stage_lower:
-                stats["closed"] = count
+                stats["discussion"] += 1
+            elif "quote" in stage_lower or "proposal" in stage_lower:
+                stats["quoted"] += 1
+            elif "closed" in stage_lower or "won" in stage_lower:
+                stats["closed"] += 1
 
         return stats

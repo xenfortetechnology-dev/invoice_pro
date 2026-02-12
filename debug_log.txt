@@ -1,0 +1,20 @@
+TIMESTAMP: 2026-02-13 00:03:22.077756
+FILTERS: Search='', Status='All Status', Client='All Clients', From='None', To='None'
+TOTAL INVOICES FETCHED: 23
+INV [0]: Num='ai-inv-20260211-001-314', Client='seenu', ID='24'
+  -> MATCHED!
+INV [1]: Num='ai-inv-20260211-001-789', Client='aravind', ID='23'
+  -> MATCHED!
+INV [2]: Num='ai-inv-20260211-001-832', Client='farook', ID='22'
+  -> MATCHED!
+INV [3]: Num='test-001', Client='test client', ID='21'
+  -> MATCHED!
+INV [4]: Num='v3-1770822402-copy-copy', Client='test client', ID='20'
+  -> MATCHED!
+INV [13]: Num='ai-inv-20260211-001-708', Client='seenu', ID='11'
+  -> MATCHED!
+INV [14]: Num='ai-inv-20260211-001-757', Client='seenu', ID='10'
+  -> MATCHED!
+INV [15]: Num='ai-inv-20260211-001-949', Client='seenu', ID='9'
+  -> MATCHED!
+FINAL RESULT COUNT: 23

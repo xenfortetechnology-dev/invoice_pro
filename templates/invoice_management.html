@@ -230,11 +230,20 @@
                             <td>
                                 {% if ai_enabled and ai_insights and invoice.id in ai_insights %}
                                 <div class="ai-insight-cell">
+                                    <!-- Payment Risk Badge -->
                                     <span
                                         class="badge bg-{{ 'danger' if ai_insights[invoice.id].payment_risk == 'High' else 'warning' if ai_insights[invoice.id].payment_risk == 'Medium' else 'success' }} bg-opacity-10 
                                                      text-{{ 'danger' if ai_insights[invoice.id].payment_risk == 'High' else 'warning' if ai_insights[invoice.id].payment_risk == 'Medium' else 'success' }}">
                                         {{ ai_insights[invoice.id].payment_risk }} Risk
                                     </span>
+
+                                    <!-- High Value Badge -->
+                                    {% if ai_insights[invoice.id].high_value %}
+                                    <span class="badge bg-primary bg-opacity-10 text-primary mt-1">
+                                        High Value
+                                    </span>
+                                    {% endif %}
+
                                     {% if ai_insights[invoice.id].predicted_payment_date %}
                                     <br><small class="text-muted">
                                         Predicted: {{ ai_insights[invoice.id].predicted_payment_date }}
