@@ -276,7 +276,8 @@
                         <thead>
                             <tr>
                                 <th>Client</th>
-                                <th>Contact</th>
+                                <th>Phone</th>
+                                <th>Email</th>
                                 <th>Type</th>
                                 <th>Lead Stage</th>
                                 <th>Total Business</th>
@@ -288,7 +289,8 @@
                             {% for client in client_list %}
                             <tr>
                                 <td>{{ client.name }}</td>
-                                <td>{{ client.email }}<br><small>{{ client.phone }}</small></td>
+                                <td>{{ client.phone }}</td>
+                                <td>{{ client.email }}</td>
                                 <td>{{ client.client_type }}</td>
                                 <td>{{ client.lead_stage }}</td>
                                 <td>{{ client.total_business or "—" }}</td>
