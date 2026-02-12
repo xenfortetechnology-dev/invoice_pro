@@ -294,7 +294,8 @@
     document.addEventListener('DOMContentLoaded', function () {
         initializeAIAssistant();
         setupEventListeners();
-
+        // Load real data from server for AI replay
+        loadAIData();
         // Initialize speech recognition if available
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             initializeSpeechRecognition();
@@ -311,6 +312,98 @@
 
         // Auto-scroll to bottom
         scrollChatToBottom();
+    }
+
+    async function loadAIData() {
+        // Fetch clients, invoices and stats in parallel and expose to page
+        try {
+            const [clientsRes, invoicesRes, statsRes] = await Promise.all([
+                fetch('/api/data/clients').then(r => r.ok ? r.json() : null).catch(() => null),
+                fetch('/api/data/invoices').then(r => r.ok ? r.json() : null).catch(() => null),
+                fetch('/api/data/stats').then(r => r.ok ? r.json() : null).catch(() => null)
+            ]);
+
+            // Build a normalized demoData object (fallback friendly)
+            const demo = {
+                clients: {
+                    total: clientsRes?.total || 0,
+                    active: clientsRes?.active || 0,
+                    inactive: clientsRes?.inactive || 0,
+                    activeNames: (clientsRes?.clients || []).slice(0, 10).map(c => c.name || c.email || `Client ${c.id}`),
+                    inactiveNames: [],
+                    details: {}
+                },
+                invoices: {
+                    total: invoicesRes?.total || 0,
+                    paid: invoicesRes?.paid || 0,
+                    unpaid: invoicesRes?.unpaid || 0,
+                    overdue: 0,
+                    byClient: {}
+                },
+                payments: {
+                    delayedClients: [],
+                    earlyPayers: [],
+                    averageDelayDays: 0,
+                    successRate: 0
+                },
+                finance: {
+                    incomeToday: statsRes?.revenue?.today || 0,
+                    incomeWeek: statsRes?.revenue?.week || 0,
+                    incomeMonth: statsRes?.revenue?.month || 0,
+                    incomeYear: 0,
+                    revenueToday: statsRes?.revenue?.today || 0,
+                    revenueWeek: statsRes?.revenue?.week || 0,
+                    revenueMonth: statsRes?.revenue?.month || 0,
+                    revenueYear: 0,
+                    profitMonth: 0,
+                    expensesMonth: 0,
+                    growth: 'N/A'
+                },
+                stats: {
+                    revenue: {
+                        today: statsRes?.revenue?.today || 0,
+                        week: statsRes?.revenue?.week || 0,
+                        month: statsRes?.revenue?.month || 0
+                    },
+                    outstanding: statsRes?.outstanding || 0
+                }
+            };
+
+            // Fill some details and mappings
+            if (clientsRes?.clients) {
+                clientsRes.clients.forEach(c => {
+                    demo.clients.details[c.name || c.email || (`${c.id}`)] = {
+                        status: 'Active',
+                        lastInvoice: '',
+                        outstandingAmount: c.total_business || 0,
+                        lastPaymentDate: ''
+                    };
+                });
+            }
+
+            if (invoicesRes?.invoices) {
+                invoicesRes.invoices.forEach(inv => {
+                    const name = inv.client_name || `Client ${inv.id}`;
+                    demo.invoices.byClient[name] = (demo.invoices.byClient[name] || 0) + 1;
+                });
+            }
+
+            // Expose globally for existing logic
+            window.demoData = demo;
+            window.AILocal = {
+                getRealData: function () {
+                    return {
+                        clients: clientsRes || demo.clients,
+                        invoices: invoicesRes || demo.invoices,
+                        stats: statsRes || demo.stats
+                    };
+                }
+            };
+
+            console.info('AI data loaded for assistant', { clientsRes, invoicesRes, statsRes });
+        } catch (e) {
+            console.warn('Failed to load AI data:', e);
+        }
     }
 
     function setupEventListeners() {

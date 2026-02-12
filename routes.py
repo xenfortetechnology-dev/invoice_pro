@@ -8,6 +8,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import func, and_, or_, extract, desc
 from sqlalchemy.orm import joinedload
 
+import os
 from app import app, mail 
 from models import *
 from utils import *
@@ -50,7 +51,7 @@ from report_generator import AnalyticsReportGenerator
 report_generator = AnalyticsReportGenerator()
 
 # ===== CLOUD API HELPER FUNCTIONS =====
-CLOUD_API_BASE = "http://44.208.164.236:5000/api"
+CLOUD_API_BASE = os.environ.get("CLOUD_API_BASE", "http://44.208.164.236:5000/api")
 
 def fetch_cloud_clients():
     """Fetch all clients from cloud database"""
@@ -2234,51 +2235,110 @@ def api_ai_chat():
     try:
         data = request.get_json()
         message = data.get('message', '').lower().strip()
-        
-        # Fetch real data from database
-        clients = Client.query.all()
-        invoices = Invoice.query.all()
-        
-        # Determine active/inactive clients based on invoice activity
-        client_ids_with_invoices = set([i.client_id for i in invoices])
-        active_clients = [c for c in clients if c.id in client_ids_with_invoices]
-        inactive_clients = [c for c in clients if c.id not in client_ids_with_invoices]
-        
-        paid_invoices = [i for i in invoices if i.payment_status == 'Paid']
-        unpaid_invoices = [i for i in invoices if i.payment_status != 'Paid']
-        
-        # Calculate revenue stats
+
+        # Try to use cloud data first (if available), otherwise fall back to local DB
+        use_cloud = False
+        clients = []
+        invoices = []
+
+        try:
+            cloud_clients = fetch_cloud_clients()
+            cloud_invoices = fetch_cloud_invoices()
+            if cloud_clients is not None and isinstance(cloud_clients, list) and len(cloud_clients) > 0:
+                clients = cloud_clients
+                invoices = cloud_invoices or []
+                use_cloud = True
+        except Exception:
+            use_cloud = False
+
+        if not use_cloud:
+            clients = Client.query.all()
+            invoices = Invoice.query.all()
+
+        # Compute helpful groupings depending on source
         from datetime import date, timedelta
         today = date.today()
-        week_ago = today - timedelta(days=7)
-        month_start = today.replace(day=1)
-        
-        today_revenue = db.session.query(func.sum(Invoice.total_amount)).filter(
-            Invoice.payment_status == 'Paid',
-            Invoice.invoice_date == today
-        ).scalar() or 0
-        
-        week_revenue = db.session.query(func.sum(Invoice.total_amount)).filter(
-            Invoice.payment_status == 'Paid',
-            Invoice.invoice_date >= week_ago
-        ).scalar() or 0
-        
-        month_revenue = db.session.query(func.sum(Invoice.total_amount)).filter(
-            Invoice.payment_status == 'Paid',
-            Invoice.invoice_date >= month_start
-        ).scalar() or 0
-        
-        outstanding = db.session.query(func.sum(Invoice.total_amount)).filter(
-            Invoice.payment_status != 'Paid'
-        ).scalar() or 0
+
+        if use_cloud:
+            client_ids_with_invoices = set([int(i.get('client_id')) for i in invoices if i.get('client_id') is not None])
+            active_clients = [c for c in clients if c.get('id') in client_ids_with_invoices]
+            inactive_clients = [c for c in clients if c.get('id') not in client_ids_with_invoices]
+
+            paid_invoices = [i for i in invoices if i.get('payment_status') == 'Paid']
+            unpaid_invoices = [i for i in invoices if i.get('payment_status') != 'Paid']
+
+            # Parse dates as strings 'YYYY-MM-DD' expected from cloud
+            def parse_date(s):
+                try:
+                    return date.fromisoformat(s)
+                except Exception:
+                    return None
+
+            today_revenue = 0
+            week_revenue = 0
+            month_revenue = 0
+            outstanding = 0
+
+            week_ago = today - timedelta(days=7)
+            month_start = today.replace(day=1)
+
+            for inv in invoices:
+                amt = float(inv.get('total_amount', 0) or 0)
+                status = inv.get('payment_status')
+                inv_date = parse_date(inv.get('invoice_date'))
+                if status == 'Paid' and inv_date:
+                    if inv_date == today:
+                        today_revenue += amt
+                    if inv_date >= week_ago:
+                        week_revenue += amt
+                    if inv_date >= month_start:
+                        month_revenue += amt
+                if status != 'Paid':
+                    outstanding += amt
+
+        else:
+            client_ids_with_invoices = set([i.client_id for i in invoices])
+            active_clients = [c for c in clients if c.id in client_ids_with_invoices]
+            inactive_clients = [c for c in clients if c.id not in client_ids_with_invoices]
+
+            paid_invoices = [i for i in invoices if i.payment_status == 'Paid']
+            unpaid_invoices = [i for i in invoices if i.payment_status != 'Paid']
+
+            week_ago = today - timedelta(days=7)
+            month_start = today.replace(day=1)
+
+            today_revenue = db.session.query(func.sum(Invoice.total_amount)).filter(
+                Invoice.payment_status == 'Paid',
+                Invoice.invoice_date == today
+            ).scalar() or 0
+
+            week_revenue = db.session.query(func.sum(Invoice.total_amount)).filter(
+                Invoice.payment_status == 'Paid',
+                Invoice.invoice_date >= week_ago
+            ).scalar() or 0
+
+            month_revenue = db.session.query(func.sum(Invoice.total_amount)).filter(
+                Invoice.payment_status == 'Paid',
+                Invoice.invoice_date >= month_start
+            ).scalar() or 0
+
+            outstanding = db.session.query(func.sum(Invoice.total_amount)).filter(
+                Invoice.payment_status != 'Paid'
+            ).scalar() or 0
         
         # ===== GREETING AND HELP PATTERNS =====
         
         # Follow-up queries (check FIRST before greetings to avoid conflicts)
         if ('follow' in message and ('up' in message or 'client' in message or 'need' in message)) or ('which' in message and 'client' in message and 'need' in message):
             if len(unpaid_invoices) > 0:
-                client_ids = set([i.client_id for i in unpaid_invoices])
-                clients_needing_followup = [c.name for c in clients if c.id in client_ids][:5]
+                # Support both cloud (dicts) and local ORM objects
+                if use_cloud:
+                    client_ids = set([int(i.get('client_id')) for i in unpaid_invoices if i.get('client_id') is not None])
+                    clients_needing_followup = [c.get('name') or c.get('email') for c in clients if c.get('id') in client_ids][:5]
+                else:
+                    client_ids = set([i.client_id for i in unpaid_invoices])
+                    clients_needing_followup = [c.name for c in clients if c.id in client_ids][:5]
+
                 return jsonify({'reply': f"📋 Clients needing follow-up: {', '.join(clients_needing_followup)}"})
             else:
                 return jsonify({'reply': "🎉 No clients currently need follow-up for delayed payments."})
@@ -2388,7 +2448,10 @@ def api_ai_chat():
         # 4. Top Clients Query
         if 'top client' in message or 'best client' in message or 'biggest client' in message:
             top_clients = clients[:5]
-            client_list = '<br>'.join([f"{i+1}. {c.name}" for i, c in enumerate(top_clients)])
+            if use_cloud:
+                client_list = '<br>'.join([f"{i+1}. {c.get('name') or c.get('email') or ('Client '+str(c.get('id')))}" for i, c in enumerate(top_clients)])
+            else:
+                client_list = '<br>'.join([f"{i+1}. {c.name}" for i, c in enumerate(top_clients)])
             return jsonify({'reply': f"""🌟 <strong>Top Clients:</strong>
             <br><br>{client_list}
             <br><br>💡 These are your most active clients. Consider offering them loyalty benefits!"""})
@@ -2466,7 +2529,10 @@ def api_ai_chat():
             elif 'inactive' in message:
                 return jsonify({'reply': f"⚠️ You have {len(inactive_clients)} inactive clients."})
             elif 'list' in message or 'name' in message:
-                client_names = ', '.join([c.name for c in clients[:10]])
+                if use_cloud:
+                    client_names = ', '.join([c.get('name') or c.get('email') or f"Client {c.get('id')}" for c in clients[:10]])
+                else:
+                    client_names = ', '.join([c.name for c in clients[:10]])
                 more = '...' if len(clients) > 10 else ''
                 return jsonify({'reply': f"👥 Here are your clients: {client_names}{more}"})
         

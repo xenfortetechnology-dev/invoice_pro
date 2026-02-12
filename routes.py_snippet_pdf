@@ -23,10 +23,13 @@ def export_clients_pdf():
 
     # Cloud Fetch
     try:
-        r_c = requests.get("http://44.208.164.236:5000/api/clients", timeout=3)
+        import os
+        CLOUD_API_BASE = os.environ.get('CLOUD_API_BASE', 'http://44.208.164.236:5000/api')
+
+        r_c = requests.get(f"{CLOUD_API_BASE}/clients", timeout=3)
         cloud_clients = r_c.json() if r_c.status_code == 200 else []
         
-        r_i = requests.get("http://44.208.164.236:5000/api/invoices", timeout=3)
+        r_i = requests.get(f"{CLOUD_API_BASE}/invoices", timeout=3)
         cloud_invoices = r_i.json() if r_i.status_code == 200 else []
         
         for c in cloud_clients:
