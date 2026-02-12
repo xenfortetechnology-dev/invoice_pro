@@ -12,21 +12,9 @@ from dateutil.relativedelta import relativedelta
 from werkzeug.security import generate_password_hash as werkzeug_generate_password_hash
 from werkzeug.security import check_password_hash as werkzeug_check_password_hash
 
-from app import db
-from models import Invoice, Client, InvoiceLineItem, Company
-import config
-import logging
 
 def safe_dict(value):
         return value if isinstance(value, dict) else {}
-
-def generate_password_hash(password):
-    """Generate password hash"""
-    return werkzeug_generate_password_hash(password)
-
-def check_password_hash(pwhash, password):
-    """Check password hash"""
-    return werkzeug_check_password_hash(pwhash, password)
 
 def number_to_words(n):
     """Convert an integer number n into words (English, Indian style)"""
@@ -94,6 +82,54 @@ def number_to_words(n):
         result += three(rest)
     
     return result.strip()
+
+def format_currency(amount, currency_symbol="₹"):
+    """Format currency in Indian style"""
+    try:
+        # Convert to float if string
+        if isinstance(amount, str):
+            amount = float(amount)
+        
+        # Indian numbering system formatting
+        amount_str = f"{amount:,.2f}"
+        
+        # Replace commas with Indian style (lakhs and crores)
+        parts = amount_str.split('.')
+        integer_part = parts[0]
+        decimal_part = parts[1] if len(parts) > 1 else "00"
+        
+        # Indian style comma placement
+        if len(integer_part) > 3:
+            # Remove existing commas
+            integer_part = integer_part.replace(',', '')
+            
+            # Add Indian style commas
+            if len(integer_part) > 3:
+                integer_part = integer_part[:-3] + ',' + integer_part[-3:]
+            if len(integer_part) > 6:
+                integer_part = integer_part[:-6] + ',' + integer_part[-6:]
+        
+        formatted_amount = f"{integer_part}.{decimal_part}"
+        return f"{currency_symbol}{formatted_amount}"
+        
+    except Exception as e:
+        print(f"Currency formatting failed: {e}")
+        return f"{currency_symbol}{amount}"
+
+from app import db
+from models import Invoice, Client, InvoiceLineItem, Company
+import config
+import logging
+
+def generate_password_hash(password):
+    """Generate password hash"""
+    return werkzeug_generate_password_hash(password)
+
+def check_password_hash(pwhash, password):
+    """Check password hash"""
+    return werkzeug_check_password_hash(pwhash, password)
+
+
 
 def generate_invoice_number():
     """Generate unique invoice number with AI-enhanced format"""
@@ -522,38 +558,7 @@ def validate_gst_number(gst_number):
     
     return True
 
-def format_currency(amount, currency_symbol="₹"):
-    """Format currency in Indian style"""
-    try:
-        # Convert to float if string
-        if isinstance(amount, str):
-            amount = float(amount)
-        
-        # Indian numbering system formatting
-        amount_str = f"{amount:,.2f}"
-        
-        # Replace commas with Indian style (lakhs and crores)
-        parts = amount_str.split('.')
-        integer_part = parts[0]
-        decimal_part = parts[1] if len(parts) > 1 else "00"
-        
-        # Indian style comma placement
-        if len(integer_part) > 3:
-            # Remove existing commas
-            integer_part = integer_part.replace(',', '')
-            
-            # Add Indian style commas
-            if len(integer_part) > 3:
-                integer_part = integer_part[:-3] + ',' + integer_part[-3:]
-            if len(integer_part) > 6:
-                integer_part = integer_part[:-6] + ',' + integer_part[-6:]
-        
-        formatted_amount = f"{integer_part}.{decimal_part}"
-        return f"{currency_symbol}{formatted_amount}"
-        
-    except Exception as e:
-        print(f"Currency formatting failed: {e}")
-        return f"{currency_symbol}{amount}"
+
 
 def get_financial_year_dates(date=None):
     """Get financial year start and end dates (Indian FY: April to March)"""

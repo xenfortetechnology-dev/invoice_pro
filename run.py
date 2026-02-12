@@ -1,10 +1,11 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 import time
 
-# Path to chromedriver
-service = Service(r"C:\Users\Aravind M\Downloads\chromedriver-win64\chromedriver-win64\chromedriver.exe")
+# Use webdriver_manager to automatically handle driver installation
+service = Service(ChromeDriverManager().install())
 
 driver = webdriver.Chrome(service=service)
 
@@ -18,8 +19,8 @@ try:
     username = driver.find_element(By.NAME, "admin")  # change if your input field has different 'name' or 'id'
     password = driver.find_element(By.NAME, " RevolutionaryAI2025!")  # adjust locator if needed
 
-    username.send_keys("your_username")
-    password.send_keys("your_password")
+    username.send_keys("admin")
+    password.send_keys("RevolutionaryAI2025!")
 
     # Step 3: Click login button
     login_btn = driver.find_element(By.XPATH, "//button[contains(text(),'Login')]")

@@ -15,9 +15,7 @@ from reportlab.pdfgen import canvas
 import logging
  
 from reportlab.pdfgen import canvas
-from routes import safe_dict
-from utils import number_to_words
-from utils import safe_dict
+from utils import number_to_words, safe_dict
 from models import Company
 from analytics_engine import AnalyticsEngine
 import config
