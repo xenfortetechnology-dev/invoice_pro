@@ -837,6 +837,13 @@ def client_management():
     lead_stage = request.args.get('lead_stage', '')
     risk_level_filter = request.args.get('risk_level', '')
     
+    # Handle View Mode Persistence
+    if 'view' in request.args:
+        view_mode = request.args.get('view')
+        session['client_view_mode'] = view_mode
+    else:
+        view_mode = session.get('client_view_mode', 'grid')
+    
     client_list = []
     client_insights = {}
     today = datetime.utcnow().date()
@@ -1024,7 +1031,8 @@ def client_management():
         client_list=paginated_items,
         search=search,
         client_type=client_type,
-        client_insights=client_insights
+        client_insights=client_insights,
+        view_mode=view_mode
     )
 
 @app.route('/create_client', methods=['GET', 'POST'])

@@ -344,7 +344,7 @@
                 <ul class="pagination justify-content-center">
                     <li class="page-item {% if not clients.has_prev %}disabled{% endif %}">
                         <a class="page-link glass-btn"
-                            href="{{ url_for('client_management', page=clients.prev_num, search=search, type=client_type) }}">
+                            href="{{ url_for('client_management', page=clients.prev_num, search=search, type=client_type, view=view_mode) }}">
                             <i data-feather="chevron-left" size="16"></i>
                         </a>
                     </li>
@@ -354,7 +354,7 @@
                     {%if page_num != clients.page %}
                     <li class="page-item">
                         <a class="page-link glass-btn"
-                            href="{{ url_for('client_management', page=page_num, search=search, type=client_type) }}">
+                            href="{{ url_for('client_management', page=page_num, search=search, type=client_type, view=view_mode) }}">
                             {{ page_num }}
                         </a>
                     </li>
@@ -372,7 +372,7 @@
 
                     <li class="page-item {% if not clients.has_next %}disabled{% endif %}">
                         <a class="page-link glass-btn"
-                            href="{{ url_for('client_management', page=clients.next_num, search=search, type=client_type) }}">
+                            href="{{ url_for('client_management', page=clients.next_num, search=search, type=client_type, view=view_mode) }}">
                             <i data-feather="chevron-right" size="16"></i>
                         </a>
                     </li>
@@ -414,22 +414,44 @@
         const gridContainer = document.getElementById("gridViewContainer");
         const listContainer = document.getElementById("listViewContainer");
 
-        // Default
-        gridContainer.style.display = "grid";
-        listContainer.style.display = "none";
+        // Function to update view and URL
+        function updateView(mode) {
+            const currentUrl = new URL(window.location.href);
+            currentUrl.searchParams.set('view', mode);
+            window.history.pushState({}, '', currentUrl);
+
+            // Update pagination links
+            document.querySelectorAll('.pagination .page-link').forEach(link => {
+                try {
+                    const url = new URL(link.href);
+                    url.searchParams.set('view', mode);
+                    link.href = url.toString();
+                } catch (e) {
+                    // Ignore invalid URLs (e.g. #)
+                }
+            });
+
+            if (mode === 'list') {
+                gridContainer.style.display = 'none';
+                listContainer.style.display = 'block';
+                listViewRadio.checked = true;
+            } else {
+                gridContainer.style.display = 'grid';
+                listContainer.style.display = 'none';
+                gridViewRadio.checked = true;
+            }
+        }
+
+        // Initialize view from server-side variable
+        const initialView = "{{ view_mode|default('grid') }}";
+        updateView(initialView);
 
         gridViewRadio.addEventListener("change", function () {
-            if (this.checked) {
-                gridContainer.style.display = "grid";
-                listContainer.style.display = "none";
-            }
+            if (this.checked) updateView('grid');
         });
 
         listViewRadio.addEventListener("change", function () {
-            if (this.checked) {
-                gridContainer.style.display = "none";
-                listContainer.style.display = "block";
-            }
+            if (this.checked) updateView('list');
         });
 
         // ===== Card Hover Effect =====
