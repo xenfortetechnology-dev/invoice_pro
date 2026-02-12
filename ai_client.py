@@ -78,3 +78,43 @@ def generate_json_response(prompt: str):
     except Exception as e:
         logging.exception(f"❌ Gemini Generation Failed: {e}")
         raise
+
+def generate_response(prompt: str):
+    """
+    Generate a text response from Gemini using REST API.
+    """
+    global AI_AVAILABLE, LAST_AI_ERROR, MODEL, API_KEY
+    
+    if not AI_AVAILABLE:
+        logging.error("❌ AI not available, cannot generate response")
+        return "AI features are currently unavailable. Please check API key configuration."
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent?key={API_KEY}"
+    
+    headers = {
+        "Content-Type": "application/json"
+    }
+    
+    # Structure prompt
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        # Extract content
+        try:
+            return data['candidates'][0]['content']['parts'][0]['text']
+        except (KeyError, IndexError):
+            logging.error(f"❌ Unexpected Gemini response structure: {data}")
+            return "I encountered an error processing your request."
+
+    except Exception as e:
+        logging.exception(f"❌ Gemini Generation Failed: {e}")
+        return f"Error: {str(e)}"

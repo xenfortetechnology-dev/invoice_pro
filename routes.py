@@ -1984,22 +1984,38 @@ def export_pdf():
 @app.route('/api/voice_command', methods=['POST'])
 @login_required
 def api_voice_command():
+    print(f"\n🎤 [VOICE API] hit: /api/voice_command")
     """Process voice commands"""
-    if not app.config.get("AI_FEATURES_ENABLED") or not voice_processor:
+    # Force enable for debugging if needed, or rely on config
+    if not app.config.get("AI_FEATURES_ENABLED") and not os.environ.get("FORCE_VOICE_DEBUG"):
+        # Log this failure case
+        app.logger.warning("Voice command rejected: AI_FEATURES_ENABLED is False")
+        if not voice_processor:
+             app.logger.error("Voice command rejected: voice_processor is None")
         return jsonify({'error': 'Voice commands not available'})
     
     try:
         data = request.get_json()
+        app.logger.info(f"🎤 API RECEIVED VOICE REQUEST: {data}")
+        
         voice_text = data.get('text', '')
         context = data.get('context', {})
         
+        if not voice_text:
+            app.logger.warning("🎤 Voice request missing 'text' field")
+            return jsonify({'success': False, 'message': 'No voice text provided'})
+
         result = voice_processor.process(voice_text)
+        app.logger.info(f"🎤 VOICE PROCESSOR RESULT: {result}")
         
         return jsonify(result)
         
     except Exception as e:
+        app.logger.error(f"❌ API VOICE ERROR: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': 'Internal Server Error processing voice command', 'error': str(e)}), 500
         logging.error(f"Voice command API failed: {e}")
         return jsonify({'error': str(e)})
+
 
 @app.route('/api/ai_suggestions/<int:client_id>')
 @login_required
@@ -2203,6 +2219,7 @@ def api_get_invoices_data():
 @app.route('/api/proxy/clients', methods=['GET'])
 @login_required
 def api_proxy_clients():
+    print(f"\n🎤 [VOICE API] hit: /api/proxy/clients")
     """Proxy endpoint for voice commands to fetch clients (avoids CORS)"""
     try:
         clients_list = fetch_cloud_clients()
@@ -2267,6 +2284,7 @@ def api_get_stats_data():
 @app.route('/api/ai/chat', methods=['POST'])
 @login_required
 def api_ai_chat():
+    print(f"\n🎤 [VOICE API] hit: /api/ai/chat")
     """AI chat endpoint that uses real database data"""
     try:
         data = request.get_json()
@@ -2590,15 +2608,34 @@ def api_ai_chat():
             elif 'month' in message:
                 return jsonify({'reply': f"📈 This month's revenue is ₹{float(month_revenue):,.2f}"})
         
-        # Default fallback
-        return jsonify({'reply': """I can help you with:
-        <br>• Business health checks
-        <br>• Revenue forecasts and predictions
-        <br>• Client and invoice information
-        <br>• Outstanding payments
-        <br>• Recent activity
-        <br>• How-to guides
-        <br><br>Try asking "Show business health" or "Forecast revenue"!"""})
+        # AI Fallback for unhandled queries
+        try:
+            # Prepare context for AI
+            business_context = f"""
+            Current Business Status:
+            - Monthly Revenue: ₹{float(month_revenue):,.2f}
+            - Weekly Revenue: ₹{float(week_revenue):,.2f}
+            - Today's Revenue: ₹{float(today_revenue):,.2f}
+            - Outstanding Amount: ₹{float(outstanding):,.2f}
+            - Active Clients: {len(active_clients)}
+            - Total Invoices: {len(invoices)}
+            - Paid Invoices: {len(paid_invoices)}
+            - Unpaid Invoices: {len(unpaid_invoices)}
+            """
+            
+            system_prompt = "You are a helpful business assistant for an invoice management system. " \
+                            "Use the provided business context to answer the user's question accurately. " \
+                            "Be concise, professional, and helpful. " \
+                            "If the user asks to perform an action (Create Invoice, etc.), guide them."
+            
+            full_prompt = f"{system_prompt}\n\nContext:{business_context}\n\nUser Question: {message}\nAssistant:"
+            
+            reply = ai_client.generate_response(full_prompt)
+            return jsonify({'reply': reply})
+            
+        except Exception as ai_error:
+             app.logger.error(f"AI generation failed: {ai_error}")
+             return jsonify({'reply': "I didn't understand that command. Try asking about revenue, clients, or specific invoices."})
             
     except Exception as e:
         logging.error(f"AI chat error: {e}")

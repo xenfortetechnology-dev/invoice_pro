@@ -155,6 +155,9 @@ class PatternMatcher:
         # Convert to lowercase
         text = text.lower().strip()
         
+        # Remove punctuation (keep only alphanumeric and spaces)
+        text = re.sub(r'[^\w\s]', '', text)
+
         # Remove filler words
         fillers = ['um', 'uh', 'er', 'ah', 'like', 'you know']
         for filler in fillers:
@@ -289,6 +292,7 @@ class PatternMatcher:
         Priority order: create_invoice > add_item > save_invoice > calculate_total > search_client
         """
         # Normalize text
+        print(f"🔍 [VOICE DEBUG] PatternMatcher matching '{text}'")
         text = PatternMatcher.normalize_text(text)
         
         # Try patterns in priority order

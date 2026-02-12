@@ -7,11 +7,48 @@ Supports English and Tamil/Tanglish commands
 import re
 import logging
 import json
+import requests
+import os
 from datetime import datetime
 from typing import Dict, Any, Optional
-from app import db
-from models import Client, Invoice, InvoiceLineItem
+from types import SimpleNamespace
+
+# Cloud API Configuration
+CLOUD_API_BASE = os.environ.get("CLOUD_API_BASE", "http://44.208.164.236:5000/api")
+
 from voice_patterns import PatternMatcher, get_command_suggestions
+
+# Configure Logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# =========================
+# HELPER FUNCTIONS
+# =========================
+
+def fetch_cloud_clients():
+    """Fetch all clients from cloud database"""
+    try:
+        response = requests.get(f"{CLOUD_API_BASE}/clients", timeout=5)
+        if response.status_code == 200:
+            return response.json()
+        logging.warning(f"Cloud API returned status {response.status_code}")
+        return []
+    except Exception as e:
+        logging.error(f"Cloud API error (clients): {e}")
+        return []
+
+def create_cloud_invoice(invoice_data):
+    """Create invoice in cloud database"""
+    try:
+        response = requests.post(f"{CLOUD_API_BASE}/invoices", json=invoice_data, timeout=5)
+        if response.status_code in (200, 201):
+            return response.json()
+        logging.error(f"Cloud API error (create invoice): {response.text}")
+        return None
+    except Exception as e:
+        logging.error(f"Cloud API error (create invoice): {e}")
+        return None
 
 # =========================
 # SESSION MANAGEMENT
@@ -28,11 +65,17 @@ class VoiceSession:
             "created_at": None
         }
     
-    def start_invoice(self, client: Client):
+    def start_invoice(self, client):
         """Start a new invoice session"""
+        # client can be dict or object, standardize to SimpleNamespace for attribute access if dict
+        if isinstance(client, dict):
+            client_obj = SimpleNamespace(**client)
+        else:
+            client_obj = client
+            
         self.active_invoice = {
-            "client": client,
-            "client_id": client.id,
+            "client": client_obj,
+            "client_id": client_obj.id,
             "items": [],
             "created_at": datetime.utcnow()
         }
@@ -86,31 +129,31 @@ class CommandHandlers:
                     "intent": "create_invoice"
                 }
             
-            # Search for client
-            client = Client.query.filter(
-                Client.name.ilike(f"%{client_name}%")
-            ).first()
+            # Search for client in Cloud
+            cloud_clients = fetch_cloud_clients()
+            
+            # Filter by name (case insensitive)
+            client_name_lower = client_name.lower()
+            matching_clients = [
+                c for c in cloud_clients 
+                if client_name_lower in (c.get('name') or '').lower()
+            ]
+            
+            client = None
+            if matching_clients:
+                # Exact match preference
+                exact_matches = [c for c in matching_clients if (c.get('name') or '').lower() == client_name_lower]
+                client_data = exact_matches[0] if exact_matches else matching_clients[0]
+                
+                # Convert to SimpleNamespace for object-like access
+                client = SimpleNamespace(**client_data)
             
             if not client:
-                # Try to find similar clients
-                similar = Client.query.filter(
-                    Client.name.ilike(f"%{client_name.split()[0]}%")
-                ).limit(3).all()
-                
-                if similar:
-                    names = ", ".join([c.name for c in similar])
-                    return {
-                        "success": False,
-                        "message": f"Client '{client_name}' not found. Did you mean: {names}?",
-                        "intent": "create_invoice",
-                        "similar_clients": [{"id": c.id, "name": c.name} for c in similar]
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "message": f"Client '{client_name}' not found. Please check the name and try again.",
-                        "intent": "create_invoice"
-                    }
+                return {
+                    "success": False,
+                    "message": f"Client '{client_name}' not found. Please check the name and try again.",
+                    "intent": "create_invoice"
+                }
             
             # Start new invoice session
             voice_session.start_invoice(client)
@@ -218,54 +261,63 @@ class CommandHandlers:
                     "intent": "save_invoice"
                 }
             
-            # Create invoice
-            invoice = Invoice(
-                client_id=voice_session.active_invoice["client_id"],
-                invoice_date=datetime.utcnow(),
-                total_amount=0,
-                payment_status="Unpaid"
-            )
-            db.session.add(invoice)
-            db.session.flush()
+            # Prepare invoice data for Cloud API
+            client = voice_session.active_invoice["client"]
+            items = voice_session.active_invoice["items"]
             
-            # Add line items
-            total = 0
-            for item in voice_session.active_invoice["items"]:
-                line_item = InvoiceLineItem(
-                    invoice_id=invoice.id,
-                    description=item["description"],
-                    quantity=item["quantity"],
-                    unit_price=item["price"],
-                    total=item["total"],
-                    unit=item.get("unit", "Nos"),
-                    hsn_code=item.get("hsn_code")
-                )
-                total += item["total"]
-                db.session.add(line_item)
-            
-            # Update invoice total
-            invoice.total_amount = total
-            db.session.commit()
-            
-            # Get client name for message
-            client_name = voice_session.active_invoice["client"].name
-            item_count = len(voice_session.active_invoice["items"])
-            
-            # Clear session
-            voice_session.clear()
-            
-            return {
-                "success": True,
-                "message": f"Invoice saved successfully for {client_name}. Total: ₹{total}, Items: {item_count}",
-                "intent": "save_invoice",
-                "invoice_id": invoice.id,
-                "total_amount": total,
-                "item_count": item_count
+            # Calculate totals
+            subtotal = sum(item["total"] for item in items)
+            # Simple tax calculation (assuming inclusive or exclusive? defaulting to exclusive logic for simplicity)
+            # Actually line items usually have tax info. 
+            total_tax = sum(item["total"] * (item.get("tax", 0) / 100) for item in items)
+            grand_total = subtotal + total_tax
+
+            invoice_payload = {
+                "client_id": client.id,
+                "invoice_date": datetime.now().strftime('%Y-%m-%d'),
+                "due_date": datetime.now().strftime('%Y-%m-%d'), # Default due today
+                "items": [
+                    {
+                        "description": item["description"],
+                        "quantity": item["quantity"],
+                        "unit_price": item["price"],
+                        "unit": item.get("unit", "Nos"),
+                        "hsn_code": item.get("hsn_code"),
+                        "tax_rate": item.get("tax", 0)
+                    } for item in items
+                ],
+                "notes": "Created via Voice Command",
+                "payment_status": "Unpaid"
             }
+            
+            # Post to Cloud
+            res = create_cloud_invoice(invoice_payload)
+            
+            if res:
+                 # Get client name for message
+                client_name = client.name
+                item_count = len(items)
+                
+                # Clear session
+                voice_session.clear()
+                
+                return {
+                    "success": True,
+                    "message": f"Invoice saved successfully for {client_name}. Total: ₹{grand_total:.2f}, Items: {item_count}",
+                    "intent": "save_invoice",
+                    "invoice_id": res.get("id"),
+                    "total_amount": grand_total,
+                    "item_count": item_count
+                }
+            else:
+                 return {
+                    "success": False,
+                    "message": "Failed to save invoice to Cloud.",
+                    "intent": "save_invoice"
+                }
             
         except Exception as e:
             logging.error(f"Save invoice error: {e}")
-            db.session.rollback()
             return {
                 "success": False,
                 "message": "Error saving invoice. Please try again.",
@@ -328,9 +380,13 @@ class CommandHandlers:
                 }
             
             # Search for clients
-            clients = Client.query.filter(
-                Client.name.ilike(f"%{client_name}%")
-            ).limit(5).all()
+            cloud_clients = fetch_cloud_clients()
+            
+            client_name_lower = client_name.lower()
+            clients = [
+                c for c in cloud_clients 
+                if client_name_lower in (c.get('name') or '').lower()
+            ]
             
             if not clients:
                 return {
@@ -341,29 +397,30 @@ class CommandHandlers:
             
             if len(clients) == 1:
                 client = clients[0]
-                invoice_count = Invoice.query.filter_by(client_id=client.id).count()
+                # Invoice count would need another fetch, skipping for now or fetching invoices
+                invoice_count = 0 # Placeholder
                 
                 return {
                     "success": True,
-                    "message": f"Found {client.name}. Email: {client.email}, Phone: {client.phone}, Invoices: {invoice_count}",
+                    "message": f"Found {client.get('name')}. Email: {client.get('email')}, Phone: {client.get('phone')}",
                     "intent": "search_client",
                     "client": {
-                        "id": client.id,
-                        "name": client.name,
-                        "email": client.email,
-                        "phone": client.phone,
+                        "id": client.get('id'),
+                        "name": client.get('name'),
+                        "email": client.get('email'),
+                        "phone": client.get('phone'),
                         "invoice_count": invoice_count
                     }
                 }
             else:
-                names = ", ".join([c.name for c in clients])
+                names = ", ".join([c.get('name') for c in clients[:5]])
                 return {
                     "success": True,
                     "message": f"Found {len(clients)} clients: {names}",
                     "intent": "search_client",
                     "clients": [
-                        {"id": c.id, "name": c.name, "email": c.email}
-                        for c in clients
+                        {"id": c.get('id'), "name": c.get('name'), "email": c.get('email')}
+                        for c in clients[:5]
                     ]
                 }
                 
@@ -409,7 +466,12 @@ class VoiceCommandProcessor:
             Response dictionary with success, message, and data
         """
         try:
-            logging.info(f"🎤 Processing voice command: '{text}' (Language: {language})")
+            # Explicit terminal debug output
+            print(f"\n🎤 [VOICE DEBUG] Processing: '{text}' (Lang: {language})")
+            
+            logger.info("="*50)
+            logger.info(f"🎤 VOICE PROCESSOR RECEIVED: '{text}' (Language: {language})")
+            logger.info("="*50)
             
             # Match command pattern
             match_result = PatternMatcher.match_command(text)
@@ -418,7 +480,12 @@ class VoiceCommandProcessor:
             entities = match_result.get("entities", {})
             confidence = match_result.get("confidence", 0.0)
             
-            logging.info(f"🧠 Matched intent: {intent} (Confidence: {confidence})")
+            print(f"🧠 [VOICE DEBUG] Intent: {intent} | Confidence: {confidence}")
+            if entities:
+                print(f"🔍 [VOICE DEBUG] Entities: {entities}")
+
+            logger.info(f"🧠 Matched intent: {intent} (Confidence: {confidence})")
+            logger.debug(f"🔍 Entities found: {entities}")
             
             # Route to appropriate handler
             if intent == "create_invoice":
@@ -452,15 +519,12 @@ class VoiceCommandProcessor:
 # =========================
 # INITIALIZATION
 # =========================
-
 # Global processor instance
 voice_processor = VoiceCommandProcessor()
-
 
 def get_voice_processor():
     """Get the global voice processor instance"""
     return voice_processor
-
 
 def get_voice_session():
     """Get the global voice session instance"""

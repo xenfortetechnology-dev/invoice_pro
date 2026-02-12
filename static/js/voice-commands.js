@@ -8,6 +8,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!SpeechRecognition) {
         console.error("❌ Speech Recognition not supported in this browser");
+        // Visual alert for the user
+        const voiceBtn = document.getElementById("voiceCreateBtn");
+        if (voiceBtn) {
+            voiceBtn.style.display = 'none'; // Hide button or show error
+            const warning = document.createElement('div');
+            warning.className = 'alert alert-warning mt-2';
+            warning.innerHTML = '<i data-feather="mic-off"></i> Voice features not supported in this browser version.';
+            voiceBtn.parentNode.appendChild(warning);
+            if (window.feather) feather.replace();
+        }
         return;
     }
 
