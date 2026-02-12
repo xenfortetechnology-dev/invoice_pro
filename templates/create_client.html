@@ -17,7 +17,7 @@
                         <p class="text-muted mb-0">Register a client to manage invoices and reminders efficiently.</p>
                     </div>
                     <div>
-                        <a href="{{ url_for('dashboard_page') }}" class="btn btn-outline-secondary glass-btn">
+                        <a href="{{ url_for('client_management') }}" class="btn btn-outline-secondary glass-btn">
                             <i data-feather="arrow-left" class="me-1"></i> Back
                         </a>
                     </div>
@@ -153,8 +153,8 @@
 
                     <div class="mb-3">
                         <label for="tags" class="form-label">Tags</label>
-                        <input type="text" class="form-control glass-input" id="tags" name="tags" 
-                               placeholder="e.g. high-priority, recurring">
+                        <input type="text" class="form-control glass-input" id="tags" name="tags"
+                            placeholder="e.g. high-priority, recurring">
                     </div>
 
                     <div class="form-check mb-2">
@@ -180,4 +180,32 @@
         </div>
     </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const clientForm = document.getElementById('clientForm');
+        const submitButton = clientForm.querySelector('button[type="submit"]');
+
+        clientForm.addEventListener('submit', function (e) {
+            // Check if required fields are filled
+            const nameInput = document.getElementById('name');
+            if (!nameInput.value.trim()) {
+                e.preventDefault();
+                alert('Please enter a client name');
+                nameInput.focus();
+                return;
+            }
+
+            // Show loading state
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<i data-feather="loader" class="me-1"></i> Saving...';
+            feather.replace();
+
+            // Let the form submit normally - it will POST to the backend
+            // The backend will handle the redirect
+        });
+    });
+</script>
 {% endblock %}

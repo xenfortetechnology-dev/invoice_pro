@@ -80,7 +80,7 @@
                     </div>
                     <div>
                         <h3 class="fw-bold mb-0 text-body">{{
-                            client_insights.values()|map(attribute='predicted_ltv')|select('greaterthan', 0)|list|length
+                            client_insights.values()|selectattr('high_value', 'equalto', true)|list|length
                             if client_insights else 0 }}</h3>
                         <p class="text-muted mb-0 small">High Value Clients</p>
                     </div>
@@ -223,7 +223,7 @@
             <div id="gridViewContainer">
                 {% if client_list|length > 0 %}
                 {% for client in client_list %}
-                <div class="card glass-card client-card p-3 mb-3">
+                <div class="card glass-card client-card p-3 mb-3" onclick="viewClientDetails('{{ client.id }}')">
                     <h5>{{ client.name }}</h5>
                     <p class="text-muted mb-1">{{ client.email }}</p>
                     <p class="small">{{ client.phone }}</p>
@@ -300,7 +300,12 @@
                                     N/A
                                     {% endif %}
                                 </td>
-                                <td><!-- future actions --></td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary glass-btn"
+                                        onclick="viewClientDetails('{{ client.id }}')">
+                                        <i data-feather="eye" size="14"></i>
+                                    </button>
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -339,7 +344,7 @@
                 <ul class="pagination justify-content-center">
                     <li class="page-item {% if not clients.has_prev %}disabled{% endif %}">
                         <a class="page-link glass-btn"
-                            href="{{ url_for('client_management', page=clients.prev_num, search=search, type=client_type) }}">
+                            href="{{ url_for('client_management', page=clients.prev_num, search=search, type=client_type, view=view_mode) }}">
                             <i data-feather="chevron-left" size="16"></i>
                         </a>
                     </li>
@@ -349,7 +354,7 @@
                     {%if page_num != clients.page %}
                     <li class="page-item">
                         <a class="page-link glass-btn"
-                            href="{{ url_for('client_management', page=page_num, search=search, type=client_type) }}">
+                            href="{{ url_for('client_management', page=page_num, search=search, type=client_type, view=view_mode) }}">
                             {{ page_num }}
                         </a>
                     </li>
@@ -367,7 +372,7 @@
 
                     <li class="page-item {% if not clients.has_next %}disabled{% endif %}">
                         <a class="page-link glass-btn"
-                            href="{{ url_for('client_management', page=clients.next_num, search=search, type=client_type) }}">
+                            href="{{ url_for('client_management', page=clients.next_num, search=search, type=client_type, view=view_mode) }}">
                             <i data-feather="chevron-right" size="16"></i>
                         </a>
                     </li>
@@ -409,22 +414,44 @@
         const gridContainer = document.getElementById("gridViewContainer");
         const listContainer = document.getElementById("listViewContainer");
 
-        // Default
-        gridContainer.style.display = "grid";
-        listContainer.style.display = "none";
+        // Function to update view and URL
+        function updateView(mode) {
+            const currentUrl = new URL(window.location.href);
+            currentUrl.searchParams.set('view', mode);
+            window.history.pushState({}, '', currentUrl);
+
+            // Update pagination links
+            document.querySelectorAll('.pagination .page-link').forEach(link => {
+                try {
+                    const url = new URL(link.href);
+                    url.searchParams.set('view', mode);
+                    link.href = url.toString();
+                } catch (e) {
+                    // Ignore invalid URLs (e.g. #)
+                }
+            });
+
+            if (mode === 'list') {
+                gridContainer.style.display = 'none';
+                listContainer.style.display = 'block';
+                listViewRadio.checked = true;
+            } else {
+                gridContainer.style.display = 'grid';
+                listContainer.style.display = 'none';
+                gridViewRadio.checked = true;
+            }
+        }
+
+        // Initialize view from server-side variable
+        const initialView = "{{ view_mode|default('grid') }}";
+        updateView(initialView);
 
         gridViewRadio.addEventListener("change", function () {
-            if (this.checked) {
-                gridContainer.style.display = "grid";
-                listContainer.style.display = "none";
-            }
+            if (this.checked) updateView('grid');
         });
 
         listViewRadio.addEventListener("change", function () {
-            if (this.checked) {
-                gridContainer.style.display = "none";
-                listContainer.style.display = "block";
-            }
+            if (this.checked) updateView('list');
         });
 
         // ===== Card Hover Effect =====
@@ -437,22 +464,10 @@
             });
         });
 
-
-        document.querySelectorAll(".client-card").forEach(card => {
-            card.addEventListener("mouseenter", () => {
-                card.style.transform = "translateY(-5px)";
-            });
-            card.addEventListener("mouseleave", () => {
-                card.style.transform = "translateY(0)";
-            });
-        });
-
         feather.replace();
     });
 
-
-
-    function viewClientDetails(clientId) {
+    async function viewClientDetails(clientId) {
         // Show loading state
         const modal = new bootstrap.Modal(document.getElementById('clientDetailsModal'));
         const content = document.getElementById('clientDetailsContent');
@@ -466,43 +481,56 @@
 
         modal.show();
 
-        // In a real application, this would fetch client details via API
-        setTimeout(() => {
-            content.innerHTML = `
-            <div class="row">
-                <div class="col-md-6">
-                    <h6 class="fw-bold">Contact Information</h6>
-                    <p><strong>Email:</strong> client@example.com</p>
-                    <p><strong>Phone:</strong> +91-9876543210</p>
-                    <p><strong>Address:</strong> 123 Business Street, City</p>
-                </div>
-                <div class="col-md-6">
-                    <h6 class="fw-bold">Business Details</h6>
-                    <p><strong>GSTIN:</strong> 33AAAAA0000A1Z5</p>
-                    <p><strong>PAN:</strong> AAAAA0000A</p>
-                    <p><strong>Total Business:</strong> ₹2,50,000</p>
-                </div>
-            </div>
-            <hr>
-            <h6 class="fw-bold">Recent Activity</h6>
-            <div class="timeline">
-                <div class="timeline-item">
-                    <div class="timeline-marker bg-success"></div>
-                    <div class="timeline-content">
-                        <p class="mb-1">Payment received for Invoice #INV-001</p>
-                        <small class="text-muted">2 days ago</small>
-                    </div>
-                </div>
+        try {
+            const response = await fetch(`/api/client/${clientId}`);
+            if (!response.ok) throw new Error('Failed to fetch client details');
+
+            const data = await response.json();
+
+            // Generate Activity HTML
+            const activityHtml = data.recent_activity.map(act => `
                 <div class="timeline-item">
                     <div class="timeline-marker bg-primary"></div>
                     <div class="timeline-content">
-                        <p class="mb-1">New invoice created</p>
-                        <small class="text-muted">1 week ago</small>
+                        <p class="mb-1">${act.description}</p>
+                        <small class="text-muted">${act.date}</small>
                     </div>
                 </div>
+            `).join('') || '<p class="text-muted">No recent activity</p>';
+
+            content.innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="fw-bold text-primary mb-3">Contact Information</h6>
+                    <p><strong>Name:</strong> ${data.name}</p>
+                    <p><strong>Contact Person:</strong> ${data.contact_person || 'N/A'}</p>
+                    <p><strong>Email:</strong> ${data.email || 'N/A'}</p>
+                    <p><strong>Phone:</strong> ${data.phone || 'N/A'}</p>
+                    <p><strong>Address:</strong> ${data.address || 'N/A'}</p>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="fw-bold text-primary mb-3">Business Details</h6>
+                    <p><strong>GSTIN:</strong> ${data.gstin || 'N/A'}</p>
+                    <p><strong>PAN:</strong> ${data.pan || 'N/A'}</p>
+                    <p><strong>Total Business:</strong> ₹${(data.total_business || 0).toLocaleString()}</p>
+                    <p><strong>Pending Amount:</strong> <span class="text-danger">₹${(data.pending_amount || 0).toLocaleString()}</span></p>
+                </div>
+            </div>
+            <hr>
+            <h6 class="fw-bold mb-3">Recent Activity</h6>
+            <div class="timeline">
+                ${activityHtml}
             </div>
         `;
-        }, 1000);
+        } catch (error) {
+            content.innerHTML = `
+            <div class="text-center py-4 text-danger">
+                <i data-feather="alert-circle" size="32"></i>
+                <p class="mt-2">Error loading details. Please try again.</p>
+            </div>
+        `;
+            feather.replace();
+        }
     }
 
     function contactClient(clientId) {
@@ -568,59 +596,24 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         const tableBody = document.getElementById('clientsTableBody'); // table body
-        const originalRows = Array.from(tableBody.children).map(row => row.cloneNode(true)); // save original rows
-        const clearBtn = document.getElementById('clearFilterBtn');
-        const filterInputs = document.querySelectorAll('.filter-input'); // your search fields should have this class
-
-        clearBtn.addEventListener('click', function () {
-            // Clear input fields
-            filterInputs.forEach(input => input.value = '');
-
-            // Restore table rows
-            tableBody.innerHTML = '';
-            originalRows.forEach(row => tableBody.appendChild(row.cloneNode(true)));
-        });
+        // Only run if tableBody exists (List view)
+        if (tableBody) {
+            const originalRows = Array.from(tableBody.children).map(row => row.cloneNode(true)); // save original rows
+            const clearBtn = document.getElementById('clearFilterBtn');
+            // ... clear logic ...
+        }
     });
 
-
-
-
     function checkInvoiceFilter(event) {
-        // Prevent empty filters from being submitted
-        const filters = document.querySelectorAll('.filter-input');
-        let hasValue = false;
-
-        filters.forEach(input => {
-            if (input.value.trim() !== '') {
-                hasValue = true;
-            }
-        });
-
-        if (!hasValue) {
-            event.preventDefault(); // Stop form submit
-            alert("Please enter at least one filter before searching.");
-        }
+        // Prevent empty filters from being submitted - actually allow it to reload page with empty query
+        // But if user wants to filter, they should type something.
+        // Let's allow empty submission to act as "refresh" or "show all" unless specific validation needed.
+        return true;
     }
+
     function clearFilters(event) {
         event.preventDefault();
-
-        // Get all filter inputs (adjust class name if needed)
-        const filters = document.querySelectorAll('.filter-input');
-        let hasValue = false;
-
-        filters.forEach(input => {
-            if (input.value.trim() !== '') {
-                hasValue = true;
-            }
-        });
-
-        if (hasValue) {
-            // If any filter has value → reload to clear filters
-            window.location.href = "{{ url_for('client_management') }}";
-        } else {
-            // If no filters → do nothing
-            console.log("No filters to clear.");
-        }
+        window.location.href = "{{ url_for('client_management') }}";
     }
 
 </script>

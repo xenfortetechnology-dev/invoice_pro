@@ -19,7 +19,11 @@ from ocr_service import ocr_processor, receipt_processor
 from voice_service import get_voice_processor, get_voice_session
 from analytics_engine import AnalyticsEngine
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
+from reportlab.lib.pagesizes import letter, landscape
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
 import io
 import csv
 from flask import Response, request, render_template_string
@@ -262,7 +266,7 @@ def create_invoice():
                 timeout=5
             )
 
-            if response.status_code == 201:
+            if response.status_code in (200, 201):
                 flash("Invoice created successfully (Cloud DB)", "success")
                 return redirect(url_for("invoice_management"))
             else:
@@ -299,7 +303,16 @@ def preview_invoice():
         if not client_data:
              return "Client not found", 404
         
-        client = SimpleNamespace(**client_data)
+        # Create client object with all required fields
+        client = SimpleNamespace(
+            id=client_data.get('id'),
+            name=client_data.get('name', 'N/A'),
+            email=client_data.get('email', ''),
+            phone=client_data.get('phone', ''),
+            address='',
+            gstin='',
+            pan=''
+        )
 
         invoice_date = datetime.strptime(invoice_date_str, '%Y-%m-%d').date() if invoice_date_str else datetime.now().date()
         
@@ -328,8 +341,8 @@ def preview_invoice():
             
             tax_amount = cgst_amount + sgst_amount + igst_amount
             
-            # Create transient object
-            li = InvoiceLineItem(
+            # Create SimpleNamespace object instead of InvoiceLineItem model
+            li = SimpleNamespace(
                 sr_no=i,
                 hsn_code=item_data.get('hsn_code', ''),
                 description=item_data.get('description', ''),
@@ -352,10 +365,11 @@ def preview_invoice():
             total_sgst += sgst_amount
             total_igst += igst_amount
 
-        # Create transient invoice
-        invoice = Invoice(
+        # Create SimpleNamespace invoice instead of Invoice model
+        invoice = SimpleNamespace(
             invoice_number="PREVIEW",
             invoice_date=invoice_date,
+            due_date=None,
             client=client,
             notes=notes,
             terms_conditions=terms_conditions,
@@ -364,10 +378,10 @@ def preview_invoice():
             sgst=total_sgst,
             igst=total_igst,
             total_amount=subtotal + total_cgst + total_sgst + total_igst,
-            invoice_format=invoice_format
+            invoice_format=invoice_format,
+            line_items=line_items,
+            payment_status='Unpaid'
         )
-        # Manually attach line items for Jinja loop
-        invoice.line_items = line_items 
         
         company = Company.query.first()
         bank = BankDetails.query.first()
@@ -397,35 +411,57 @@ def preview_invoice():
 @app.route('/invoice/<int:id>')
 @login_required
 def invoice_detail(id):
-    """Detailed invoice view with blockchain verification"""
-    invoice = Invoice.query.get_or_404(id)
- 
-    # Blockchain verification
-    blockchain_verification = {}
-    if app.config.get("BLOCKCHAIN_ENABLED") and blockchain_service and invoice.blockchain_hash:
-        try:
-            blockchain_verification = blockchain_service.verify_invoice_integrity(id)
-        except Exception as e:
-            logging.error(f"Blockchain verification failed: {e}")
+    """Detailed invoice view (fetch from cloud)"""
+    # Fetch invoice from cloud API
+    invoice_data = fetch_cloud_invoice_by_id(id)
+    if not invoice_data:
+        flash('Invoice not found', 'error')
+        return redirect(url_for('invoice_management'))
     
-    # AI insights for this invoice
+    # Fetch client data from cloud API
+    client_data = fetch_cloud_client_by_id(invoice_data.get('client_id'))
+    if not client_data:
+        flash('Client not found', 'error')
+        return redirect(url_for('invoice_management'))
+    
+    # Create invoice object with all required fields
+    invoice = SimpleNamespace(
+        id=invoice_data.get('id'),
+        invoice_number=invoice_data.get('invoice_number', 'N/A'),
+        invoice_date=datetime.strptime(invoice_data.get('invoice_date'), '%Y-%m-%d').date() if invoice_data.get('invoice_date') else datetime.now().date(),
+        due_date=None,
+        total_amount=invoice_data.get('total_amount', 0),
+        payment_status=invoice_data.get('payment_status', 'Unpaid'),
+        notes='',
+        terms_conditions='',
+        line_items=[],
+        subtotal=invoice_data.get('total_amount', 0),
+        cgst=0,
+        sgst=0,
+        igst=0,
+        invoice_format='default'
+    )
+    
+    invoice.client = SimpleNamespace(
+        name=client_data.get('name', 'N/A'),
+        email=client_data.get('email', ''),
+        phone=client_data.get('phone', ''),
+        address='',
+        gstin='',
+        pan=''
+    )
+ 
+    # Blockchain verification (skip for cloud data)
+    blockchain_verification = {}
+    
+    # AI insights (skip for cloud data)
     ai_insights = {}
-    if app.config.get("AI_FEATURES_ENABLED") and ai_services.ai_assistant:
-        try:
-            client_analysis = ai_services.ai_assistant.analyze_client_history(invoice.client_id)
-            ai_insights = {
-                'payment_prediction': client_analysis.get('risk_assessment', {}),
-                'similar_invoices': analytics_engine.find_similar_invoices(id)
-            }
-        except Exception as e:
-            logging.error(f"AI insights failed: {e}")
 
-    # 🔹 FORMAT SWITCH LOGIC (THIS IS THE ONLY ADDITION)
+    # Select template
     template_map = {
     "default": "invoice_detail.html",
     "excel_customer_A": "invoice_excel_customer_A.html"
     }
-
 
     template_name = template_map.get(
         invoice.invoice_format,
@@ -434,7 +470,6 @@ def invoice_detail(id):
    
     company = Company.query.first()
     bank = BankDetails.query.first()
-
 
     return render_template(
         template_name,
@@ -449,10 +484,51 @@ def invoice_detail(id):
 @app.route('/invoice/<int:id>/download-pdf')
 @login_required
 def download_invoice_pdf(id):
-    """Download PDF directly to user's Downloads folder"""
+    """Download PDF directly to user's Downloads folder (fetch from cloud)"""
     try:
-        invoice = Invoice.query.get_or_404(id)
-        logging.info(f"Generating PDF for invoice {id}: {invoice.invoice_number}")
+        # Fetch invoice from cloud API
+        invoice_data = fetch_cloud_invoice_by_id(id)
+        if not invoice_data:
+            return jsonify({'success': False, 'error': 'Invoice not found'}), 404
+        
+        # Fetch client data
+        client_data = fetch_cloud_client_by_id(invoice_data.get('client_id'))
+        if not client_data:
+            return jsonify({'success': False, 'error': 'Client not found'}), 404
+        
+        # Create invoice object for PDF generation with all required fields
+        invoice = SimpleNamespace(
+            id=invoice_data.get('id'),
+            invoice_number=invoice_data.get('invoice_number', 'N/A'),
+            invoice_date=datetime.strptime(invoice_data.get('invoice_date'), '%Y-%m-%d').date() if invoice_data.get('invoice_date') else datetime.now().date(),
+            due_date=None,
+            total_amount=invoice_data.get('total_amount', 0),
+            payment_status=invoice_data.get('payment_status', 'Unpaid'),
+            notes='',
+            terms_conditions='',
+            line_items=[],
+            subtotal=invoice_data.get('total_amount', 0),
+            cgst=0,
+            sgst=0,
+            igst=0,
+            invoice_type='Invoice',  # Required by PDF generator
+            blockchain_hash=None  # Required by PDF generator
+        )
+        
+        invoice.client = SimpleNamespace(
+            name=client_data.get('name', 'N/A'),
+            email=client_data.get('email', ''),
+            phone=client_data.get('phone', ''),
+            address='',
+            city='',
+            state='',
+            pincode='',
+            gstin='',
+            pan='',
+            contact_person=''  # Required by PDF generator
+        )
+        
+        logging.info(f"Generating PDF for invoice {id}: {invoice_data.get('invoice_number')}")
         
         pdf_buffer = generate_invoice_pdf(invoice)
         pdf_buffer.seek(0)
@@ -463,7 +539,7 @@ def download_invoice_pdf(id):
         downloads_folder.mkdir(exist_ok=True)
         
         # Create filename and save
-        filename = f'Invoice_{invoice.invoice_number}.pdf'
+        filename = f'Invoice_{invoice_data.get("invoice_number")}.pdf'
         filepath = downloads_folder / filename
         
         # Write PDF to file
@@ -514,10 +590,20 @@ def invoice_pdf(id):
 @app.route('/invoice/<int:id>/delete', methods=['POST'])
 @login_required
 def delete_invoice(id):
-    invoice = Invoice.query.get_or_404(id)
-    db.session.delete(invoice)
-    db.session.commit()
-    flash('Invoice deleted successfully.', 'success')
+    """Delete invoice from cloud database"""
+    try:
+        response = requests.delete(
+            f"{CLOUD_API_BASE}/invoices/{id}",
+            timeout=5
+        )
+        if response.status_code in (200, 204):
+            flash('Invoice deleted successfully.', 'success')
+        else:
+            flash(f'Failed to delete invoice: {response.text}', 'error')
+    except Exception as e:
+        logging.error(f"Cloud API delete error: {e}")
+        flash(f'API connection error: {str(e)}', 'error')
+    
     return redirect(url_for('invoice_management'))
 
 @app.route('/invoices/bulk_delete', methods=['POST'])
@@ -533,13 +619,21 @@ def bulk_delete_invoices():
 @app.route('/invoices/<int:id>', methods=['DELETE'])
 @login_required
 def delete_invoice1(id):
-    invoice = Invoice.query.get_or_404(id)
+    """Delete invoice from cloud database (REST endpoint)"""
     try:
-        db.session.delete(invoice)
-        db.session.commit()
-        return jsonify({'success': True})
+        response = requests.delete(
+            f"{CLOUD_API_BASE}/invoices/{id}",
+            timeout=5
+        )
+        if response.status_code in (200, 204):
+            return jsonify({'success': True})
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Cloud API error: {response.text}'
+            }), response.status_code
     except Exception as e:
-        db.session.rollback()
+        logging.error(f"Delete error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -550,42 +644,69 @@ def delete_invoice1(id):
 @app.route('/invoice/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_invoice(id):
-    invoice = Invoice.query.get_or_404(id)
-
+    """Edit invoice from cloud database"""
+    
     if request.method == 'POST':
         action = request.form.get('action', 'update')
-
-        # Update fields from the form
-        invoice.notes = request.form.get('notes', invoice.notes)
-        invoice.terms_conditions = request.form.get('terms_conditions', invoice.terms_conditions)
         
-        # Update client if changed
-        client_id = request.form.get('client_id')
-        if client_id:
-            invoice.client_id = int(client_id)
-            
+        # Prepare update data
+        update_data = {}
+        
         # Handle specific actions
         if action == 'mark_paid':
-            invoice.payment_status = 'Paid'
-            flash('Invoice marked as Paid!', 'success')
+            update_data['payment_status'] = 'Paid'
+            flash_msg = 'Invoice marked as Paid!'
         elif action == 'mark_unpaid':
-            invoice.payment_status = 'Unpaid'
-            flash('Invoice marked as Unpaid!', 'success')
+            update_data['payment_status'] = 'Unpaid'
+            flash_msg = 'Invoice marked as Unpaid!'
         else:
-            flash('Invoice updated successfully!', 'success')
-
-        # You can update other invoice fields here as needed
-
-        db.session.commit()
+            # Regular update
+            if request.form.get('notes'):
+                update_data['notes'] = request.form.get('notes')
+            if request.form.get('terms_conditions'):
+                update_data['terms_conditions'] = request.form.get('terms_conditions')
+            if request.form.get('client_id'):
+                update_data['client_id'] = int(request.form.get('client_id'))
+            flash_msg = 'Invoice updated successfully!'
         
-        # Always return a response after POST
+        # Send update to cloud API
+        try:
+            response = requests.put(
+                f"{CLOUD_API_BASE}/invoices/{id}",
+                json=update_data,
+                timeout=5
+            )
+            if response.status_code in (200, 204):
+                flash(flash_msg, 'success')
+            else:
+                flash(f'Failed to update invoice: {response.text}', 'error')
+        except Exception as e:
+            logging.error(f"Cloud API update error: {e}")
+            flash(f'API connection error: {str(e)}', 'error')
+        
         return redirect(url_for('invoice_management'))
 
-    # GET request — show edit form
+    # GET request — fetch invoice from cloud and show edit form
+    invoice_data = fetch_cloud_invoice_by_id(id)
+    if not invoice_data:
+        flash('Invoice not found', 'error')
+        return redirect(url_for('invoice_management'))
+    
+    # Create invoice object with all fields needed by edit form
+    invoice = SimpleNamespace(
+        id=invoice_data.get('id'),
+        invoice_number=invoice_data.get('invoice_number', 'N/A'),
+        invoice_date=invoice_data.get('invoice_date'),
+        client_id=invoice_data.get('client_id'),
+        total_amount=invoice_data.get('total_amount', 0),
+        payment_status=invoice_data.get('payment_status', 'Unpaid'),
+        notes=invoice_data.get('notes', ''),
+        terms_conditions=invoice_data.get('terms_conditions', '')
+    )
+    
     client_list = fetch_cloud_clients()
     clients = [SimpleNamespace(**c) for c in client_list]
     
-    # Always return a response
     return render_template('edit_invoice.html', invoice=invoice, clients=clients)
 
 
@@ -617,19 +738,59 @@ def duplicate_invoice(id):
 @app.route('/invoice/<int:id>/send', methods=['POST'])
 @login_required
 def send_invoice(id):
-    """Send invoice via email to client"""
+    """Send invoice via email to client (fetch from cloud)"""
     try:
-        invoice = Invoice.query.get_or_404(id)
-        recipient_email = invoice.client.email
+        # Fetch invoice from cloud API
+        invoice_data = fetch_cloud_invoice_by_id(id)
+        if not invoice_data:
+            return jsonify({"success": False, "message": "❌ Invoice not found."}), 404
+        
+        # Fetch client data from cloud API
+        client_data = fetch_cloud_client_by_id(invoice_data.get('client_id'))
+        if not client_data:
+            return jsonify({"success": False, "message": "❌ Client not found."}), 404
+        
+        recipient_email = client_data.get('email')
 
         if not recipient_email:
             return jsonify({"success": False, "message": "❌ Client has no email address set."}), 400
 
+        # Create invoice object for email sending with all required fields
+        invoice = SimpleNamespace(
+            id=invoice_data.get('id'),
+            invoice_number=invoice_data.get('invoice_number', 'N/A'),
+            invoice_date=datetime.strptime(invoice_data.get('invoice_date'), '%Y-%m-%d').date() if invoice_data.get('invoice_date') else datetime.now().date(),
+            due_date=None,
+            total_amount=invoice_data.get('total_amount', 0),
+            payment_status=invoice_data.get('payment_status', 'Unpaid'),
+            notes='',
+            terms_conditions='',
+            line_items=[],
+            subtotal=invoice_data.get('total_amount', 0),
+            cgst=0,
+            sgst=0,
+            igst=0,
+            invoice_type='Invoice',  # Required by PDF generator
+            blockchain_hash=None  # Required by PDF generator
+        )
+        
+        invoice.client = SimpleNamespace(
+            name=client_data.get('name', 'N/A'),
+            email=client_data.get('email', ''),
+            phone=client_data.get('phone', ''),
+            address='',
+            city='',
+            state='',
+            pincode='',
+            gstin='',
+            pan='',
+            contact_person=''  # Required by PDF generator
+        )
+        
         # Send the email
         send_invoice_email(invoice, recipient_email)
         
-        # Log the activity
-        logging.info(f"Invoice {invoice.invoice_number} sent to {recipient_email}")
+        logging.info(f"Invoice {invoice_data.get('invoice_number')} sent to {recipient_email}")
         
         return jsonify({
             "success": True, 
@@ -671,70 +832,340 @@ def bulk_export():
 @app.route('/clients')
 @login_required
 def client_management():
+    search = request.args.get('search', '').lower()
+    client_type = request.args.get('type', '')
+    lead_stage = request.args.get('lead_stage', '')
+    risk_level_filter = request.args.get('risk_level', '')
+    
+    # Handle View Mode Persistence
+    if 'view' in request.args:
+        view_mode = request.args.get('view')
+        session['client_view_mode'] = view_mode
+    else:
+        view_mode = session.get('client_view_mode', 'grid')
+    
+    client_list = []
+    client_insights = {}
+    today = datetime.utcnow().date()
+
+    # --- 1. Fetch Cloud Data ---
+    cloud_clients = []
+    cloud_invoices = []
     try:
-        response = requests.get(
-            "http://44.208.164.236:5000/api/clients",
-            timeout=5
-        )
-
-        if response.status_code == 200:
-            client_list = response.json()
-        else:
-            client_list = []
-            flash("Failed to load clients from cloud API", "error")
-
+        # Fetch Clients
+        r_c = requests.get("http://44.208.164.236:5000/api/clients", timeout=3)
+        if r_c.status_code == 200:
+            cloud_clients = r_c.json()
+        
+        # Fetch Invoices for metrics
+        r_i = requests.get("http://44.208.164.236:5000/api/invoices", timeout=3)
+        if r_i.status_code == 200:
+            cloud_invoices = r_i.json()
+            
     except Exception as e:
-        client_list = []
-        flash("Cloud API not reachable", "error")
+        print(f"Cloud fetch error: {e}")
+        flash("Could not fetch some cloud data, showing local only.", "warning")
 
+    # Process Cloud Clients
+    for c in cloud_clients:
+        # Create a hybrid object
+        # Metric Calculation
+        c_invoices = [inv for inv in cloud_invoices if inv.get('client_id') == c['id']]
+        total_business = sum(inv.get('total_amount', 0) for inv in c_invoices)
+        
+        # Risk Logic
+        is_high_risk = False
+        for inv in c_invoices:
+            if inv.get('payment_status') != 'Paid':
+                inv_date_str = inv.get('invoice_date')
+                if inv_date_str:
+                    try:
+                        inv_date = datetime.strptime(inv_date_str, '%Y-%m-%d').date()
+                        if (today - inv_date).days > 60:
+                            is_high_risk = True
+                            break
+                    except:
+                        pass
+        
+        risk_level = "High" if is_high_risk else "Low"
+        is_high_value = total_business > 100000
+
+        # Create unified object
+        # Use string ID with prefix to avoid collision
+        client_obj = SimpleNamespace(
+            id=f"c_{c['id']}",
+            real_id=c['id'],
+            source='cloud',
+            name=c.get('name'),
+            email=c.get('email'),
+            phone=c.get('phone'),
+            contact_person=c.get('name'), # Default
+            client_type='Regular', # Default for cloud
+            lead_stage='New', # Default for cloud
+            total_business=total_business,
+            gstin="N/A",
+            pan="N/A",
+            risk_level=risk_level,
+            high_value=is_high_value,
+            created_at=datetime.utcnow() # Mock
+        )
+        
+        client_insights[client_obj.id] = {
+            'risk_level': risk_level,
+            'predicted_ltv': total_business,
+            'high_value': is_high_value
+        }
+        
+        client_list.append(client_obj)
+
+    # --- 2. Fetch Local Data ---
+    local_clients = Client.query.all()
+    for lc in local_clients:
+        # Calculate local metrics
+        l_total = lc.total_business or 0
+        l_risk = "Low" # Default
+        # Check local invoices if any (assuming logic exists)
+        # For now use stored or simple logic
+        l_high_value = l_total > 100000
+        
+        # Local Risk Check (reusing logic from previous turn if needed, or simple)
+        is_local_risk = False
+        for inv in lc.invoices:
+             if inv.payment_status != 'Paid' and inv.invoice_date:
+                if (today - inv.invoice_date).days > 60:
+                    is_local_risk = True
+        
+        l_risk = "High" if is_local_risk else "Low"
+
+        # Unique ID is just str(id) for local vs c_id for cloud
+        # But to be safe let's keep local as just ID (int) or str without prefix? 
+        # Frontend expects ID. If I use int, it might mismatch the "c_" string.
+        # Let's use string "l_{id}" for consistency? Or just keep raw ID and handle in template?
+        # Template uses `client.id`.
+        # If I use `c_1` and `1`, they are distinct.
+        
+        lc_obj = SimpleNamespace(
+            id=lc.id, # Keep original INT id for local to avoid breaking other things?
+            real_id=lc.id,
+            source='local',
+            name=lc.name,
+            email=lc.email,
+            phone=lc.phone,
+            contact_person=lc.contact_person,
+            client_type=lc.client_type,
+            lead_stage=lc.lead_stage,
+            total_business=l_total,
+            gstin=lc.gstin,
+            pan=lc.pan,
+            risk_level=l_risk,
+            high_value=l_high_value,
+            created_at=lc.created_at
+        )
+        
+        client_insights[lc.id] = {
+            'risk_level': l_risk,
+            'predicted_ltv': l_total,
+            'high_value': l_high_value
+        }
+        
+        client_list.append(lc_obj)
+
+
+    # --- 3. Filtering ---
+    filtered_list = []
+    
+    for c in client_list:
+        # Search
+        if search:
+            s = search
+            if not (s in (c.name or '').lower() or 
+                    s in (c.email or '').lower() or 
+                    s in (c.phone or '').lower()):
+                continue
+                
+        # Type
+        if client_type and c.client_type != client_type:
+            continue
+            
+        # Lead Stage
+        if lead_stage and c.lead_stage != lead_stage:
+            continue
+            
+        # Risk Level
+        if risk_level_filter:
+            c_risk = client_insights[c.id]['risk_level']
+            if risk_level_filter == 'High' and c_risk != 'High':
+                continue
+            if risk_level_filter == 'Low' and c_risk != 'Low':
+                continue
+
+        filtered_list.append(c)
+
+    # Sort
+    filtered_list.sort(key=lambda x: str(x.name))
+
+    # --- 4. Pagination ---
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+    total = len(filtered_list)
+    start = (page - 1) * per_page
+    end = start + per_page
+    
+    paginated_items = filtered_list[start:end]
+    
     clients_obj = SimpleNamespace(
-        items=client_list,
-        total=len(client_list),
-        pages=1,
-        has_prev=False,
-        has_next=False,
-        page=1
+        items=paginated_items,
+        total=total,
+        pages=(total + per_page - 1) // per_page,
+        has_prev=page > 1,
+        has_next=end < total,
+        page=page,
+        prev_num=page - 1,
+        next_num=page + 1,
+        iter_pages=lambda **kwargs: range(1, (total + per_page - 1) // per_page + 1)
     )
 
     return render_template(
         'client_management.html',
         clients=clients_obj,
-        client_list=client_list,
-        search="",
-        client_type="",
-        client_insights={}
+        client_list=paginated_items,
+        search=search,
+        client_type=client_type,
+        client_insights=client_insights,
+        view_mode=view_mode
     )
+
 @app.route('/create_client', methods=['GET', 'POST'])
 @login_required
 def create_client():
     if request.method == 'POST':
         try:
-            payload = request.form.to_dict()
-
-            # Convert checkbox properly
-            payload['blockchain_verified'] = payload.get('blockchain_verified') == 'on'
-
-            # Send form data to CLOUD API (this replaces Postman)
-            response = requests.post(
-                "http://44.208.164.236:5000/api/clients",
-                json=payload,
-                timeout=5
+            # Create local Client object (Persist all details)
+            new_client = Client(
+                name=request.form.get('name'),
+                contact_person=request.form.get('contact_person'),
+                phone=request.form.get('phone'),
+                email=request.form.get('email'),
+                client_type=request.form.get('client_type', 'Regular'),
+                address=request.form.get('address'),
+                city=request.form.get('city'),
+                state=request.form.get('state'),
+                pincode=request.form.get('pincode'),
+                gstin=request.form.get('gstin'),
+                pan=request.form.get('pan'),
+                notes=request.form.get('notes'),
+                lead_stage=request.form.get('lead_stage', 'New'),
+                tags=request.form.get('tags'),
+                follow_up_date=datetime.strptime(request.form.get('follow_up_date'), '%Y-%m-%d') if request.form.get('follow_up_date') else None,
+                created_at=datetime.utcnow()
             )
-
-            if response.status_code in (200, 201):
-                flash('Client created successfully!', 'success')
-                return redirect(url_for('client_management'))
-            else:
-                flash(
-                    f"API error: {response.status_code} - {response.text}",
-                    'error'
-                )
+            
+            db.session.add(new_client)
+            db.session.commit()
+            
+            flash('Client created locally!', 'success')
+            return redirect(url_for('client_management'))
 
         except Exception as e:
-            logging.error(f"API client creation failed: {e}")
-            flash(f'API connection error: {str(e)}', 'error')
+            logging.error(f"Client creation failed: {e}")
+            db.session.rollback()
+            flash(f'Error creating client: {str(e)}', 'error')
 
     return render_template('create_client.html')
+
+@app.route('/api/client/<client_id>')
+@login_required
+def api_client_details(client_id):
+    # Determine source
+    is_cloud = str(client_id).startswith('c_')
+    
+    data = {}
+    recent_activity = []
+    
+    if is_cloud:
+        # Fetch from Cloud
+        real_id = int(str(client_id).replace('c_', ''))
+        try:
+            # Fetch Client
+            # Cloud API doesn't have single fetch? Use list for now or hope query works
+            # Helper function from before or manual fetch
+            r = requests.get(f"http://44.208.164.236:5000/api/clients", timeout=3)
+            # Find in list (inefficient but works for 32 items)
+            found = None
+            if r.status_code == 200:
+                for c in r.json():
+                    if c['id'] == real_id:
+                        found = c
+                        break
+            
+            if found:
+                # Get invoices for stats
+                r_i = requests.get("http://44.208.164.236:5000/api/invoices", timeout=3)
+                c_invoices = []
+                pending_amount = 0
+                total_business = 0
+                if r_i.status_code == 200:
+                    all_inv = r_i.json()
+                    c_invoices = [inv for inv in all_inv if inv.get('client_id') == real_id]
+                    total_business = sum(inv.get('total_amount', 0) for inv in c_invoices)
+                    pending_amount = sum(inv.get('total_amount', 0) for inv in c_invoices if inv.get('payment_status') != 'Paid')
+                
+                # Format Activity
+                for inv in sorted(c_invoices, key=lambda x: x.get('invoice_date', ''), reverse=True)[:5]:
+                    recent_activity.append({
+                        'description': f"Invoice #{inv.get('invoice_number')} ({inv.get('payment_status')})",
+                        'date': inv.get('invoice_date') or 'Recent'
+                    })
+
+                data = {
+                    'name': found.get('name'),
+                    'email': found.get('email'),
+                    'phone': found.get('phone'),
+                    'address': "Cloud Record (Address N/A)", 
+                    'gstin': "N/A",
+                    'pan': "N/A",
+                    'total_business': total_business,
+                    'pending_amount': pending_amount,
+                    'contact_person': found.get('name'),
+                    'recent_activity': recent_activity
+                }
+            else:
+                 return jsonify({'error': 'Cloud client not found'}), 404
+                 
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+            
+    else:
+        # Local Fetch
+        try:
+            client = Client.query.get_or_404(int(client_id))
+            # Calculate stats
+            total_invoices = len(client.invoices)
+            pending_amount = sum(inv.total_amount - inv.amount_paid for inv in client.invoices if inv.payment_status != 'Paid')
+            
+            # Recent activity
+            for inv in sorted(client.invoices, key=lambda x: x.created_at, reverse=True)[:5]:
+                recent_activity.append({
+                    'description': f"Invoice #{inv.invoice_number} generated",
+                    'date': inv.created_at.strftime('%Y-%m-%d') if inv.created_at else 'Recent'
+                })
+                
+            data = {
+                'name': client.name,
+                'email': client.email,
+                'phone': client.phone,
+                'address': client.address,
+                'gstin': client.gstin,
+                'pan': client.pan,
+                'total_business': client.total_business or 0,
+                'pending_amount': pending_amount,
+                'contact_person': client.contact_person,
+                'recent_activity': recent_activity
+            }
+        except Exception as e:
+             return jsonify({'error': str(e)}), 500
+
+    return jsonify(data)
 
 @app.route('/api/export/clients/excel')
 @login_required
@@ -796,108 +1227,141 @@ def export_clients_excel():
 @app.route('/api/export/clients/pdf')
 @login_required
 def export_clients_pdf():
-    search = request.args.get('search', '')
+    # --- 1. Fetch Hybrid Data (Copy logic from client_management) ---
+    search = request.args.get('search', '').lower()
     client_type = request.args.get('type', '')
     
-    # Build query with filters
-    query = Client.query
-    if search:
-        query = query.filter(
-            or_(
-                Client.name.contains(search),
-                Client.phone.contains(search),
-                Client.email.contains(search),
-                Client.contact_person.contains(search)
-            )
-        )
-    if client_type:
-        query = query.filter(Client.client_type == client_type)
+    client_list = []
+    today = datetime.utcnow().date()
+
+    # Cloud Fetch
+    try:
+        r_c = requests.get("http://44.208.164.236:5000/api/clients", timeout=3)
+        cloud_clients = r_c.json() if r_c.status_code == 200 else []
         
-    clients = query.order_by(Client.name).all()
-    
+        r_i = requests.get("http://44.208.164.236:5000/api/invoices", timeout=3)
+        cloud_invoices = r_i.json() if r_i.status_code == 200 else []
+        
+        for c in cloud_clients:
+            c_invs = [inv for inv in cloud_invoices if inv.get('client_id') == c['id']]
+            total_biz = sum(inv.get('total_amount', 0) for inv in c_invs)
+            
+            client_dict = {
+                'name': c.get('name', ''),
+                'email': c.get('email', ''),
+                'phone': c.get('phone', ''),
+                'type': 'Regular', # Cloud default
+                'gstin': 'N/A', # Cloud default
+                'business_value': total_biz
+            }
+            client_list.append(client_dict)
+    except Exception as e:
+        print(f"Cloud fetch error in export: {e}")
+
+    # Local Fetch
+    local_clients = Client.query.all()
+    for lc in local_clients:
+        client_dict = {
+            'name': lc.name,
+            'email': lc.email,
+            'phone': lc.phone,
+            'type': lc.client_type,
+            'gstin': lc.gstin or 'N/A',
+            'business_value': lc.total_business or 0
+        }
+        client_list.append(client_dict)
+
+    # Filter
+    filtered = []
+    for c in client_list:
+        if search:
+            if not (search in c['name'].lower() or search in c['email'].lower() or search in c['phone'].lower()):
+                continue
+        if client_type and c['type'] != client_type:
+            continue
+        filtered.append(c)
+        
+    filtered.sort(key=lambda x: x['name'])
+
+    # --- 2. Generate PDF ---
     buffer = io.BytesIO()
-    p = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=18)
+    elements = []
+    styles = getSampleStyleSheet()
 
-    PAGE_MARGIN = 20
-
-    def draw_page_border():
-        p.setStrokeColorRGB(0, 0, 0)
-        p.setLineWidth(1)
-        p.rect(PAGE_MARGIN, PAGE_MARGIN, width - PAGE_MARGIN*2, height - PAGE_MARGIN*2)
-
-    draw_page_border()
-    p.setFont("Helvetica-Bold", 18)
-    p.drawCentredString(width / 2, height - 50, "Client Directory Report")
+    # Header
+    title_style = ParagraphStyle(
+        'Title',
+        parent=styles['Heading1'],
+        fontSize=24,
+        alignment=1, # Center
+        spaceAfter=20,
+        textColor=colors.black
+    )
+    elements.append(Paragraph("Client Directory Report", title_style))
     
-    p.setStrokeColorRGB(0.7, 0.7, 0.7)
-    p.line(40, height - 65, width - 40, height - 65)
-
-    y = height - 100
-    col_x = [60, width / 2 + 10]
-    col = 0
-    block_height = 130
-
-    for c in clients:
-        if y - block_height < 60:
-            if col == 0:
-                col = 1
-                y = height - 100
-            else:
-                p.showPage()
-                draw_page_border()
-                col = 0
-                y = height - 100
-
-        x = col_x[col]
-        box_width = width / 2 - 70
-
-        p.setFillColorRGB(0.97, 0.98, 1)
-        p.roundRect(x, y - block_height, box_width, block_height, 6, fill=1)
-        
-        p.setStrokeColorRGB(0.8, 0.8, 0.9)
-        p.roundRect(x, y - block_height, box_width, block_height, 6, fill=0)
-
-        p.setFillColorRGB(0, 0, 0)
-        curr_y = y - 25
-        
-        p.setFont("Helvetica-Bold", 12)
-        p.drawString(x + 15, curr_y, c.name or "N/A")
-        curr_y -= 20
-        
-        p.setFont("Helvetica", 10)
-        p.drawString(x + 15, curr_y, f"Email: {c.email or 'N/A'}")
-        curr_y -= 15
-        p.drawString(x + 15, curr_y, f"Phone: {c.phone or 'N/A'}")
-        curr_y -= 15
-        p.drawString(x + 15, curr_y, f"Type: {c.client_type or 'Regular'}")
-        curr_y -= 15
-        p.drawString(x + 15, curr_y, f"Business: ₹{c.total_business:,.2f}" if c.total_business else "Business: ₹0.00")
-        curr_y -= 15
-        p.drawString(x + 15, curr_y, f"GSTIN: {c.gstin or 'N/A'}")
-
-        y -= block_height + 20
-
-    p.setFont("Helvetica-Oblique", 8)
-    p.drawCentredString(width/2, 35, f"Generated: {datetime.now().strftime('%d-%m-%Y %H:%M')}")
+    # Org Details (Hardcoded for now or fetch from settings if available)
+    org_style = ParagraphStyle('Org', parent=styles['Normal'], fontSize=10, spaceAfter=20)
+    user_org = "Revolutionary Invoice System" # Placeholder
+    gen_date = datetime.now().strftime("%d-%b-%Y")
     
-    p.save()
+    elements.append(Paragraph(f"<b>Organization Name:</b> {user_org}", org_style))
+    elements.append(Paragraph(f"<b>Generated On:</b> {gen_date}", org_style))
+    elements.append(Spacer(1, 10))
+    elements.append(Paragraph("<b>Client Information Structure</b>", styles['Heading3']))
+    elements.append(Spacer(1, 10))
+
+    # Table Info
+    # Data structure for Table: Header row + Data rows
+    table_data = [['Client Name', 'Email Address', 'Phone Number', 'Client Type', 'Business Value', 'GSTIN']]
+    
+    for c in filtered:
+        row = [
+            c['name'][:20], # Truncate long names
+            c['email'][:25], 
+            c['phone'], 
+            c['type'], 
+            f"Rs. {c['business_value']:,.2f}", 
+            c['gstin']
+        ]
+        table_data.append(row)
+
+    # Create Table
+    # Column widths
+    col_widths = [2.0*inch, 2.5*inch, 1.2*inch, 1.0*inch, 1.5*inch, 1.5*inch]
+    t = Table(table_data, colWidths=col_widths)
+
+    # Styling
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    
+    elements.append(t)
+    doc.build(elements)
+    
     buffer.seek(0)
+    filename = f"Client_Directory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     
-    filename = f"client_directory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     filepath = _save_buffer_to_downloads(buffer, filename)
     
     if filepath:
         return jsonify({
             'success': True,
-            'message': f'PDF report generated and saved to Downloads: {filename}',
+            'message': f'PDF report generated: {filename}',
             'filename': filename
         })
     else:
-        return jsonify({
-            'success': False,
-            'message': 'Failed to save PDF to system Downloads folder.'
-        }), 500
+        return jsonify({'success': False, 'message': 'Failed to save PDF'}), 500
 
 
 def _get_analytics_data_dict(time_range='12m'):
@@ -2067,12 +2531,33 @@ def safe_float(value):
 @app.route("/quotations/create", methods=["POST"])
 @login_required
 def create_quotation():
-
     try:
+        # Capture all possible fields from the form
         payload = {
+            "quotation_number": request.form.get("quotation_number"),
             "quotation_date": request.form.get("quotation_date"),
+            "validity_days": request.form.get("validity_days"),
             "status": request.form.get("status", "Draft"),
-            "grand_total": request.form.get("grand_total", 0)
+            "sales_person": request.form.get("sales_person"),
+            "reference_id": request.form.get("reference_id"),
+            
+            "subtotal": request.form.get("subtotal", 0),
+            "discount": request.form.get("discount", 0),
+            "taxable_value": request.form.get("taxable", 0),
+            "cgst": request.form.get("cgst", 0),
+            "sgst": request.form.get("sgst", 0),
+            "igst": request.form.get("igst", 0),
+            "shipping": request.form.get("shipping", 0),
+            "rounding": request.form.get("rounding", 0),
+            "grand_total": request.form.get("grand_total", 0),
+            
+            "delivery_timeline": request.form.get("delivery_timeline"),
+            "project_scope": request.form.get("project_scope"),
+            "milestones": request.form.get("milestones"),
+            "warranty": request.form.get("warranty"),
+            "revision_policy": request.form.get("revision_policy"),
+            "dependencies": request.form.get("dependencies"),
+            "terms": request.form.get("terms")
         }
 
         response = requests.post(
@@ -2099,8 +2584,51 @@ def create_quotation():
 # -------------------------
 @app.route("/quotations/preview/<int:qid>")
 def quotation_preview(qid):
-    q = Quotation.query.get_or_404(qid)
-    return render_template("quotation_preview.html", q=q)
+    try:
+        response = requests.get(
+            f"http://44.208.164.236:5000/api/quotations/{qid}",
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            q_data = response.json()
+            q = SimpleNamespace(
+                id=q_data["id"],
+                quotation_number=q_data["quotation_number"],
+                quotation_date=datetime.strptime(
+                    q_data["quotation_date"], "%Y-%m-%d"
+                ) if q_data.get("quotation_date") else None,
+                status=q_data.get("status"),
+                grand_total=q_data.get("grand_total", 0),
+                sales_person=q_data.get("sales_person", ""),
+                reference_id=q_data.get("reference_id", ""),
+                subtotal=q_data.get("subtotal", 0),
+                discount=q_data.get("discount", 0),
+                taxable_value=q_data.get("taxable_value", 0),
+                cgst=q_data.get("cgst", 0),
+                sgst=q_data.get("sgst", 0),
+                igst=q_data.get("igst", 0),
+                shipping=q_data.get("shipping", 0),
+                rounding=q_data.get("rounding", 0),
+                validity_days=q_data.get("validity_days"),
+                expiry_date=datetime.strptime(
+                    q_data["expiry_date"], "%Y-%m-%d"
+                ) if q_data.get("expiry_date") else None,
+                delivery_timeline=q_data.get("delivery_timeline", ""),
+                project_scope=q_data.get("project_scope", ""),
+                milestones=q_data.get("milestones", ""),
+                warranty=q_data.get("warranty", ""),
+                revision_policy=q_data.get("revision_policy", ""),
+                dependencies=q_data.get("dependencies", ""),
+                terms=q_data.get("terms", "")
+            )
+            return render_template("quotation_preview.html", q=q)
+        else:
+            flash("Quotation not found", "error")
+            return redirect(url_for("quotation_list"))
+    except Exception as e:
+        flash(f"Error loading quotation: {str(e)}", "error")
+        return redirect(url_for("quotation_list"))
 
 
 # -------------------------
@@ -2161,39 +2689,60 @@ def quotation_list():
 # -------------------------
 @app.route("/quotations/duplicate/<int:qid>")
 def duplicate_quotation(qid):
-    q = Quotation.query.get_or_404(qid)
-
-    new = Quotation(
-        quotation_number=generate_quotation_number(),
-        quotation_date=q.quotation_date,
-        validity_days=q.validity_days,
-        expiry_date=q.expiry_date,
-        status="Draft",
-        sales_person=q.sales_person,
-        reference_id=q.reference_id,
-
-        subtotal=q.subtotal,
-        discount=q.discount,
-        taxable_value=q.taxable_value,
-        cgst=q.cgst,
-        sgst=q.sgst,
-        igst=q.igst,
-        shipping=q.shipping,
-        rounding=q.rounding,
-        grand_total=q.grand_total,
-
-        delivery_timeline=q.delivery_timeline,
-        project_scope=q.project_scope,
-        milestones=q.milestones,
-        warranty=q.warranty,
-        revision_policy=q.revision_policy,
-        dependencies=q.dependencies,
-        terms=q.terms
-    )
-
-    db.session.add(new)
-    db.session.commit()
-    return redirect(url_for("quotation_preview", qid=new.id))
+    try:
+        # Fetch original quotation from API
+        response = requests.get(
+            f"http://44.208.164.236:5000/api/quotations/{qid}",
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            q_data = response.json()
+            
+            # Create duplicate via API
+            new_payload = {
+                "quotation_date": q_data.get("quotation_date"),
+                "validity_days": q_data.get("validity_days"),
+                "expiry_date": q_data.get("expiry_date"),
+                "status": "Draft",
+                "sales_person": q_data.get("sales_person"),
+                "reference_id": q_data.get("reference_id"),
+                "subtotal": q_data.get("subtotal"),
+                "discount": q_data.get("discount"),
+                "taxable_value": q_data.get("taxable_value"),
+                "cgst": q_data.get("cgst"),
+                "sgst": q_data.get("sgst"),
+                "igst": q_data.get("igst"),
+                "shipping": q_data.get("shipping"),
+                "rounding": q_data.get("rounding"),
+                "grand_total": q_data.get("grand_total"),
+                "delivery_timeline": q_data.get("delivery_timeline"),
+                "project_scope": q_data.get("project_scope"),
+                "milestones": q_data.get("milestones"),
+                "warranty": q_data.get("warranty"),
+                "revision_policy": q_data.get("revision_policy"),
+                "dependencies": q_data.get("dependencies"),
+                "terms": q_data.get("terms")
+            }
+            
+            create_response = requests.post(
+                "http://44.208.164.236:5000/api/quotations",
+                json=new_payload,
+                timeout=5
+            )
+            
+            if create_response.status_code in (200, 201):
+                new_q = create_response.json()
+                flash("Quotation duplicated successfully!", "success")
+                return redirect(url_for("quotation_preview", qid=new_q["id"]))
+            else:
+                flash("Failed to duplicate quotation", "error")
+        else:
+            flash("Original quotation not found", "error")
+    except Exception as e:
+        flash(f"Error duplicating quotation: {str(e)}", "error")
+    
+    return redirect(url_for("quotation_list"))
 
 
 # -------------------------
@@ -2201,70 +2750,168 @@ def duplicate_quotation(qid):
 # -------------------------
 @app.route("/quotations/cancel/<int:qid>")
 def cancel_quotation(qid):
-    q = Quotation.query.get_or_404(qid)
-    q.status = "Cancelled"
-    db.session.commit()
-    flash("Quotation has been cancelled.", "warning")
-    return redirect(url_for("quotation_preview", qid=q.id))
+    try:
+        response = requests.put(
+            f"http://44.208.164.236:5000/api/quotations/{qid}",
+            json={"status": "Cancelled"},
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            flash("Quotation has been cancelled.", "warning")
+            return redirect(url_for("quotation_preview", qid=qid))
+        else:
+            flash("Failed to cancel quotation", "error")
+    except Exception as e:
+        flash(f"Error cancelling quotation: {str(e)}", "error")
+    
+    return redirect(url_for("quotation_list"))
 
 
 @app.route("/quotations/<int:qid>/delete")
 def delete_quotation(qid):
-    q = Quotation.query.get_or_404(qid)
-    db.session.delete(q)
-    db.session.commit()
-    flash("Quotation deleted successfully!", "success")
+    try:
+        response = requests.delete(
+            f"http://44.208.164.236:5000/api/quotations/{qid}",
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            flash("Quotation deleted successfully!", "success")
+        else:
+            flash("Failed to delete quotation", "error")
+    except Exception as e:
+        flash(f"Error deleting quotation: {str(e)}", "error")
+    
     return redirect(url_for("quotation_list"))
 
 @app.route("/quotations/<int:qid>/pdf")
 def quotation_pdf(qid):
-    quotation = Quotation.query.get_or_404(qid)
-    pdf_buffer = generate_quotation_pdf(quotation)
-
-    filename = f"Quotation_{quotation.quotation_number.replace('-', '_')}.pdf"
-    filepath = _save_buffer_to_downloads(pdf_buffer, filename)
-    
-    if filepath:
-        return jsonify({
-            'success': True,
-            'message': f'Quotation PDF generated and saved to Downloads: {filename}',
-            'filename': filename
-        })
-    else:
+    try:
+        # Fetch quotation from API
+        response = requests.get(
+            f"http://44.208.164.236:5000/api/quotations/{qid}",
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            q_data = response.json()
+            
+            # Convert API data to SimpleNamespace for PDF generator
+            quotation = SimpleNamespace(
+                id=q_data["id"],
+                quotation_number=q_data["quotation_number"],
+                quotation_date=datetime.strptime(
+                    q_data["quotation_date"], "%Y-%m-%d"
+                ) if q_data.get("quotation_date") else None,
+                status=q_data.get("status"),
+                grand_total=q_data.get("grand_total", 0),
+                sales_person=q_data.get("sales_person", ""),
+                reference_id=q_data.get("reference_id", ""),
+                subtotal=q_data.get("subtotal", 0),
+                discount=q_data.get("discount", 0),
+                taxable_value=q_data.get("taxable_value", 0),
+                cgst=q_data.get("cgst", 0),
+                sgst=q_data.get("sgst", 0),
+                igst=q_data.get("igst", 0),
+                shipping=q_data.get("shipping", 0),
+                rounding=q_data.get("rounding", 0),
+                validity_days=q_data.get("validity_days"),
+                expiry_date=datetime.strptime(
+                    q_data["expiry_date"], "%Y-%m-%d"
+                ) if q_data.get("expiry_date") else None,
+                delivery_timeline=q_data.get("delivery_timeline", ""),
+                project_scope=q_data.get("project_scope", ""),
+                milestones=q_data.get("milestones", ""),
+                warranty=q_data.get("warranty", ""),
+                revision_policy=q_data.get("revision_policy", ""),
+                dependencies=q_data.get("dependencies", ""),
+                terms=q_data.get("terms", "")
+            )
+            
+            pdf_buffer = generate_quotation_pdf(quotation)
+            filename = f"Quotation_{quotation.quotation_number.replace('-', '_')}.pdf"
+            filepath = _save_buffer_to_downloads(pdf_buffer, filename)
+            
+            if filepath:
+                return jsonify({
+                    'success': True,
+                    'message': f'Quotation PDF generated and saved to Downloads: {filename}',
+                    'filename': filename
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': 'Failed to save PDF to system Downloads folder.'
+                }), 500
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Quotation not found in API'
+            }), 404
+    except Exception as e:
         return jsonify({
             'success': False,
-            'message': 'Failed to save PDF to system Downloads folder.'
+            'message': f'Error generating PDF: {str(e)}'
         }), 500
 
 
 @app.route("/quotations/<int:qid>/convert")
 def convert_to_invoice(qid):
-    quotation = Quotation.query.get_or_404(qid)
-
-    quotation.status = "Converted to Invoice"
-    db.session.commit()
-
-    flash("Quotation converted to Invoice successfully!", "success")
+    try:
+        response = requests.put(
+            f"http://44.208.164.236:5000/api/quotations/{qid}",
+            json={"status": "Converted to Invoice"},
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            flash("Quotation converted to Invoice successfully!", "success")
+        else:
+            flash("Failed to convert quotation", "error")
+    except Exception as e:
+        flash(f"Error converting quotation: {str(e)}", "error")
+    
     return redirect(url_for("quotation_list"))
 @app.route("/quotations/<int:qid>/send-email")
 def send_email(qid):
-    q = Quotation.query.get_or_404(qid)
-
-    # TEMP DEMO (replace with real email later)
-    print("Sending email for quotation:", q.quotation_number)
-
-    flash("Email sent successfully (demo).")
+    try:
+        response = requests.get(
+            f"http://44.208.164.236:5000/api/quotations/{qid}",
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            q_data = response.json()
+            # TEMP DEMO (replace with real email later)
+            print("Sending email for quotation:", q_data["quotation_number"])
+            flash("Email sent successfully (demo).", "success")
+        else:
+            flash("Quotation not found", "error")
+    except Exception as e:
+        flash(f"Error sending email: {str(e)}", "error")
+    
     return redirect(url_for("quotation_list"))
 
 
 @app.route("/quotations/<int:qid>/send-whatsapp")
 def send_whatsapp(qid):
-    q = Quotation.query.get_or_404(qid)
-
-    # TEMP DEMO
-    print("Sending WhatsApp for quotation:", q.quotation_number)
-
-    flash("WhatsApp sent successfully (demo).")
+    try:
+        response = requests.get(
+            f"http://44.208.164.236:5000/api/quotations/{qid}",
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            q_data = response.json()
+            # TEMP DEMO
+            print("Sending WhatsApp for quotation:", q_data["quotation_number"])
+            flash("WhatsApp sent successfully (demo).", "success")
+        else:
+            flash("Quotation not found", "error")
+    except Exception as e:
+        flash(f"Error sending WhatsApp: {str(e)}", "error")
+    
     return redirect(url_for("quotation_list"))
 
 
@@ -2273,74 +2920,52 @@ def send_whatsapp(qid):
 @login_required
 def dashboard_page():
 
-    # Get today's date
+    # ✅ REQUIRED BY TEMPLATE
     today = date.today()
 
-    #  First day of current month
-    start_of_month = date(today.year, today.month, 1)
+    try:
+        data = fetch_cloud_invoices()
+    except Exception as e:
+        logging.error(f"Dashboard cloud fetch failed: {e}")
+        data = []
 
-    #  Current Month Revenue (Only PAID invoices)
-    monthly_revenue_total = (
-        db.session.query(func.sum(Invoice.total_amount))
-        .filter(
-            Invoice.payment_status == 'Paid',
-            Invoice.invoice_date >= start_of_month,
-            Invoice.invoice_date <= today
+    recent_invoices = []
+
+    for inv in data[:10]:
+        invoice_obj = SimpleNamespace(
+            id=inv.get("id"),
+            invoice_number=inv.get("invoice_number"),
+            total_amount=inv.get("total_amount", 0),
+            amount_paid=inv.get("amount_paid", 0),
+            payment_status=inv.get("payment_status"),
+            client=SimpleNamespace(
+                name=inv.get("client_name", "Unknown")
+            )
         )
-        .scalar()
-    ) or 0
-
-    #  Outstanding Amount (Pending money only)
-    outstanding_amount = (
-        db.session.query(
-            func.sum(Invoice.total_amount - Invoice.amount_paid)
-        )
-        .filter(
-            Invoice.payment_status.in_(['Unpaid', 'Partially Paid'])
-        )
-        .scalar()
-    ) or 0
-
-    #  Recent Invoices (ALL: Paid, Unpaid, Partial)
-    recent_invoices = (
-        Invoice.query
-        .order_by(Invoice.invoice_date.desc())
-        .limit(10)
-        .all()
-    )
-
-    #  Monthly revenue for last 12 months (Paid invoices only)
-    monthly_revenue_rows = (
-        db.session.query(
-            func.strftime('%Y-%m', Invoice.invoice_date).label("month"),
-            func.sum(Invoice.total_amount).label("revenue")
-        )
-        .filter(Invoice.payment_status == 'Paid')
-        .group_by("month")
-        .order_by("month")
-        .all()
-    )
-
-    monthly_revenue = [
-        {
-            "month": row.month,
-            "revenue": float(row.revenue)
-        }
-        for row in monthly_revenue_rows
-    ]
-
-    print(" Current Month Revenue:", monthly_revenue_total)
-    print(" Outstanding Amount:", outstanding_amount)
-    print(" Recent Invoices Count:", len(recent_invoices))
-    print(" Monthly Revenue Data:", monthly_revenue)
+        recent_invoices.append(invoice_obj)
 
     return render_template(
         "dashboard.html",
-        monthly_revenue_total=monthly_revenue_total,
-        outstanding_amount=outstanding_amount,
+
+        # 🔑 MUST-HAVE VARIABLES
+        today=today,
         recent_invoices=recent_invoices,
-        monthly_revenue=monthly_revenue   # ✅ NEW
+
+        # 🔑 METRICS (safe defaults)
+        monthly_revenue_total=0,
+        outstanding_amount=0,
+        total_invoices=len(data),
+        total_clients=0,
+
+        # 🔑 CHART
+        monthly_revenue=[],
+
+        # 🔑 OPTIONAL SECTIONS (prevent crashes)
+        ai_insights={},
+        upcoming_payments=[],
+        blockchain_stats=None
     )
+
 
 
 @app.route('/api/voice_command_regex', methods=['POST'])
@@ -2548,6 +3173,9 @@ def challan_pdf(id):
         logging.error(f"Challan PDF generation failed: {e}")
         flash(f'Error generating PDF: {str(e)}', 'error')
         return redirect(url_for('delivery_challan'))
+
+
+
 
 
 

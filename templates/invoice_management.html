@@ -128,14 +128,14 @@
                     <input type="checkbox" class="form-check-input me-2" id="selectAll">
                     <label for="selectAll" class="form-check-label">Select All</label>
                     <div class="bulk-actions ms-3" style="display: none;">
-                    <button class="btn btn-outline-danger btn-sm me-2" onclick="bulkDelete()">
-                        <i data-feather="trash-2" size="14"></i> Delete Selected
-                    </button>
+                        <button class="btn btn-outline-danger btn-sm me-2" onclick="bulkDelete()">
+                            <i data-feather="trash-2" size="14"></i> Delete Selected
+                        </button>
 
-                    <button class="btn btn-outline-primary btn-sm" onclick="bulkExport()">
-                        <i data-feather="download" size="14"></i> Export Selected
-                    </button>
-                </div>
+                        <button class="btn btn-outline-primary btn-sm" onclick="bulkExport()">
+                            <i data-feather="download" size="14"></i> Export Selected
+                        </button>
+                    </div>
 
                 </div>
                 <div class="text-muted small">
@@ -149,7 +149,7 @@
                     <thead class="table-light">
                         <tr>
                             <th width="40">
-                                
+
                             </th>
                             <th>Invoice #</th>
                             <th>Client</th>
@@ -251,7 +251,7 @@
                                 <div class="d-flex flex-wrap gap-1 align-items-center">
                                     <!-- View Details -->
                                     <a href="{{ url_for('invoice_detail', id=invoice.id) }}"
-                                        class="btn btn-outline-primary btn-sm" target="_blank" title="View Details">
+                                        class="btn btn-outline-primary btn-sm" title="View Details">
                                         <i data-feather="eye" size="14"></i>
                                     </a>
 
@@ -262,7 +262,7 @@
                                     </a>
 
                                     <!-- Blockchain Verify -->
-                                   
+
 
                                     <!-- Edit -->
                                     <button class="btn btn-outline-warning btn-sm"
@@ -480,8 +480,8 @@
 
     function sendInvoice(invoiceId) {
         console.log('Sending invoice:', invoiceId);
-        
-        fetch(`/invoice/${invoiceId}/send`, { 
+
+        fetch(`/invoice/${invoiceId}/send`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -560,7 +560,7 @@
     // Download invoice PDF - direct save to Downloads folder for desktop app
     function downloadInvoice(invoiceId) {
         console.log('Downloading invoice:', invoiceId);
-        
+
         fetch(`/invoice/${invoiceId}/download-pdf`, { method: 'GET' })
             .then(res => res.json())
             .then(data => {

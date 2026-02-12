@@ -1,0 +1,151 @@
+
+def _save_buffer_to_downloads(buffer, filename):
+    import os
+    try:
+        downloads_path = os.path.join(os.path.expanduser("~"), "Downloads")
+        filepath = os.path.join(downloads_path, filename)
+        with open(filepath, "wb") as f:
+            f.write(buffer.getvalue())
+        return filepath
+    except Exception as e:
+        print(f"Failed to save to downloads: {e}")
+        return None
+
+@app.route('/api/export/clients/pdf')
+@login_required
+def export_clients_pdf():
+    # --- 1. Fetch Hybrid Data (Copy logic from client_management) ---
+    search = request.args.get('search', '').lower()
+    client_type = request.args.get('type', '')
+    
+    client_list = []
+    today = datetime.utcnow().date()
+
+    # Cloud Fetch
+    try:
+        r_c = requests.get("http://44.208.164.236:5000/api/clients", timeout=3)
+        cloud_clients = r_c.json() if r_c.status_code == 200 else []
+        
+        r_i = requests.get("http://44.208.164.236:5000/api/invoices", timeout=3)
+        cloud_invoices = r_i.json() if r_i.status_code == 200 else []
+        
+        for c in cloud_clients:
+            c_invs = [inv for inv in cloud_invoices if inv.get('client_id') == c['id']]
+            total_biz = sum(inv.get('total_amount', 0) for inv in c_invs)
+            
+            client_dict = {
+                'name': c.get('name', ''),
+                'email': c.get('email', ''),
+                'phone': c.get('phone', ''),
+                'type': 'Regular', # Cloud default
+                'gstin': 'N/A', # Cloud default
+                'business_value': total_biz
+            }
+            client_list.append(client_dict)
+    except Exception as e:
+        print(f"Cloud fetch error in export: {e}")
+
+    # Local Fetch
+    local_clients = Client.query.all()
+    for lc in local_clients:
+        client_dict = {
+            'name': lc.name,
+            'email': lc.email,
+            'phone': lc.phone,
+            'type': lc.client_type,
+            'gstin': lc.gstin or 'N/A',
+            'business_value': lc.total_business or 0
+        }
+        client_list.append(client_dict)
+
+    # Filter
+    filtered = []
+    for c in client_list:
+        if search:
+            if not (search in c['name'].lower() or search in c['email'].lower() or search in c['phone'].lower()):
+                continue
+        if client_type and c['type'] != client_type:
+            continue
+        filtered.append(c)
+        
+    filtered.sort(key=lambda x: x['name'])
+
+    # --- 2. Generate PDF ---
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=18)
+    elements = []
+    styles = getSampleStyleSheet()
+
+    # Header
+    title_style = ParagraphStyle(
+        'Title',
+        parent=styles['Heading1'],
+        fontSize=24,
+        alignment=1, # Center
+        spaceAfter=20,
+        textColor=colors.black
+    )
+    elements.append(Paragraph("Client Directory Report", title_style))
+    
+    # Org Details (Hardcoded for now or fetch from settings if available)
+    org_style = ParagraphStyle('Org', parent=styles['Normal'], fontSize=10, spaceAfter=20)
+    user_org = "Revolutionary Invoice System" # Placeholder
+    gen_date = datetime.now().strftime("%d-%b-%Y")
+    
+    elements.append(Paragraph(f"<b>Organization Name:</b> {user_org}", org_style))
+    elements.append(Paragraph(f"<b>Generated On:</b> {gen_date}", org_style))
+    elements.append(Spacer(1, 10))
+    elements.append(Paragraph("<b>Client Information Structure</b>", styles['Heading3']))
+    elements.append(Spacer(1, 10))
+
+    # Table Info
+    # Data structure for Table: Header row + Data rows
+    table_data = [['Client Name', 'Email Address', 'Phone Number', 'Client Type', 'Business Value', 'GSTIN']]
+    
+    for c in filtered:
+        row = [
+            c['name'][:20], # Truncate long names
+            c['email'][:25], 
+            c['phone'], 
+            c['type'], 
+            f"Rs. {c['business_value']:,.2f}", 
+            c['gstin']
+        ]
+        table_data.append(row)
+
+    # Create Table
+    # Column widths
+    col_widths = [2.0*inch, 2.5*inch, 1.2*inch, 1.0*inch, 1.5*inch, 1.5*inch]
+    t = Table(table_data, colWidths=col_widths)
+
+    # Styling
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    
+    elements.append(t)
+    doc.build(elements)
+    
+    buffer.seek(0)
+    filename = f"Client_Directory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    
+    filepath = _save_buffer_to_downloads(buffer, filename)
+    
+    if filepath:
+        return jsonify({
+            'success': True,
+            'message': f'PDF report generated: {filename}',
+            'filename': filename
+        })
+    else:
+        return jsonify({'success': False, 'message': 'Failed to save PDF'}), 500
