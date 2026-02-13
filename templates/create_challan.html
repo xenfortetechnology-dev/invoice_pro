@@ -3,6 +3,30 @@
 {% block title %}Create Delivery Challan - Invoice Management System{% endblock %}
 
 {% block content %}
+<style>
+    /* Custom scrollbar for Tom Select dropdown */
+    .ts-dropdown .ts-dropdown-content::-webkit-scrollbar {
+        width: 4px !important;
+    }
+
+    .ts-dropdown .ts-dropdown-content::-webkit-scrollbar-track {
+        background: transparent !important;
+    }
+
+    .ts-dropdown .ts-dropdown-content::-webkit-scrollbar-thumb {
+        background: #888 !important;
+        border-radius: 2px !important;
+    }
+
+    .ts-dropdown .ts-dropdown-content::-webkit-scrollbar-thumb:hover {
+        background: #555 !important;
+    }
+
+    /* Make dropdown more compact */
+    .ts-dropdown .ts-dropdown-content {
+        max-height: 100px !important;
+    }
+</style>
 <div class="container-fluid py-4">
     <div class="row">
         <div class="col-12">
@@ -219,29 +243,39 @@
 
     document.addEventListener("DOMContentLoaded", function () {
 
-        const clientSelect = document.getElementById("client_id");
-        const detailsBox = document.getElementById("clientDetails");
+        // Initialize Tom Select for client dropdown with custom scrollbar
+        const clientSelectElement = document.getElementById("client_id");
+        const tomSelectInstance = new TomSelect(clientSelectElement, {
+            placeholder: 'Choose a client...',
+            maxOptions: null,
+            onChange: function (value) {
+                const detailsBox = document.getElementById("clientDetails");
 
-        clientSelect.addEventListener("change", function () {
+                if (!value) {
+                    detailsBox.classList.add("d-none");
+                    return;
+                }
 
-            const selected = this.options[this.selectedIndex];
+                // Get the original option element by value
+                const selected = clientSelectElement.querySelector(`option[value="${value}"]`);
 
-            if (!selected.value) {
-                detailsBox.classList.add("d-none");
-                return;
+                if (!selected) {
+                    detailsBox.classList.add("d-none");
+                    return;
+                }
+
+                // Access data attributes from the original option
+                document.getElementById("clientAddress").innerText =
+                    selected.getAttribute('data-address') || "N/A";
+
+                document.getElementById("clientCity").innerText =
+                    selected.getAttribute('data-city') || "N/A";
+
+                document.getElementById("clientPhone").innerText =
+                    selected.getAttribute('data-phone') || "N/A";
+
+                detailsBox.classList.remove("d-none");
             }
-
-            document.getElementById("clientAddress").innerText =
-                selected.dataset.address || "N/A";
-
-            document.getElementById("clientCity").innerText =
-                selected.dataset.city || "N/A";
-
-            document.getElementById("clientPhone").innerText =
-                selected.dataset.phone || "N/A";
-
-            // ✅ SHOW DETAILS BOX
-            detailsBox.classList.remove("d-none");
         });
 
     });
@@ -251,7 +285,7 @@
 
     //let challanItemCounter = 0;
     //let challanItems = [];
-    let challanItemCounter = 1;
+    let challanItemCounter = 0;
 
     function addChallanItem() {
         challanItemCounter++;
@@ -285,6 +319,9 @@
         [qtyInput, priceInput].forEach(input => {
             input.addEventListener('input', calculateChallanTotals);
         });
+
+        // Renumber all items to ensure sequential order
+        renumberChallanItems();
     }
 
     function removeChallanItem(button) {

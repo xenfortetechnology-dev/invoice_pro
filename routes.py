@@ -1730,7 +1730,7 @@ def create_challan():
             flash(f"Error creating challan: {e}", 'error')
     
     client_list = fetch_cloud_clients()
-    clients = [SimpleNamespace(**c) for c in client_list][:2] # Limit to 2 clients as requested
+    clients = [SimpleNamespace(**c) for c in client_list]  # Show all clients
     return render_template("create_challan.html", clients=clients, today=datetime.now())
 
 @app.route('/challan/preview', methods=['POST'])
