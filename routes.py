@@ -1403,11 +1403,15 @@ def export_clients_pdf():
 
 def _get_analytics_data_dict(time_range='12m'):
     """Helper to gather all analytics data as a dictionary"""
+    # Fetch cloud data
+    invoices_data = fetch_cloud_invoices()
+    clients_data = fetch_cloud_clients()
+    
     analytics_data = {
-        'revenue_trends': analytics_engine.get_revenue_trends(time_range),
-        'client_performance': analytics_engine.get_client_performance_metrics(),
-        'payment_analytics': analytics_engine.get_payment_analytics(),
-        'profitability_analysis': analytics_engine.get_profitability_analysis(),
+        'revenue_trends': analytics_engine.compute_revenue_trends(invoices_data, time_range),
+        'client_performance': analytics_engine.compute_client_performance_metrics(invoices_data, clients_data),
+        'payment_analytics': analytics_engine.compute_payment_analytics(invoices_data),
+        'profitability_analysis': analytics_engine.compute_profitability_analysis(invoices_data),
         'ai_predictions': {},
         'blockchain_insights': {}
     }
