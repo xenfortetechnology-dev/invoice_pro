@@ -3182,14 +3182,16 @@ def dashboard_page():
     today = date.today()
 
     try:
-        data = fetch_cloud_invoices()
+        invoices = fetch_cloud_invoices()
+        clients = fetch_cloud_clients()
     except Exception as e:
         logging.error(f"Dashboard cloud fetch failed: {e}")
-        data = []
+        invoices = []
+        clients = []
 
     recent_invoices = []
 
-    for inv in data[:10]:
+    for inv in invoices[:10]:
         invoice_obj = SimpleNamespace(
             id=inv.get("id"),
             invoice_number=inv.get("invoice_number"),
@@ -3202,6 +3204,37 @@ def dashboard_page():
         )
         recent_invoices.append(invoice_obj)
 
+    # 📊 Compute Metrics from Cloud Data
+    rev_trends = analytics_engine.compute_revenue_trends(invoices)
+    monthly_revenue = rev_trends.get('monthly_data', [])
+    
+    # Calculate totals
+    monthly_revenue_total = sum(item['revenue'] for item in monthly_revenue)
+    
+    # Calculate growth (latest month vs previous)
+    revenue_growth = 0
+    if monthly_revenue:
+        revenue_growth = monthly_revenue[-1].get('growth_rate', 0)
+
+    outstanding_amount = sum(
+        float(inv.get('total_amount', 0)) - float(inv.get('amount_paid', 0))
+        for inv in invoices 
+        if inv.get('payment_status') != 'Paid'
+    )
+
+    # Calculate recent invoices count (last 30 days)
+    thirty_days_ago = today - timedelta(days=30)
+    new_invoices_count = 0
+    for inv in invoices:
+        inv_date_str = inv.get('invoice_date')
+        if inv_date_str:
+            try:
+                inv_date = datetime.strptime(inv_date_str, '%Y-%m-%d').date()
+                if inv_date >= thirty_days_ago:
+                    new_invoices_count += 1
+            except ValueError:
+                pass
+
     return render_template(
         "dashboard.html",
 
@@ -3209,14 +3242,16 @@ def dashboard_page():
         today=today,
         recent_invoices=recent_invoices,
 
-        # 🔑 METRICS (safe defaults)
-        monthly_revenue_total=0,
-        outstanding_amount=0,
-        total_invoices=len(data),
-        total_clients=0,
+        # 🔑 METRICS (Calculated)
+        monthly_revenue_total=monthly_revenue_total,
+        revenue_growth=revenue_growth,
+        outstanding_amount=outstanding_amount,
+        total_invoices=len(invoices),
+        new_invoices_count=new_invoices_count,
+        total_clients=len(clients),
 
         # 🔑 CHART
-        monthly_revenue=[],
+        monthly_revenue=monthly_revenue,
 
         # 🔑 OPTIONAL SECTIONS (prevent crashes)
         ai_insights={},

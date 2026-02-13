@@ -48,8 +48,10 @@
                             ₹{{ "%.2f"|format(monthly_revenue_total or 0) }}
                         </h3>
 
-                        <small class="text-success">
-                            <i data-feather="trending-up" size="14"></i> +12.5% this month
+                        <small class="{{ 'text-success' if revenue_growth >= 0 else 'text-danger' }}">
+                            <i data-feather="{{ 'trending-up' if revenue_growth >= 0 else 'trending-down' }}"
+                                size="14"></i>
+                            {{ '+' if revenue_growth > 0 else '' }}{{ revenue_growth }}% this month
                         </small>
                     </div>
                 </div>
@@ -86,7 +88,7 @@
                         <p class="text-muted mb-1 small">Total Invoices</p>
                         <h3 class="fw-bold mb-0 text-body">{{ total_invoices }}</h3>
                         <small class="text-warning">
-                            <i data-feather="file" size="14"></i> {{ recent_invoices|length }} recent
+                            <i data-feather="file" size="14"></i> {{ new_invoices_count }} recent
                         </small>
                     </div>
                 </div>
@@ -156,10 +158,10 @@
 
 
                     <!--Scan Document-->
-                    <button class="btn btn-outline-info glass-btn text-start" data-bs-toggle="modal"
+                    <!-- <button class="btn btn-outline-info glass-btn text-start" data-bs-toggle="modal"
                         data-bs-target="#documentScannerModal" disabled>
                         <i data-feather="camera" class="me-2"></i> Scan Document
-                    </button>
+                    </button> -->
 
                     {% endif %}
 
@@ -170,9 +172,9 @@
 
                     {% if blockchain_enabled %}
                     <!-- Blockchain Status -->
-                    <button class="btn btn-outline-dark glass-btn text-start" id="blockchainStatsBtn" disabled>
+                    <!-- <button class="btn btn-outline-dark glass-btn text-start" id="blockchainStatsBtn" disabled>
                         <i data-feather="shield" class="me-2"></i> Blockchain Status
-                    </button>
+                    </button> -->
                     {% endif %}
 
                 </div>
@@ -407,25 +409,9 @@
                 function buildMonthSeries(monthCount) {
                     const today = new Date();
                     const result = [];
-                    const currentYear = today.getFullYear();
 
-                    // ✅ 12M → Full current year Jan → Dec
-                    if (monthCount === 12) {
-                        for (let m = 0; m < 12; m++) {
-                            const d = new Date(currentYear, m, 1);
-                            const key = `${currentYear}-${String(m + 1).padStart(2, "0")}`;
-                            const match = revenueData.find(r => r.month === key);
-
-                            result.push({
-                                month: key,
-                                revenue: match ? match.revenue : 0
-                            });
-                        }
-                        return result;
-                    }
-
-                    // ✅ 6M → Last 6 months from current month
-                    for (let i = 5; i >= 0; i--) {
+                    // Generate last N months dynamically
+                    for (let i = monthCount - 1; i >= 0; i--) {
                         const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
                         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
                         const match = revenueData.find(r => r.month === key);
