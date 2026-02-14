@@ -52,11 +52,11 @@
                             <i data-feather="cpu" class="me-1"></i> AI Settings
                         </a>
                     </li>
-                    <li class="nav-item">
+                    <!-- <li class="nav-item">
                         <a class="nav-link" href="#blockchain" data-bs-toggle="pill">
                             <i data-feather="shield" class="me-1"></i> Blockchain
                         </a>
-                    </li>
+                    </li> -->
                     <li class="nav-item">
                         <a class="nav-link" href="#invoice" data-bs-toggle="pill">
                             <i data-feather="file-text" class="me-1"></i> Invoice
@@ -478,7 +478,7 @@
                     </div>
                 </div>
 
-                <!-- Blockchain Settings -->
+                <!-- Blockchain Settings 
                 <div class="tab-pane fade" id="blockchain">
                     <div class="glass-card p-4">
                         <h5 class="fw-bold mb-4">
@@ -598,7 +598,7 @@
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>-->
 
                 <!-- Invoice Settings -->
                 <div class="tab-pane fade" id="invoice">
@@ -979,6 +979,24 @@ Subject to local jurisdiction only.</textarea>
     document.addEventListener('DOMContentLoaded', function () {
         initializeSettings();
         setupEventListeners();
+        // Load user profile from cloud
+fetch("http://44.208.164.236:5000/api/user/profile")
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById("username").value = data.username || "";
+        document.getElementById("userEmail").value = data.email || "";
+        document.getElementById("preferredLanguage").value = data.preferred_language || "en";
+        document.getElementById("themePreference").value = data.theme_preference || "light";
+
+        document.getElementById("aiFeatures").checked = data.ai_features_enabled || false;
+        document.getElementById("voiceCommands").checked = data.voice_commands_enabled || false;
+        document.getElementById("collaborationAccess").checked = data.collaboration_access || false;
+        document.getElementById("biometricEnabled").checked = data.biometric_enabled || false;
+    })
+    .catch(error => {
+        console.error("Error loading user profile:", error);
+    });
+
     });
 
     function initializeSettings() {
@@ -1042,8 +1060,7 @@ Subject to local jurisdiction only.</textarea>
         // Show loading state
         saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
         saveBtn.disabled = true;
-
-        // Collect all form data
+         // Collect all form data
         const settings = {
             company: collectFormData('companyForm'),
             user: collectFormData('userForm'),
@@ -1053,19 +1070,55 @@ Subject to local jurisdiction only.</textarea>
             notifications: collectFormData('notificationForm'),
             security: collectFormData('securityForm')
         };
+        // Save user profile to cloud
+        fetch("http://44.208.164.236:5000/api/user/profile", {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            email: settings.user.userEmail,
+            preferred_language: settings.user.preferredLanguage,
+            theme_preference: settings.user.themePreference,
+            ai_features_enabled: settings.user.aiFeatures,
+            voice_commands_enabled: settings.user.voiceCommands,
+            collaboration_access: settings.user.collaborationAccess,
+            biometric_enabled: settings.user.biometricEnabled
+        })
+        })
+        .then(res => res.json())
+        .then(data => {
+        console.log("User profile updated:", data);
+        })
+        .catch(error => {
+        console.error("User update failed:", error);
+        });
+
+       
 
         // DEBUG: Alert the user what we are sending
         alert("DEBUG: Sending data to server:\n" + JSON.stringify(settings.company, null, 2));
         console.log('SaveAllSettings: Sending payload', settings);
 
         // In real application, send to backend
-        fetch('/settings/update', {
-            method: 'POST',
+        fetch('http://44.208.164.236:5000/api/company', {
+        method: 'PUT',
+
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(settings)
-        })
+            body: JSON.stringify({name: settings.company.companyName,
+            email: settings.company.companyEmail,
+            phone: settings.company.companyPhone,
+            website: settings.company.companyWebsite,
+            address: settings.company.companyAddress,
+            city: settings.company.companyCity,
+            state: settings.company.companyState,
+            pincode: settings.company.companyPincode,
+            gstin: settings.company.companyGstin,
+            pan: settings.company.companyPan,
+            logo_path: ""})
+                })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -1138,10 +1191,7 @@ Subject to local jurisdiction only.</textarea>
 
         return data;
     }
-
-    function setupFormValidation() {
-        // Password confirmation validation
-        function validatePasswords() {
+       function validatePasswords() {
             const newPassword = document.getElementById('newPassword');
             const confirmPassword = document.getElementById('confirmPassword');
 
@@ -1156,6 +1206,10 @@ Subject to local jurisdiction only.</textarea>
                 }
             }
         }
+
+    function setupFormValidation() {
+        // Password confirmation validation
+     
 
         // GST validation
         const gstinInput = document.getElementById('companyGstin');

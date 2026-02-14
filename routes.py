@@ -1553,19 +1553,22 @@ def ai_assistant_page():
 @app.route('/settings')
 @login_required
 def settings():
-    """Application settings with AI and blockchain configuration"""
-    company = Company.query.first()
-    user = User.query.get(session['user_id'])
-    business_settings = BusinessSettings.query.all()
-    
+
+    cloud_url = "http://44.208.164.236:5000/api/company"
+
+    try:
+        response = requests.get(cloud_url)
+        company_data = response.json() if response.status_code == 200 else {}
+    except:
+        company_data = {}
+
     settings_data = {
-        'company': company,
-        'user': user,
-        'business_settings': {setting.key: setting.value for setting in business_settings},
-        'ai_enabled': app.config.get("AI_FEATURES_ENABLED", False),
-        'blockchain_enabled': app.config.get("BLOCKCHAIN_ENABLED", False)
+        'company': company_data,
+        'user': None,
+        'ai_enabled': True,
+        'blockchain_enabled': True
     }
-    
+
     return render_template('settings.html', settings_data=settings_data)
 
 @app.route('/settings/update', methods=['POST'])
