@@ -119,8 +119,18 @@
   background-color: var(--body-bg) !important;
 }
 
+/* delivery */
 
+.card-header{
+  color: var(--text-primary-light) !important;
+}
 
+.form-label{
+  color: var(--text-primary-light) !important;
+}
+.badge{
+  color: var(--text-primary-light) !important;
+}
 /*  AI Assistant*/
 
 .message-bubble{
