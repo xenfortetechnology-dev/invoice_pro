@@ -3,7 +3,7 @@ from io import BytesIO
 from app import db
 import os
 from datetime import datetime
-from turtle import pd
+import pandas as pd
 from flask import send_file
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4

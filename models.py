@@ -341,7 +341,7 @@ class BankDetails(db.Model):
 
 
 from datetime import datetime
-from app import db
+# from app import db
 
 class Quotation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -374,6 +374,11 @@ class Quotation(db.Model):
     terms = db.Column(db.Text)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class DeletedQuotation(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    quotation_id = db.Column(db.Integer, unique=True, nullable=False)
+    deleted_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 # ==========================
 # BUSINESS VALIDATIONS & HOOKS
