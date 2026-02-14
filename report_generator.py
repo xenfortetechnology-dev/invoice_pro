@@ -21,45 +21,179 @@ class AnalyticsReportGenerator:
         pass
         
     def generate_excel_report(self, analytics_data):
-        """Generate Excel report from analytics data dictionary"""
+        """
+        Generate Excel report from analytics data dictionary.
+        Matches PDF structure: Header -> Revenue -> Profit -> Payments -> Summary
+        """
         output = io.BytesIO()
         
         # safely extract data with defaults
         revenue = safe_dict(analytics_data.get("revenue_trends", {}))
         profit = safe_dict(analytics_data.get("profitability_analysis", {}))
         payments = safe_dict(analytics_data.get("payment_analytics", {}))
-        clients = safe_dict(analytics_data.get("client_performance", {}))
+        # Client performance removed to match PDF
 
         with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+            workbook = writer.book
             
-            # Revenue Sheet
+            # --- Formats ---
+            header_format = workbook.add_format({'bold': True, 'align': 'center', 'font_size': 14})
+            sub_header_format = workbook.add_format({'bold': True, 'font_size': 12, 'underline': True})
+            table_header_format = workbook.add_format({'bold': True, 'bg_color': '#D3D3D3', 'border': 1})
+            currency_format = workbook.add_format({'num_format': '₹#,##0.00'})
+            bold_format = workbook.add_format({'bold': True})
+            
+            # --- Main Sheet: Analytics Report ---
+            worksheet = workbook.add_worksheet("Analytics Report")
+            writer.sheets["Analytics Report"] = worksheet
+            
+            row = 0
+            
+            # 1. Report Header
+            # Check config or default
+            try:
+                import config
+                org_name = getattr(config, 'COMPANY_NAME', 'Xenforte')
+            except:
+                org_name = 'Xenforte'
+
+            worksheet.merge_range(row, 0, row, 4, "Analytics Report", header_format)
+            row += 2
+            worksheet.write(row, 0, f"Organization: {org_name}")
+            row += 1
+            worksheet.write(row, 0, f"Generated On: {datetime.now().strftime('%d-%m-%Y %H:%M')}")
+            row += 1
+            worksheet.write(row, 0, "Reporting Period: Last 12 Months")
+            row += 2
+            
+            # 2. Revenue Trends
+            worksheet.write(row, 0, "1. Revenue Trends", sub_header_format)
+            row += 2
+            
             revenue_data = revenue.get("monthly_data", [])
-            if revenue_data:
-                pd.DataFrame(revenue_data).to_excel(writer, sheet_name="Revenue Trends", index=False)
-            else:
-                pd.DataFrame({"Message": ["No revenue data available"]}).to_excel(writer, sheet_name="Revenue Trends", index=False)
-
-            # Profit Sheet
-            profit_data = profit.get("monthly_trends", [])
-            if profit_data:
-                pd.DataFrame(profit_data).to_excel(writer, sheet_name="Profitability", index=False)
-            else:
-                 pd.DataFrame({"Message": ["No profitability data available"]}).to_excel(writer, sheet_name="Profitability", index=False)
-
-            # Payments Sheet
-            payment_data = payments.get("payment_status_distribution", [])
-            if payment_data:
-                pd.DataFrame(payment_data).to_excel(writer, sheet_name="Payments", index=False)
-            else:
-                pd.DataFrame({"Message": ["No payment data available"]}).to_excel(writer, sheet_name="Payments", index=False)
-
-            # Client Performance Sheet
-            client_data = clients.get("top_clients", [])
-            if client_data:
-                pd.DataFrame(client_data).to_excel(writer, sheet_name="Client Performance", index=False)
-            else:
-                pd.DataFrame({"Message": ["No client data available"]}).to_excel(writer, sheet_name="Client Performance", index=False)
+            df_revenue = pd.DataFrame(revenue_data)
+            if not df_revenue.empty:
+                # Rename cols for display
+                df_revenue = df_revenue.rename(columns={
+                    "month": "Month", 
+                    "revenue": "Revenue (₹)", 
+                    "invoice_count": "Number of Invoices"
+                })
+                # Select specific columns to match PDF
+                cols_to_show = ["Month", "Revenue (₹)", "Number of Invoices"]
+                # Ensure cols exist
+                valid_cols = [c for c in cols_to_show if c in df_revenue.columns]
+                df_revenue = df_revenue[valid_cols] if valid_cols else df_revenue
                 
+                df_revenue.to_excel(writer, sheet_name="Analytics Report", startrow=row, index=False)
+                
+                # Apply format to Revenue column (approximate check)
+                # Pandas writes header at 'row', data starts 'row+1'
+                # Revenue is col 1 (B) if strictly following the list
+                for i in range(len(df_revenue)):
+                    worksheet.write_number(row + 1 + i, 1, df_revenue.iloc[i]["Revenue (₹)"], currency_format)
+                
+                row += len(df_revenue) + 3
+            else:
+                worksheet.write(row, 0, "-")
+                row += 3
+
+            # 3. Profitability Analysis
+            worksheet.write(row, 0, "2. Profitability Analysis", sub_header_format)
+            row += 2
+            
+            profit_data = profit.get("monthly_trends", [])
+            df_profit = pd.DataFrame(profit_data)
+            if not df_profit.empty:
+                df_profit = df_profit.rename(columns={
+                    "month": "Month",
+                    "revenue": "Revenue (₹)", 
+                    "cost": "Cost (₹)", 
+                    "profit": "Profit (₹)",
+                    "margin_percentage": "Margin (%)"
+                })
+                cols_to_show = ["Month", "Revenue (₹)", "Cost (₹)", "Profit (₹)", "Margin (%)"]
+                valid_cols = [c for c in cols_to_show if c in df_profit.columns]
+                df_profit = df_profit[valid_cols] if valid_cols else df_profit
+                
+                df_profit.to_excel(writer, sheet_name="Analytics Report", startrow=row, index=False)
+                
+                # Apply currency formats
+                # Revenue (B), Cost (C), Profit (D)
+                for i in range(len(df_profit)):
+                    if "Revenue (₹)" in df_profit.columns:
+                        worksheet.write_number(row + 1 + i, 1, df_profit.iloc[i].get("Revenue (₹)", 0), currency_format)
+                    if "Cost (₹)" in df_profit.columns:
+                        worksheet.write_number(row + 1 + i, 2, df_profit.iloc[i].get("Cost (₹)", 0), currency_format)
+                    if "Profit (₹)" in df_profit.columns:
+                        worksheet.write_number(row + 1 + i, 3, df_profit.iloc[i].get("Profit (₹)", 0), currency_format)
+
+                row += len(df_profit) + 3
+            else:
+                worksheet.write(row, 0, "-")
+                row += 3
+
+            # 4. Payment Status Distribution
+            worksheet.write(row, 0, "3. Payment Status Distribution", sub_header_format)
+            row += 2
+            
+            payment_data = payments.get("payment_status_distribution", [])
+            df_payments = pd.DataFrame(payment_data)
+            if not df_payments.empty:
+                df_payments = df_payments.rename(columns={
+                    "status": "Payment Status",
+                    "count": "Invoice Count", 
+                    "amount": "Amount (₹)"
+                })
+                cols_to_show = ["Payment Status", "Invoice Count", "Amount (₹)"]
+                valid_cols = [c for c in cols_to_show if c in df_payments.columns]
+                df_payments = df_payments[valid_cols] if valid_cols else df_payments
+                
+                df_payments.to_excel(writer, sheet_name="Analytics Report", startrow=row, index=False)
+                
+                # Apply currency format to Amount (C)
+                for i in range(len(df_payments)):
+                     worksheet.write_number(row + 1 + i, 2, df_payments.iloc[i]["Amount (₹)"], currency_format)
+
+                row += len(df_payments) + 4
+            else:
+                worksheet.write(row, 0, "-")
+                row += 4
+
+            # 5. Summary Section
+            worksheet.write(row, 0, "Summary", sub_header_format)
+            row += 2
+            
+            overall_profit = profit.get("overall", {})
+            total_revenue = overall_profit.get("total_revenue", 0)
+            total_profit = overall_profit.get("total_profit", 0)
+            total_cost = overall_profit.get("total_cost", 0)
+            
+            outstanding_amount = sum(
+                p.get('amount', 0) for p in payment_data 
+                if p.get('status') in ['Unpaid', 'Partially Paid']
+            )
+            
+            worksheet.write(row, 0, "Total Revenue:", bold_format)
+            worksheet.write_number(row, 1, total_revenue, currency_format)
+            row += 1
+            
+            worksheet.write(row, 0, "Total Profit:", bold_format)
+            worksheet.write_number(row, 1, total_profit, currency_format)
+            row += 1
+            
+            worksheet.write(row, 0, "Total Cost:", bold_format)
+            worksheet.write_number(row, 1, total_cost, currency_format)
+            row += 1
+            
+            worksheet.write(row, 0, "Outstanding Amount:", bold_format)
+            worksheet.write_number(row, 1, outstanding_amount, currency_format)
+            row += 1
+
+            # Adjust column widths
+            worksheet.set_column(0, 0, 25) # Month/Label
+            worksheet.set_column(1, 4, 18) # Metrics
+            
         output.seek(0)
         return output
 
