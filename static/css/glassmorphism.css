@@ -80,9 +80,12 @@
   .sidebar{
     background-color:var(--body-bg);
   }
-  .dropdown-item{
-    color: var(--text-primary-light);
+  .dropdown-menu{
+    background-color: var(--text-primary-dark) !important;
 
+  }
+  .dropdown-item{
+    color: var(--text-primary-light) !important;
   }
   .dropdown-item:hover{
     color: var(--text-primary-dark);
@@ -118,6 +121,14 @@
 .border{
   background-color: var(--body-bg) !important;
 }
+
+
+/* Analytics */
+
+/* .dropdown-item
+{
+  color: var(--text-primary-light) !important;
+} */
 
 /* delivery */
 
