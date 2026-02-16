@@ -50,6 +50,36 @@ analytics_engine = AnalyticsEngine(db.session)
 from report_generator import AnalyticsReportGenerator
 report_generator = AnalyticsReportGenerator()
 
+
+CLOUD_API_BASE = os.environ.get("CLOUD_API_BASE", "http://44.208.164.236:5000/api")
+
+def cloud_request(method, endpoint, **kwargs):
+    """
+    Centralized Cloud API request handler with JWT Authorization
+    Keeps all existing routes unchanged, only fixes authentication.
+    """
+    headers = kwargs.pop("headers", {})
+
+    # Attach JWT token if available
+    token = session.get("token")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    try:
+        response = requests.request(
+            method,
+            f"{CLOUD_API_BASE}{endpoint}",
+            headers=headers,
+            timeout=5,
+            **kwargs
+        )
+        return response
+    except Exception as e:
+        logging.error(f"Cloud request error: {e}")
+        return None
+
+
+
 # ===== HELPER FOR DESKTOP DOWNLOADS =====
 def save_pdf_to_downloads(buffer, filename):
     """Save PDF buffer to local Downloads folder (Reliable for Desktop EXE)"""
@@ -67,15 +97,13 @@ def save_pdf_to_downloads(buffer, filename):
         return None
 
 # ===== CLOUD API HELPER FUNCTIONS =====
-CLOUD_API_BASE = os.environ.get("CLOUD_API_BASE", "http://44.208.164.236:5000/api")
+# CLOUD_API_BASE = os.environ.get("CLOUD_API_BASE", "http://44.208.164.236:5000/api")
 
 def fetch_cloud_clients():
-    """Fetch all clients from cloud database"""
     try:
-        response = requests.get(f"{CLOUD_API_BASE}/clients", timeout=5)
-        if response.status_code == 200:
+        response = cloud_request("GET", "/clients")
+        if response and response.status_code == 200:
             return response.json()
-        logging.warning(f"Cloud API returned status {response.status_code}")
         return []
     except Exception as e:
         logging.error(f"Cloud API error (clients): {e}")
@@ -95,16 +123,15 @@ def fetch_cloud_client_by_id(client_id):
         return None
 
 def fetch_cloud_invoices():
-    """Fetch all invoices from cloud database"""
     try:
-        response = requests.get(f"{CLOUD_API_BASE}/invoices", timeout=5)
-        if response.status_code == 200:
+        response = cloud_request("GET", "/invoices")
+        if response and response.status_code == 200:
             return response.json()
-        logging.warning(f"Cloud API returned status {response.status_code}")
         return []
     except Exception as e:
         logging.error(f"Cloud API error (invoices): {e}")
         return []
+
 
 def fetch_cloud_invoice_by_id(invoice_id):
     """Fetch single invoice from cloud database by ID"""
@@ -181,45 +208,57 @@ def fetch_cloud_quotation_by_id(qid):
         logging.error(f"Cloud API error (quotation by ID): {e}")
         return None
 
+from functools import wraps
+
 def login_required(f):
-    """Decorator to require login for routes"""
-    from functools import wraps
     @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
-            # Redirect to login without flash message (to avoid alert on automatic redirects)
-            return redirect(url_for('login'))
+    def decorated(*args, **kwargs):
+        if "token" not in session:
+            return redirect("/login")
         return f(*args, **kwargs)
-    return decorated_function
+    return decorated
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """User login"""
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        
-        # Validate empty fields
-        if not username or not password:
-            flash('Please enter both username and password.', 'error')
-            return render_template('login.html')
-        
-        user = User.query.filter_by(username=username).first()
-        if user and check_password_hash(user.password_hash, password):
-            session['user_id'] = user.id
-            session['username'] = user.username
-            session['is_admin'] = user.is_admin
-            
-            # Update last login
-            user.last_login = datetime.utcnow()
-            db.session.commit()
-            
-            flash('Welcome back! AI-powered invoice system is ready.', 'success')
-            return redirect(url_for('dashboard_page'))
+    if request.method == 'GET':
+        return render_template("login.html")
+
+    username = request.form.get("username")
+    password = request.form.get("password")
+
+    cloud_url = f"{CLOUD_API_BASE}/login"
+
+    try:
+        response = requests.post(
+            cloud_url,
+            json={
+                "username": username,
+                "password": password
+            }
+        )
+
+        data = response.json()
+
+        if data.get("success"):
+            session["token"] = data["token"]
+
+            # 🔥 FIX: Set user_id manually
+            session["user_id"] = username   # just needs to be truthy
+
+            # Optional
+            session["username"] = username
+            session["is_admin"] = False
+
+            return redirect("/dashboard")
         else:
-            flash('Invalid credentials. Please try again.', 'error')
-    
-    return render_template('login.html')
+            flash("Invalid credentials")
+            return redirect("/login")
+
+    except Exception:
+        flash("Cloud server not reachable")
+        return redirect("/login")
+
 
 @app.route('/logout')
 def logout():
@@ -237,10 +276,8 @@ def index():
 @login_required
 def invoice_management():
     try:
-        response = requests.get(
-            "http://44.208.164.236:5000/api/invoices",
-            timeout=5
-        )
+        response = cloud_request("GET", "/invoices")
+
 
         if response.status_code == 200:
             data = response.json()
@@ -464,17 +501,18 @@ def create_invoice():
             total_amount = subtotal + total_tax
 
             # 🔥 SEND TO CLOUD API
-            response = requests.post(
-                "http://44.208.164.236:5000/api/invoices",
+            response = cloud_request(
+                "POST",
+                "/invoices",
                 json={
                     "invoice_number": invoice_number,
                     "client_id": client_id,
                     "invoice_date": invoice_date_str,
                     "total_amount": total_amount,
                     "payment_status": "Unpaid"
-                },
-                timeout=5
+                }
             )
+
 
             if response.status_code in (200, 201):
                 flash("Invoice created successfully (Cloud DB)", "success")
@@ -807,10 +845,8 @@ def invoice_pdf(id):
 def delete_invoice(id):
     """Delete invoice from cloud database"""
     try:
-        response = requests.delete(
-            f"{CLOUD_API_BASE}/invoices/{id}",
-            timeout=5
-        )
+        response = cloud_request("DELETE", f"/invoices/{id}")
+
         if response.status_code in (200, 204):
             flash('Invoice deleted successfully.', 'success')
         else:
@@ -1206,11 +1242,12 @@ def create_client():
                 # For now assuming basic fields supported by the provided API
             }
             
-            response = requests.post(
-                f"{CLOUD_API_BASE}/clients",
-                json=client_data,
-                timeout=5
+            response = cloud_request(
+                "POST",
+                "/clients",
+                json=client_data
             )
+
 
             if response.status_code in (200, 201):
                 flash('Client created successfully in Cloud!', 'success')
@@ -1628,8 +1665,15 @@ def settings():
     cloud_url = "http://44.208.164.236:5000/api/company"
 
     try:
-        response = requests.get(cloud_url)
+        response = requests.get(
+            cloud_url,
+            headers={
+                "Authorization": f"Bearer {session['token']}"
+            }
+        )
+
         company_data = response.json() if response.status_code == 200 else {}
+
     except:
         company_data = {}
 
@@ -1641,6 +1685,7 @@ def settings():
     }
 
     return render_template('settings.html', settings_data=settings_data)
+
 
 @app.route('/settings/update', methods=['POST'])
 @login_required
@@ -1912,10 +1957,8 @@ def preview_challan():
 @login_required
 def delivery_challan():
     try:
-        response = requests.get(
-            "http://44.208.164.236:5000/api/challans",
-            timeout=5
-        )
+        response = cloud_request("GET", "/invoices")
+
 
         if response.status_code == 200:
             data = response.json()
@@ -3762,6 +3805,8 @@ def challan_pdf(id):
         logging.error(f"Challan PDF generation failed: {e}")
         flash(f'Error generating PDF: {str(e)}', 'error')
         return redirect(url_for('delivery_challan'))
+
+
 
 
 
