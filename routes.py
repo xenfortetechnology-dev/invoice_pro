@@ -1706,23 +1706,60 @@ def settings():
 @app.route('/settings/update', methods=['POST'])
 @login_required
 def update_settings():
-
     try:
         data = request.get_json()
 
         # 1️⃣ Update Company (Cloud)
         if "company" in data:
-            cloud_request(
-                "POST",
-                "/company",
-                json=data["company"]
-            )
+            company_payload = {
+                "name": data["company"].get("companyName"),
+                "email": data["company"].get("companyEmail"),
+                "phone": data["company"].get("companyPhone"),
+                "website": data["company"].get("companyWebsite"),
+                "address": data["company"].get("companyAddress"),
+                "city": data["company"].get("companyCity"),
+                "state": data["company"].get("companyState"),
+                "pincode": data["company"].get("companyPincode"),
+                "gstin": data["company"].get("companyGstin"),
+                "pan": data["company"].get("companyPan")
+            }
 
-        # 2️⃣ Update Invoice Defaults
+            response = cloud_request("POST", "/company", json=company_payload)
+
+            if not response or response.status_code != 200:
+                return jsonify({"success": False, "message": "Company update failed"}), 400
+
+
+        # 2️⃣ Update User Profile (Cloud)
+        if "user" in data:
+            user_payload = {
+                "preferred_language": data["user"].get("preferredLanguage"),
+                "theme_preference": data["user"].get("themePreference"),
+                "ai_features_enabled": data["user"].get("aiFeatures", False),
+                "voice_commands_enabled": data["user"].get("voiceCommands", False),
+                "collaboration_access": data["user"].get("collaborationAccess", False),
+                "biometric_enabled": data["user"].get("biometricEnabled", False),
+            }
+
+            if data["user"].get("newPassword"):
+                user_payload["new_password"] = data["user"]["newPassword"]
+
+            response = cloud_request("PUT", "/user/profile", json=user_payload)
+
+            if not response or response.status_code != 200:
+                return jsonify({"success": False, "message": "User update failed"}), 400
+
+
+        # 3️⃣ Invoice Settings
         if "invoice" in data:
             inv = data["invoice"]
 
-            # Prefix + Currency + Terms
+            cloud_request(
+                "POST",
+                "/settings/default-tax",
+                json={"default_tax_rate": inv.get("defaultTaxRate")}
+            )
+
             cloud_request(
                 "POST",
                 "/settings/default-prefix",
@@ -1733,22 +1770,12 @@ def update_settings():
                 }
             )
 
-            # Tax
-            cloud_request(
-                "POST",
-                "/settings/default-tax",
-                json={
-                    "default_tax_rate": inv.get("defaultTaxRate")
-                }
-            )
-
         return jsonify({
             "success": True,
-            "message": "Settings saved successfully (Tenant Scoped)"
+            "message": "Settings saved successfully"
         })
 
     except Exception as e:
-        logging.error(f"Settings update failed: {e}")
         return jsonify({
             "success": False,
             "message": str(e)
