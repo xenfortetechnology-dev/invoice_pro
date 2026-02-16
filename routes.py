@@ -1915,9 +1915,18 @@ def delivery_challan():
         flash(f"API connection error: {str(e)}", "error")
         data = []
 
+    # Fetch all clients from cloud API to get phone numbers
+    clients_data = fetch_cloud_clients()
+    # Create a mapping of client_id to client data for quick lookup
+    client_map = {client.get('id'): client for client in clients_data}
+
     challan_list = []
 
     for c in data:
+        # Get client details from the client_map
+        client_id = c.get("client_id")
+        client_info = client_map.get(client_id, {})
+        
         challan_obj = SimpleNamespace(
             id=c["id"],
             challan_number=c["challan_number"],
@@ -1935,7 +1944,9 @@ def delivery_challan():
             ) if c.get("created_at") else None,
 
             client=SimpleNamespace(
-                name=c.get("client_name")
+                id=client_id,
+                name=c.get("client_name") or client_info.get("name", "Unknown"),
+                phone=client_info.get("phone", "")
             ),
 
             status=c["status"],
@@ -1945,13 +1956,33 @@ def delivery_challan():
 
         challan_list.append(challan_obj)
 
+    # Pagination logic
+    page = request.args.get('page', 1, type=int)
+    per_page = 15
+    total_challans = len(challan_list)
+    total_pages = (total_challans + per_page - 1) // per_page  # Ceiling division
+    
+    # Ensure page is within valid range
+    if page < 1:
+        page = 1
+    elif page > total_pages and total_pages > 0:
+        page = total_pages
+    
+    # Calculate start and end indices for slicing
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    
+    # Slice the challan list for current page
+    paginated_challans = challan_list[start_idx:end_idx]
+
     challans_obj = SimpleNamespace(
-        items=challan_list,
-        total=len(challan_list),
-        pages=1,
-        has_prev=False,
-        has_next=False,
-        page=1
+        items=paginated_challans,
+        total=total_challans,
+        pages=total_pages,
+        has_prev=(page > 1),
+        has_next=(page < total_pages),
+        page=page,
+        per_page=per_page
     )
 
     return render_template(

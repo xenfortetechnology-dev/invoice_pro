@@ -129,6 +129,67 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Pagination Controls -->
+            {% if challans.pages > 1 %}
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <div class="text-muted">
+                    Showing {{ ((challans.page - 1) * challans.per_page) + 1 }} -
+                    {{ [challans.page * challans.per_page, challans.total] | min }}
+                    of {{ challans.total }} challans
+                </div>
+                <nav aria-label="Challan pagination">
+                    <ul class="pagination mb-0">
+                        <!-- Previous Button -->
+                        <li class="page-item {% if not challans.has_prev %}disabled{% endif %}">
+                            <a class="page-link"
+                                href="{% if challans.has_prev %}{{ url_for('delivery_challan', page=challans.page - 1) }}{% else %}#{% endif %}"
+                                {% if not challans.has_prev %}tabindex="-1" aria-disabled="true" {% endif %}>
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </a>
+                        </li>
+
+                        <!-- Page Numbers -->
+                        {% set start_page = [1, challans.page - 2] | max %}
+                        {% set end_page = [challans.pages, challans.page + 2] | min %}
+
+                        {% if start_page > 1 %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('delivery_challan', page=1) }}">1</a>
+                        </li>
+                        {% if start_page > 2 %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                        {% endif %}
+                        {% endif %}
+
+                        {% for p in range(start_page, end_page + 1) %}
+                        <li class="page-item {% if p == challans.page %}active{% endif %}">
+                            <a class="page-link" href="{{ url_for('delivery_challan', page=p) }}">{{ p }}</a>
+                        </li>
+                        {% endfor %}
+
+                        {% if end_page < challans.pages %} {% if end_page < challans.pages - 1 %} <li
+                            class="page-item disabled"><span class="page-link">...</span></li>
+                            {% endif %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('delivery_challan', page=challans.pages) }}">{{
+                                    challans.pages }}</a>
+                            </li>
+                            {% endif %}
+
+                            <!-- Next Button -->
+                            <li class="page-item {% if not challans.has_next %}disabled{% endif %}">
+                                <a class="page-link"
+                                    href="{% if challans.has_next %}{{ url_for('delivery_challan', page=challans.page + 1) }}{% else %}#{% endif %}"
+                                    {% if not challans.has_next %}tabindex="-1" aria-disabled="true" {% endif %}>
+                                    Next <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </li>
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+
             {% else %}
             <div class="text-center py-5">
                 <i class="fas fa-truck fa-3x text-muted mb-3"></i>

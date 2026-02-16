@@ -700,3 +700,79 @@ select.form-select {
     padding-left: 0.75rem;
     padding-right: 0.75rem;
 }
+
+/* ========================================
+   Pagination Button Styles
+   ======================================== */
+
+/* Base pagination link styles */
+.pagination .page-link {
+    transition: all 0.3s ease;
+    border: 1px solid #dee2e6;
+    color: #0d6efd;
+    font-weight: 500;
+    background-color: #ffffff;
+}
+
+/* Hover effect for pagination buttons */
+.pagination .page-link:hover:not(.disabled) {
+    background-color: #0d6efd;
+    color: white;
+    border-color: #0d6efd;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(13, 110, 253, 0.3);
+}
+
+/* Active page button - with white text for visibility */
+.pagination .page-item.active .page-link {
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+    color: white !important;
+    box-shadow: 0 2px 4px rgba(13, 110, 253, 0.4);
+    font-weight: 600;
+}
+
+/* Active page button hover - keep text white */
+.pagination .page-item.active .page-link:hover {
+    transform: none;
+    box-shadow: 0 2px 6px rgba(13, 110, 253, 0.5);
+    color: white !important;
+}
+
+/* Disabled pagination buttons */
+.pagination .page-item.disabled .page-link {
+    cursor: not-allowed;
+    opacity: 0.5;
+    background-color: #ffffff;
+    color: #6c757d;
+}
+
+/* Smooth transition for page info text */
+.text-muted {
+    transition: color 0.3s ease;
+}
+
+/* Dark theme pagination styles */
+[data-theme="dark"] .pagination .page-link {
+    background-color: var(--card-bg);
+    color: #60a5fa;
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .pagination .page-link:hover:not(.disabled) {
+    background-color: #60a5fa;
+    color: var(--text-primary-dark);
+    border-color: #60a5fa;
+}
+
+[data-theme="dark"] .pagination .page-item.active .page-link {
+    background-color: #60a5fa !important;
+    border-color: #60a5fa !important;
+    color: var(--text-primary-dark) !important;
+}
+
+[data-theme="dark"] .pagination .page-item.disabled .page-link {
+    background-color: var(--card-bg);
+    color: rgba(255, 255, 255, 0.3);
+}
+
