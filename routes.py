@@ -131,6 +131,18 @@ def fetch_cloud_challans():
         logging.error(f"Cloud API error (challans): {e}")
         return []
 
+def fetch_cloud_challan_by_id(challan_id):
+    """Fetch a single challan from cloud database by ID"""
+    try:
+        challans = fetch_cloud_challans()
+        for challan in challans:
+            if challan.get('id') == int(challan_id):
+                return challan
+        return None
+    except Exception as e:
+        logging.error(f"Cloud API error (challan by ID): {e}")
+        return None
+
 def fetch_cloud_quotations():
     """Fetch all quotations from cloud database"""
     try:
@@ -1995,23 +2007,35 @@ def delivery_challan():
 @login_required
 def update_challan_status(id):
     try:
-        challan = DeliveryChallan.query.get_or_404(id)
         new_status = request.form.get('status')
         note = request.form.get('note')
         
         if new_status:
-            challan.status = new_status
-            if note:
-                challan.notes = (challan.notes or "") + f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Status updated to {new_status}: {note}"
+            # Build update payload
+            update_data = {'status': new_status}
             
-            db.session.commit()
-            flash(f'Challan status updated to {new_status}', 'success')
+            # Add note to existing notes if provided
+            if note:
+                challan_data = fetch_cloud_challan_by_id(id)
+                existing_notes = challan_data.get('notes', '') if challan_data else ''
+                update_data['notes'] = (existing_notes or "") + f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Status updated to {new_status}: {note}"
+            
+            response = requests.put(
+                f"{CLOUD_API_BASE}/challans/{id}",
+                json=update_data,
+                timeout=5
+            )
+            if response.status_code in (200, 204):
+                flash(f'Challan status updated to {new_status}', 'success')
+            else:
+                flash(f'Failed to update status: {response.text}', 'error')
         
         return redirect(url_for('delivery_challan'))
     except Exception as e:
-        db.session.rollback()
+        logging.error(f"Cloud API update error: {e}")
         flash(f'Error updating status: {str(e)}', 'error')
         return redirect(url_for('delivery_challan'))
+
 @app.route('/crm')
 @login_required
 def crm():
@@ -3461,97 +3485,205 @@ def voice_session_clear():
 
 
 
+@app.route('/challan/<int:id>/details')
+@login_required
+def challan_details(id):
+    """Fetch challan details from cloud API and return HTML fragment for modal"""
+    try:
+        challan_data = fetch_cloud_challan_by_id(id)
+        if not challan_data:
+            return '<div class="text-danger">Challan not found in cloud database.</div>', 404
+        
+        # Fetch client info
+        client_id = challan_data.get('client_id')
+        client_data = fetch_cloud_client_by_id(client_id) if client_id else None
+        client_name = challan_data.get('client_name') or (client_data.get('name', 'Unknown') if client_data else 'Unknown')
+        client_phone = client_data.get('phone', 'N/A') if client_data else 'N/A'
+        client_email = client_data.get('email', 'N/A') if client_data else 'N/A'
+        client_address = client_data.get('address', 'N/A') if client_data else 'N/A'
+        
+        # Build HTML response for modal
+        line_items = challan_data.get('line_items', [])
+        items_html = ""
+        total = 0
+        for item in line_items:
+            qty = float(item.get('quantity', 0))
+            price = float(item.get('unit_price', 0))
+            amt = qty * price
+            total += amt
+            items_html += f"""
+            <tr>
+                <td>{item.get('sr_no', '')}</td>
+                <td>{item.get('description', '')}</td>
+                <td>{item.get('hsn_code', '')}</td>
+                <td>{qty}</td>
+                <td>{item.get('unit', '')}</td>
+                <td>₹{price:,.2f}</td>
+                <td>₹{amt:,.2f}</td>
+            </tr>"""
+        
+        html = f"""
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <h6 class="fw-bold">Challan Info</h6>
+                <p class="mb-1"><strong>Number:</strong> {challan_data.get('challan_number', 'N/A')}</p>
+                <p class="mb-1"><strong>Date:</strong> {challan_data.get('challan_date', 'N/A')}</p>
+                <p class="mb-1"><strong>Delivery Date:</strong> {challan_data.get('delivery_date', 'N/A')}</p>
+                <p class="mb-1"><strong>Status:</strong> <span class="badge bg-info">{challan_data.get('status', 'N/A')}</span></p>
+            </div>
+            <div class="col-md-6">
+                <h6 class="fw-bold">Client Info</h6>
+                <p class="mb-1"><strong>Name:</strong> {client_name}</p>
+                <p class="mb-1"><strong>Phone:</strong> {client_phone}</p>
+                <p class="mb-1"><strong>Email:</strong> {client_email}</p>
+                <p class="mb-1"><strong>Address:</strong> {client_address}</p>
+            </div>
+        </div>
+        <h6 class="fw-bold">Line Items</h6>
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered">
+                <thead>
+                    <tr>
+                        <th>Sr</th>
+                        <th>Description</th>
+                        <th>HSN</th>
+                        <th>Qty</th>
+                        <th>Unit</th>
+                        <th>Price</th>
+                        <th>Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {items_html}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="6" class="text-end fw-bold">Total:</td>
+                        <td class="fw-bold">₹{total:,.2f}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {f'<p class="text-muted"><strong>Notes:</strong> {challan_data.get("notes", "")}</p>' if challan_data.get('notes') else ''}
+        """
+        return html
+        
+    except Exception as e:
+        logging.error(f"Challan details error: {e}")
+        return f'<div class="text-danger">Error loading challan details: {str(e)}</div>', 500
+
 
 @app.route('/convert_challan_to_invoice/<int:id>')
 @login_required
 def convert_challan_to_invoice(id):
     try:
-        challan = DeliveryChallan.query.get_or_404(id)
-        
-        if challan.invoice_id:
-            flash('This challan is already linked to an invoice.', 'warning')
+        # Fetch challan from cloud
+        challan_data = fetch_cloud_challan_by_id(id)
+        if not challan_data:
+            flash('Challan not found in cloud database.', 'error')
             return redirect(url_for('delivery_challan'))
-            
-        # Generate Invoice Number logic (simplified)
-        last_inv = Invoice.query.order_by(Invoice.id.desc()).first()
-        if last_inv and last_inv.invoice_number.startswith('INV-'):
-            try:
-                last_seq = int(last_inv.invoice_number.split('-')[-1])
-                new_seq = last_seq + 1
-            except:
-                new_seq = 1
-        else:
-            new_seq = 1
-        invoice_number = f"INV-{datetime.now().year}-{new_seq:04d}"
         
-        # Create Invoice
-        new_invoice = Invoice(
-            invoice_number=invoice_number,
-            client_id=challan.client_id,
-            invoice_date=datetime.utcnow().date(),
-            notes=f"Converted from Challan {challan.challan_number}. {request.args.get('notes', '')}",
-            terms_conditions="Standard Terms Applied",
-            due_date=datetime.strptime(request.args.get('due_date'), '%Y-%m-%d').date() if request.args.get('due_date') else None
-        )
-        db.session.add(new_invoice)
-        db.session.flush()
+        if challan_data.get('status') == 'Billed':
+            flash('This challan has already been converted to an invoice.', 'warning')
+            return redirect(url_for('delivery_challan'))
         
-        # Copy Line Items
+        # Fetch client data
+        client_id = challan_data.get('client_id')
+        client_data = fetch_cloud_client_by_id(client_id) if client_id else None
+        
+        # Build invoice data from challan
+        line_items = challan_data.get('line_items', [])
         total_amt = 0
-        for item in challan.line_items:
-            # Basic validation
-            qty = item.quantity or 0
-            price = item.unit_price or 0
+        invoice_items = []
+        for item in line_items:
+            qty = float(item.get('quantity', 0))
+            price = float(item.get('unit_price', 0))
             total = qty * price
-            
-            inv_item = InvoiceLineItem(
-                invoice_id=new_invoice.id,
-                sr_no=item.sr_no,
-                hsn_code=item.hsn_code,
-                description=item.description,
-                quantity=qty,
-                unit=item.unit,
-                unit_price=price,
-                total_amount=total
-            )
             total_amt += total
-            db.session.add(inv_item)
-            
-        new_invoice.total_amount = total_amt
-        new_invoice.subtotal = total_amt # Assuming no tax calc for simplicity, or 0 tax
+            invoice_items.append({
+                'sr_no': item.get('sr_no', 0),
+                'hsn_code': item.get('hsn_code', ''),
+                'description': item.get('description', ''),
+                'quantity': qty,
+                'unit': item.get('unit', ''),
+                'unit_price': price,
+                'total_amount': total
+            })
         
-        # Link Challan
-        challan.invoice_id = new_invoice.id
-        challan.status = 'Billed'
+        # Create invoice via cloud API
+        due_date = request.args.get('due_date', '')
+        notes = request.args.get('notes', '')
         
-        db.session.commit()
+        # Determine next invoice number from cloud data
+        cloud_invoices = fetch_cloud_invoices()
+        current_year = datetime.now().year
+        max_seq = 0
         
-        flash(f'Challan {challan.challan_number} converted to Invoice {invoice_number}!', 'success')
-        return redirect(url_for('invoice_detail', id=new_invoice.id))
+        if cloud_invoices:
+            for inv in cloud_invoices:
+                inv_num = inv.get('invoice_number', '')
+                if inv_num and inv_num.startswith(f'INV-{current_year}-'):
+                    try:
+                        seq = int(inv_num.split('-')[-1])
+                        if seq > max_seq:
+                            max_seq = seq
+                    except:
+                        pass
+        
+        new_seq = max_seq + 1
+        invoice_number = f"INV-{current_year}-{new_seq:04d}"
+
+        invoice_data = {
+            'invoice_number': invoice_number,
+            'client_id': client_id,
+            'invoice_date': datetime.now().strftime('%Y-%m-%d'),
+            'due_date': due_date if due_date else None,
+            'notes': f"Converted from Challan {challan_data.get('challan_number', '')}. {notes}".strip(),
+            'terms_conditions': 'Standard Terms Applied',
+            'total_amount': total_amt,
+            'subtotal': total_amt,
+            'payment_status': 'Unpaid',
+            'line_items': invoice_items
+        }
+        
+        response = requests.post(
+            f"{CLOUD_API_BASE}/invoices",
+            json=invoice_data,
+            timeout=10
+        )
+        
+        if response.status_code in (200, 201):
+            # Update challan status to Billed
+            requests.put(
+                f"{CLOUD_API_BASE}/challans/{id}",
+                json={'status': 'Billed'},
+                timeout=5
+            )
+            flash(f'Challan {challan_data.get("challan_number", "")} converted to invoice successfully!', 'success')
+            return redirect(url_for('invoice_management'))
+        else:
+            flash(f'Failed to create invoice: {response.text}', 'error')
+            return redirect(url_for('delivery_challan'))
         
     except Exception as e:
-        db.session.rollback()
         logging.error(f"Conversion failed: {e}")
+        flash(f'Error converting challan: {str(e)}', 'error')
         return redirect(url_for('delivery_challan'))
 
 @app.route('/delete_challan/<int:id>', methods=['POST'])
 @login_required
 def delete_challan(id):
     try:
-        challan = DeliveryChallan.query.get_or_404(id)
-        
-        # Optional: Prevent deleting if converted to invoice
-        if challan.status == 'Billed' or challan.invoice_id:
-             # Unlink from invoice instead of hard block? Or just block.
-             # For now, let's allow it but warn, or maybe just unlink.
-             # Let's keep it simple: cleanup line items is cascade delete.
-             pass
-
-        db.session.delete(challan)
-        db.session.commit()
-        flash('Delivery Challan deleted successfully.', 'success')
+        response = requests.delete(
+            f"{CLOUD_API_BASE}/challans/{id}",
+            timeout=5
+        )
+        if response.status_code in (200, 204):
+            flash('Delivery Challan deleted successfully.', 'success')
+        else:
+            flash(f'Failed to delete challan: {response.text}', 'error')
     except Exception as e:
-        db.session.rollback()
+        logging.error(f"Cloud API delete error: {e}")
         flash(f'Error deleting challan: {str(e)}', 'error')
     
     return redirect(url_for('delivery_challan'))
@@ -3559,16 +3691,62 @@ def delete_challan(id):
 @app.route('/challan/<int:id>/pdf')
 @login_required
 def challan_pdf(id):
-    """Generate PDF for delivery challan"""
+    """Generate PDF for delivery challan from cloud data"""
     try:
-        challan = DeliveryChallan.query.get_or_404(id)
+        # Fetch challan from cloud
+        challan_data = fetch_cloud_challan_by_id(id)
+        if not challan_data:
+            flash('Challan not found in cloud database.', 'error')
+            return redirect(url_for('delivery_challan'))
         
+        # Fetch client data
+        client_id = challan_data.get('client_id')
+        client_data = fetch_cloud_client_by_id(client_id) if client_id else {}
+        if not client_data:
+            client_data = {'name': challan_data.get('client_name', 'Unknown'), 'id': client_id}
+        
+        # Build SimpleNamespace client object
+        client = SimpleNamespace(**client_data)
+        
+        # Parse dates
+        challan_date = datetime.strptime(challan_data['challan_date'], '%Y-%m-%d').date() if challan_data.get('challan_date') else datetime.now().date()
+        delivery_date = datetime.strptime(challan_data['delivery_date'], '%Y-%m-%d').date() if challan_data.get('delivery_date') else None
+        
+        # Create challan object for PDF generator
+        challan = DeliveryChallan(
+            challan_number=challan_data.get('challan_number', ''),
+            client_id=client_id,
+            challan_date=challan_date,
+            delivery_date=delivery_date,
+            notes=challan_data.get('notes', ''),
+            status=challan_data.get('status', '')
+        )
+        challan.id = challan_data.get('id')
+        challan.preview_client = client
+        
+        # Build line items
+        line_items = []
+        for item in challan_data.get('line_items', []):
+            li = ChallanLineItem(
+                sr_no=int(item.get('sr_no', 0)),
+                hsn_code=item.get('hsn_code', ''),
+                description=item.get('description', ''),
+                quantity=float(item.get('quantity', 0)),
+                unit=item.get('unit', ''),
+                unit_price=float(item.get('unit_price', 0)),
+                total_amount=float(item.get('quantity', 0)) * float(item.get('unit_price', 0))
+            )
+            line_items.append(li)
+        
+        challan.line_items = line_items
+        
+        # Generate PDF
         pdf_buffer = generate_challan_pdf(challan)
         pdf_buffer.seek(0)
         
         filename = f'Challan_{challan.challan_number}.pdf'
         
-        # 🔥 Save to local Downloads for Desktop EXE support
+        # Save to local Downloads for Desktop EXE support
         saved_path = save_pdf_to_downloads(pdf_buffer, filename)
         if saved_path:
             flash(f"PDF saved to: {saved_path}", "success")
@@ -3584,8 +3762,6 @@ def challan_pdf(id):
         logging.error(f"Challan PDF generation failed: {e}")
         flash(f'Error generating PDF: {str(e)}', 'error')
         return redirect(url_for('delivery_challan'))
-
-
 
 
 
