@@ -1662,123 +1662,87 @@ def ai_assistant_page():
 @login_required
 def settings():
 
-    cloud_url = "http://44.208.164.236:5000/api/company"
-
     try:
-        response = requests.get(
-            cloud_url,
-            headers={
-                "Authorization": f"Bearer {session['token']}"
-            }
-        )
+        # Fetch company from cloud (tenant scoped automatically)
+        company_res = cloud_request("GET", "/company")
+        company_data = company_res.json() if company_res and company_res.status_code == 200 else {}
 
-        company_data = response.json() if response.status_code == 200 else {}
+        # Fetch invoice defaults
+        defaults_res = cloud_request("GET", "/settings/default-prefix")
+        defaults_data = defaults_res.json() if defaults_res and defaults_res.status_code == 200 else {}
 
-    except:
+        tax_res = cloud_request("GET", "/settings/default-tax")
+        tax_data = tax_res.json() if tax_res and tax_res.status_code == 200 else {}
+
+    except Exception:
         company_data = {}
+        defaults_data = {}
+        tax_data = {}
 
     settings_data = {
-        'company': company_data,
-        'user': None,
-        'ai_enabled': True,
-        'blockchain_enabled': True
+        "company": company_data,
+        "invoice_defaults": defaults_data,
+        "tax_settings": tax_data,
+        "user": {
+            "username": session.get("username"),
+        },
+        "ai_enabled": True,
+        "blockchain_enabled": True
     }
 
-    return render_template('settings.html', settings_data=settings_data)
+    return render_template("settings.html", settings_data=settings_data)
 
 
 @app.route('/settings/update', methods=['POST'])
 @login_required
 def update_settings():
+
     try:
         data = request.get_json()
-        user = User.query.get(session['user_id'])
-        company = Company.query.first()
-        if not company:
-            company = Company(name="SyncForte")
-            db.session.add(company)
-        
-        # 1. Update Company
-        if 'company' in data:
-            c_data = data['company']
-            company.name = c_data.get('companyName')
-            company.email = c_data.get('companyEmail')
-            company.phone = c_data.get('companyPhone')
-            company.website = c_data.get('companyWebsite')
-            company.address = c_data.get('companyAddress')
-            company.city = c_data.get('companyCity')
-            company.state = c_data.get('companyState')
-            company.pincode = c_data.get('companyPincode')
-            company.gstin = c_data.get('companyGstin')
-            company.pan = c_data.get('companyPan')
-            
-        # 2. Update User Profile
-        if 'user' in data:
-            u_data = data['user']
-            # user.email = u_data.get('userEmail') # Handle carefully if email is login
-            if 'preferredLanguage' in u_data:
-                user.preferred_language = u_data['preferredLanguage']
-            if 'themePreference' in u_data:
-                user.theme_preference = u_data['themePreference']
-            
-            # User Features
-            user.ai_features_enabled = u_data.get('aiFeatures', False)
-            user.voice_commands_enabled = u_data.get('voiceCommands', False)
-            user.collaboration_access = u_data.get('collaborationAccess', False)
-            user.biometric_enabled = u_data.get('biometricEnabled', False)
-            
-            # Handle Password Change
-            new_pass = u_data.get('newPassword')
-            if new_pass:
-                # In a real app, verify current password first
-                from werkzeug.security import generate_password_hash
-                user.password_hash = generate_password_hash(new_pass)
 
-        # 3. Update Business Settings (General, AI, Blockchain, etc.)
-        # Helper to update or create setting
-        def update_biz_setting(key, value, type='general'):
-            setting = BusinessSettings.query.filter_by(key=key).first()
-            if not setting:
-                setting = BusinessSettings(key=key, setting_type=type)
-                db.session.add(setting)
-            setting.value = str(value)
-            
-        # Invoice Settings
-        if 'invoice' in data:
-            inv = data['invoice']
-            update_biz_setting('default_tax_rate', inv.get('defaultTaxRate'))
-            update_biz_setting('payment_terms', inv.get('paymentTerms'))
-            update_biz_setting('invoice_prefix', inv.get('invoicePrefix'))
-            update_biz_setting('default_currency', inv.get('defaultCurrency'))
-            update_biz_setting('qr_code_payments', inv.get('qrCodePayments'))
-            update_biz_setting('digital_watermark', inv.get('digitalWatermark'))
-            update_biz_setting('auto_numbering', inv.get('autoNumbering'))
-            update_biz_setting('default_terms', inv.get('defaultTerms'))
-            
-        # AI Settings
-        if 'ai' in data:
-            ai = data['ai']
-            update_biz_setting('ai_assistant_enabled', ai.get('aiAssistant'), 'ai')
-            update_biz_setting('ai_confidence_threshold', ai.get('aiConfidenceThreshold'), 'ai')
-            
-        # Blockchain Settings
-        if 'blockchain' in data:
-            bc = data['blockchain']
-            update_biz_setting('blockchain_verification', bc.get('blockchainVerification'), 'blockchain')
-            update_biz_setting('blockchain_network', bc.get('blockchainNetwork'), 'blockchain')
+        # 1️⃣ Update Company (Cloud)
+        if "company" in data:
+            cloud_request(
+                "POST",
+                "/company",
+                json=data["company"]
+            )
 
-        # Notifications
-        if 'notifications' in data:
-            user.notification_preferences = data['notifications']
+        # 2️⃣ Update Invoice Defaults
+        if "invoice" in data:
+            inv = data["invoice"]
 
-        db.session.commit()
-        return jsonify({'success': True, 'message': 'Settings saved successfully'})
-        
+            # Prefix + Currency + Terms
+            cloud_request(
+                "POST",
+                "/settings/default-prefix",
+                json={
+                    "invoice_prefix": inv.get("invoicePrefix"),
+                    "default_currency": inv.get("defaultCurrency"),
+                    "default_terms": inv.get("defaultTerms")
+                }
+            )
+
+            # Tax
+            cloud_request(
+                "POST",
+                "/settings/default-tax",
+                json={
+                    "default_tax_rate": inv.get("defaultTaxRate")
+                }
+            )
+
+        return jsonify({
+            "success": True,
+            "message": "Settings saved successfully (Tenant Scoped)"
+        })
+
     except Exception as e:
-        db.session.rollback()
         logging.error(f"Settings update failed: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
-
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        }), 500
 
 @app.route("/create-challan", methods=['GET', 'POST'])
 @login_required
