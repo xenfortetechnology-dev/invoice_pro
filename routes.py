@@ -1915,9 +1915,18 @@ def delivery_challan():
         flash(f"API connection error: {str(e)}", "error")
         data = []
 
+    # Fetch all clients from cloud API to get phone numbers
+    clients_data = fetch_cloud_clients()
+    # Create a mapping of client_id to client data for quick lookup
+    client_map = {client.get('id'): client for client in clients_data}
+
     challan_list = []
 
     for c in data:
+        # Get client details from the client_map
+        client_id = c.get("client_id")
+        client_info = client_map.get(client_id, {})
+        
         challan_obj = SimpleNamespace(
             id=c["id"],
             challan_number=c["challan_number"],
@@ -1935,7 +1944,9 @@ def delivery_challan():
             ) if c.get("created_at") else None,
 
             client=SimpleNamespace(
-                name=c.get("client_name")
+                id=client_id,
+                name=c.get("client_name") or client_info.get("name", "Unknown"),
+                phone=client_info.get("phone", "")
             ),
 
             status=c["status"],
