@@ -391,38 +391,45 @@ Subject to local jurisdiction only.</textarea>
 <script>
     let itemCounter = 0;
     let lineItems = [];
+    let defaultTaxRate = 0;
 
-    document.addEventListener('DOMContentLoaded', function () {
-        // Initialize Tom Select for Client Dropdown
-        const clientSelect = new TomSelect('#client_id', {
-            create: false,
-            sortField: {
-                field: "text",
-                direction: "asc"
-            },
-            placeholder: "Select a client...",
-            maxOptions: null // Show all options, but let it scroll
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    // 1️⃣ Load default tax
+    fetch("http://44.208.164.236:5000/api/settings/default-tax")
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                defaultTaxRate = parseFloat(data.default_tax_rate) || 0;
+                console.log("Default Tax Loaded:", defaultTaxRate);
+            }
+        })
+        .catch(err => {
+            console.error("Failed to load default tax:", err);
         });
 
-        const voiceBtn = document.getElementById("voiceCreateBtn");
-        if (!voiceBtn) return; // Stop if button doesn't exist
+    // 2️⃣ Initialize Tom Select
+    new TomSelect('#client_id', {
+        create: false,
+        sortField: { field: "text", direction: "asc" },
+        placeholder: "Select a client...",
+        maxOptions: null
+    });
 
-        voiceBtn.addEventListener("click", () => {
-            console.log("✅ Voice button clicked");
-            // Start SpeechRecognition here
-        });
-        // Initialize first row
-        // addItemRow();
+    // 3️⃣ Add Item Button
+    document.getElementById('addItemBtn')
+        .addEventListener('click', addItemRow);
 
-        // Add new item row button
-        document.getElementById('addItemBtn').addEventListener('click', addItemRow);
-
-        // Form submission
-        document.getElementById('invoiceForm').addEventListener('submit', function (e) {
+    // 4️⃣ Form submit
+    document.getElementById('invoiceForm')
+        .addEventListener('submit', function (e) {
             e.preventDefault();
             saveInvoice();
         });
-    });
+
+});
+
 
     // Add a new invoice item row
     function addItemRow(suggestion = null) {
@@ -430,6 +437,14 @@ Subject to local jurisdiction only.</textarea>
         const template = document.getElementById('itemRowTemplate');
         const clone = template.content.cloneNode(true); // deep clone
         const row = clone.querySelector('.item-row');
+        // Apply default tax
+        if (defaultTaxRate > 0) {
+            const halfTax = (defaultTaxRate / 2).toFixed(2);
+
+            row.querySelector('[name="cgst_percentage"]').value = halfTax;
+            row.querySelector('[name="sgst_percentage"]').value = halfTax;
+            row.querySelector('[name="igst_percentage"]').value = defaultTaxRate.toFixed(2);
+        }
 
         // Update item number
         row.querySelector('.item-number').textContent = itemCounter;
@@ -555,16 +570,22 @@ Subject to local jurisdiction only.</textarea>
         let sgstInput = row.querySelector('[name="sgst_percentage"]');
         let igstInput = row.querySelector('[name="igst_percentage"]');
 
-        let cgstPercent = parseFloat(cgstInput.value) || 0;
+       let cgstPercent = parseFloat(cgstInput.value) || 0;
 
-        // Automatically update SGST to match CGST
-        if (sgstInput) {
-            sgstInput.value = cgstPercent.toFixed(2);
-        }
-        let sgstPercent = parseFloat(sgstInput.value) || 0;
+// Always mirror CGST into SGST
+let sgstPercent = cgstPercent;
 
-        // IGST = CGST + SGST
-        let igstPercent = cgstPercent + sgstPercent;
+if (sgstInput) {
+    sgstInput.value = sgstPercent.toFixed(2);
+}
+
+// IGST = CGST + SGST
+let igstPercent = cgstPercent + sgstPercent;
+
+if (igstInput) {
+    igstInput.value = igstPercent.toFixed(2);
+}
+
 
         const lineAmount = quantity * unitPrice;
 

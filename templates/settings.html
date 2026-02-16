@@ -1095,6 +1095,16 @@ fetch("http://44.208.164.236:5000/api/user/profile")
             notifications: collectFormData('notificationForm'),
             security: collectFormData('securityForm')
         };
+        fetch("http://44.208.164.236:5000/api/settings/default-tax", {
+    method: "POST",
+    headers: {
+        "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+        default_tax_rate: settings.invoice.defaultTaxRate
+    })
+});
+
         // Save user profile to cloud
         fetch("http://44.208.164.236:5000/api/user/profile", {
         method: "PUT",
