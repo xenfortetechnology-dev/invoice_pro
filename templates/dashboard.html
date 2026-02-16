@@ -40,11 +40,12 @@
             <div class="glass-card p-4 metric-card card-green h-100 d-flex flex-column justify-content-center">
                 <div class="d-flex align-items-center">
                     <div class="metric-icon bg-success bg-opacity-10 text-success rounded-circle p-3 me-3">
-                        <i data-feather="dollar-sign" size="24"></i>
+                        <span style="font-size: 24px; font-weight: bold;">₹</span>
                     </div>
-                    <div>
+                    <div style="min-width: 0;">
                         <p class="text-muted mb-1 small">Total Revenue</p>
-                        <h3 class="fw-bold mb-0 text-body">
+                        <h3 class="fw-bold mb-0 text-body text-truncate"
+                            title="₹{{ '%.2f'|format(monthly_revenue_total or 0) }}">
                             ₹{{ "%.2f"|format(monthly_revenue_total or 0) }}
                         </h3>
 
@@ -62,12 +63,17 @@
 
                 <div class="glass-card p-4 metric-card card-red h-100 d-flex flex-column justify-content-center">
 
-                    <div>
-                        <p class="text-muted mb-1 small">Outstanding Amount</p>
-
-                        <h3 class="fw-bold mb-0 text-body">
-                            ₹{{ "%.2f"|format(outstanding_amount or 0) }}
-                        </h3>
+                    <div class="d-flex align-items-center">
+                        <div class="metric-icon bg-danger bg-opacity-10 text-danger rounded-circle p-3 me-3">
+                            <span style="font-size: 24px; font-weight: bold;">₹</span>
+                        </div>
+                        <div style="min-width: 0;">
+                            <p class="text-muted mb-1 small">Outstanding Amount</p>
+                            <h3 class="fw-bold mb-0 text-body text-truncate"
+                                title="₹{{ '%.2f'|format(outstanding_amount or 0) }}">
+                                ₹{{ "%.2f"|format(outstanding_amount or 0) }}
+                            </h3>
+                        </div>
                     </div>
 
                 </div>
