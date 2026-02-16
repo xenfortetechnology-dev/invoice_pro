@@ -3,11 +3,11 @@
 {% block content %}
 <div class="container-fluid py-4">
 
-    <form method="POST" action="{{ url_for('create_quotation') }}">
+    <form method="POST" action="{{ url_for('edit_quotation', qid=q.id) if is_edit else url_for('create_quotation') }}">
 
         <!-- ================= OVERVIEW ================= -->
         <div class="card shadow mb-3">
-            <div class="card-header fw-bold">Quotation Overview</div>
+            <div class="card-header fw-bold">{{ 'Edit' if is_edit else 'Create' }} Quotation</div>
             <div class="card-body row g-3">
 
                 <input type="hidden" name="quotation_number" value="{{ quotation_no }}">
@@ -19,13 +19,14 @@
 
                 <div class="col-md-3">
                     <label>Quotation Date</label>
-                    <input type="date" name="quotation_date" id="quotation_date" class="form-control" required>
+                    <input type="date" name="quotation_date" id="quotation_date" class="form-control"
+                        value="{{ q.quotation_date.strftime('%Y-%m-%d') if q and q.quotation_date else '' }}" required>
                 </div>
 
                 <div class="col-md-3">
                     <label>Validity (Days)</label>
                     <input type="number" name="validity_days" id="validity_days" class="form-control"
-                        placeholder="Enter days (eg: 15)" min="1" value="15" required>
+                        placeholder="Enter days (eg: 15)" min="1" value="{{ q.validity_days if q else '15' }}" required>
                 </div>
 
                 <div class="col-md-3">
@@ -47,12 +48,12 @@
 
                 <div class="col-md-4">
                     <label>Sales Person</label>
-                    <input name="sales_person" class="form-control">
+                    <input name="sales_person" class="form-control" value="{{ q.sales_person if q else '' }}">
                 </div>
 
                 <div class="col-md-4">
                     <label>Reference / Lead ID</label>
-                    <input name="reference_id" class="form-control">
+                    <input name="reference_id" class="form-control" value="{{ q.reference_id if q else '' }}">
                 </div>
 
             </div>
@@ -120,23 +121,13 @@
                 <!-- Project Scope -->
                 <div class="col-md-4">
                     <label>Project Scope</label>
-                    <select name="project_scope" class="form-select">
-                        <option>Website Development</option>
-                        <option>Mobile App Development</option>
-                        <option>ERP System</option>
-                        <option>CRM Implementation</option>
-                        <option>Maintenance Support</option>
-                    </select>
+                    <input type="text" name="project_scope" class="form-control" placeholder="">
                 </div>
 
                 <!-- Milestones -->
                 <div class="col-md-4">
                     <label>Milestones</label>
-                    <select name="milestones" class="form-select">
-                        <option>Requirement → Design → Development → Testing → Delivery</option>
-                        <option>Phase Wise Delivery</option>
-                        <option>Single Final Delivery</option>
-                    </select>
+                    <input type="text" name="milestones" class="form-control" placeholder="">
                 </div>
 
                 <!-- Warranty -->
@@ -163,12 +154,7 @@
                 <!-- Dependencies -->
                 <div class="col-md-4">
                     <label>Dependencies</label>
-                    <select name="dependencies" class="form-select">
-                        <option>Client Content</option>
-                        <option>API Access</option>
-                        <option>Server Credentials</option>
-                        <option>Design Approval</option>
-                    </select>
+                    <input type="text" name="dependencies" class="form-control" placeholder="">
                 </div>
 
 
@@ -187,12 +173,13 @@
             </select>
 
             <textarea name="terms" id="termsBox" class="form-control" rows="8"
-                placeholder="Terms will auto load here... You can edit if needed." required></textarea>
+                placeholder="Terms will auto load here... You can edit if needed."
+                required>{{ q.terms if q else '' }}</textarea>
         </div>
 
         <!-- ================= ACTIONS ================= -->
         <div class="d-flex gap-2">
-            <button class="btn btn-success">Save Quotation</button>
+            <button class="btn btn-success">{{ 'Update' if is_edit else 'Save' }} Quotation</button>
 
             <a href="{{ url_for('quotation_list') }}" class="btn btn-secondary">View Quotations</a>
         </div>

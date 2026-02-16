@@ -64,6 +64,9 @@ def cloud_request(method, endpoint, **kwargs):
     token = session.get("token")
     if token:
         headers["Authorization"] = f"Bearer {token}"
+        logging.debug(f"Token found in session for {method} {endpoint}")
+    else:
+        logging.warning(f"No token in session for {method} {endpoint}")
 
     try:
         response = requests.request(
@@ -73,6 +76,7 @@ def cloud_request(method, endpoint, **kwargs):
             timeout=5,
             **kwargs
         )
+        logging.debug(f"API Response: {method} {endpoint} - Status: {response.status_code}")
         return response
     except Exception as e:
         logging.error(f"Cloud request error: {e}")
@@ -173,10 +177,13 @@ def fetch_cloud_challan_by_id(challan_id):
 def fetch_cloud_quotations():
     """Fetch all quotations from cloud database"""
     try:
-        response = requests.get(f"{CLOUD_API_BASE}/quotations", timeout=5)
-        if response.status_code == 200:
+        response = cloud_request("GET", "/quotations")
+        if response and response.status_code == 200:
             return response.json()
-        logging.warning(f"Cloud API returned status {response.status_code}")
+        if response:
+            logging.warning(f"Cloud API returned status {response.status_code}")
+        else:
+            logging.warning("Cloud API request returned None")
         return []
     except Exception as e:
         logging.error(f"Cloud API error (quotations): {e}")
@@ -185,23 +192,26 @@ def fetch_cloud_quotations():
 def fetch_cloud_quotation_by_id(qid):
     """Fetch single quotation from cloud database by ID (with query param pattern)"""
     try:
+        # Standardize qid to string for reliable comparison
+        qid_str = str(qid)
+        
         # Cloud API uses ?id=NN pattern or returns a list
-        # Note: Probing shows it often returns the full list even with ?id=
-        response = requests.get(f"{CLOUD_API_BASE}/quotations?id={qid}", timeout=5)
-        if response.status_code == 200:
+        response = cloud_request("GET", f"/quotations?id={qid_str}")
+        if response and response.status_code == 200:
             data = response.json()
             if isinstance(data, list):
                 # Search for correct ID in list since API might ignore query param
                 for item in data:
-                    if item.get("id") == int(qid):
+                    if str(item.get("id")) == qid_str:
                         return item
             elif isinstance(data, dict):
-                return data
+                if str(data.get("id")) == qid_str:
+                    return data
         
         # Fallback to full list filtering if needed
         quotations = fetch_cloud_quotations()
         for q in quotations:
-            if q.get('id') == int(qid):
+            if str(q.get('id')) == qid_str:
                 return q
         return None
     except Exception as e:
@@ -2950,48 +2960,49 @@ def safe_float(value):
 @login_required
 def create_quotation():
     try:
-        # Capture all possible fields from the form
+        # Start with minimal required fields to test
         payload = {
             "quotation_number": request.form.get("quotation_number"),
             "quotation_date": request.form.get("quotation_date"),
-            "validity_days": request.form.get("validity_days"),
             "status": request.form.get("status", "Draft"),
-            "sales_person": request.form.get("sales_person"),
-            "reference_id": request.form.get("reference_id"),
-            
-            "subtotal": request.form.get("subtotal", 0),
-            "discount": request.form.get("discount", 0),
-            "taxable_value": request.form.get("taxable", 0),
-            "cgst": request.form.get("cgst", 0),
-            "sgst": request.form.get("sgst", 0),
-            "igst": request.form.get("igst", 0),
-            "shipping": request.form.get("shipping", 0),
-            "rounding": request.form.get("rounding", 0),
-            "grand_total": request.form.get("grand_total", 0),
-            
-            "delivery_timeline": request.form.get("delivery_timeline"),
-            "project_scope": request.form.get("project_scope"),
-            "milestones": request.form.get("milestones"),
-            "warranty": request.form.get("warranty"),
-            "revision_policy": request.form.get("revision_policy"),
-            "dependencies": request.form.get("dependencies"),
-            "terms": request.form.get("terms")
+            "grand_total": float(request.form.get("grand_total", 0) or 0)
         }
+        
+        # Add optional fields only if they have values
+        validity_days = request.form.get("validity_days")
+        if validity_days:
+            payload["validity_days"] = int(validity_days)
+            
+        sales_person = request.form.get("sales_person")
+        if sales_person:
+            payload["sales_person"] = sales_person
+            
+        reference_id = request.form.get("reference_id")
+        if reference_id:
+            payload["reference_id"] = reference_id
+            
+        terms = request.form.get("terms")
+        if terms:
+            payload["terms"] = terms
 
-        response = requests.post(
-            "http://44.208.164.236:5000/api/quotations",
-            json=payload,
-            timeout=5
+        # Log the payload for debugging
+        logging.debug(f"Quotation payload: {json.dumps(payload, indent=2)}")
+
+        response = cloud_request(
+            "POST",
+            "/quotations",
+            json=payload
         )
 
-        if response.status_code in (200, 201):
+        if response is None:
+            flash("API connection error: Unable to reach server", "error")
+        elif response.status_code in (200, 201):
             flash("Quotation created successfully!", "success")
             return redirect(url_for("quotation_list"))
         else:
-            flash(
-                f"API error: {response.status_code} - {response.text}",
-                "error"
-            )
+            error_msg = f"API error: {response.status_code} - {response.text}"
+            logging.error(f"Quotation creation failed: {error_msg}")
+            flash(error_msg, "error")
 
     except Exception as e:
         flash(f"API connection error: {str(e)}", "error")
@@ -3138,10 +3149,10 @@ def duplicate_quotation(qid):
                 "terms": q_data.get("terms")
             }
             
-            create_response = requests.post(
-                "http://44.208.164.236:5000/api/quotations",
-                json=new_payload,
-                timeout=5
+            create_response = cloud_request(
+                "POST",
+                "/quotations",
+                json=new_payload
             )
             
             if create_response.status_code in (200, 201):
@@ -3162,19 +3173,29 @@ def duplicate_quotation(qid):
 # Cancel / Reject
 # -------------------------
 @app.route("/quotations/cancel/<int:qid>")
+@login_required
 def cancel_quotation(qid):
     try:
-        response = requests.put(
-            f"http://44.208.164.236:5000/api/quotations/{qid}",
-            json={"status": "Cancelled"},
-            timeout=5
+        response = cloud_request(
+            "PUT",
+            f"/quotations/{qid}",
+            json={"status": "Cancelled"}
         )
         
         if response.status_code == 200:
             flash("Quotation has been cancelled.", "warning")
             return redirect(url_for("quotation_preview", qid=qid))
-        else:
-            flash("Failed to cancel quotation", "error")
+        # Fallback to query param if needed
+        response = cloud_request(
+            "PUT",
+            f"/quotations?id={qid}",
+            json={"status": "Cancelled"}
+        )
+        if response.status_code == 200:
+            flash("Quotation has been cancelled.", "warning")
+            return redirect(url_for("quotation_preview", qid=qid))
+            
+        flash("Failed to cancel quotation", "error")
     except Exception as e:
         flash(f"Error cancelling quotation: {str(e)}", "error")
     
@@ -3295,35 +3316,52 @@ def quotation_pdf(qid):
 
 
 @app.route("/quotations/<int:qid>/convert")
+@login_required
 def convert_to_invoice(qid):
     try:
-        response = requests.put(
-            f"http://44.208.164.236:5000/api/quotations/{qid}",
-            json={"status": "Converted to Invoice"},
-            timeout=5
+        response = cloud_request(
+            "PUT",
+            f"/quotations/{qid}",
+            json={"status": "Converted to Invoice"}
         )
         
         if response.status_code == 200:
             flash("Quotation converted to Invoice successfully!", "success")
         else:
-            flash("Failed to convert quotation", "error")
+            # Fallback to query param
+            response = cloud_request(
+                "PUT",
+                f"/quotations?id={qid}",
+                json={"status": "Converted to Invoice"}
+            )
+            if response.status_code == 200:
+                flash("Quotation converted to Invoice successfully!", "success")
+            else:
+                flash("Failed to convert quotation", "error")
     except Exception as e:
         flash(f"Error converting quotation: {str(e)}", "error")
     
     return redirect(url_for("quotation_list"))
 @app.route("/quotations/<int:qid>/send-email")
+@login_required
 def send_email(qid):
     try:
-        response = requests.get(
-            f"http://44.208.164.236:5000/api/quotations/{qid}",
-            timeout=5
+        response = cloud_request(
+            "GET",
+            f"/quotations?id={qid}"
         )
         
         if response.status_code == 200:
             q_data = response.json()
-            # TEMP DEMO (replace with real email later)
-            print("Sending email for quotation:", q_data["quotation_number"])
-            flash("Email sent successfully (demo).", "success")
+            if isinstance(q_data, list) and q_data:
+                q_data = next((item for item in q_data if str(item.get('id')) == str(qid)), None)
+            
+            if q_data:
+                # TEMP DEMO (replace with real email later)
+                print("Sending email for quotation:", q_data.get("quotation_number"))
+                flash("Email sent successfully (demo).", "success")
+            else:
+                flash("Quotation not found", "error")
         else:
             flash("Quotation not found", "error")
     except Exception as e:
@@ -3333,24 +3371,87 @@ def send_email(qid):
 
 
 @app.route("/quotations/<int:qid>/send-whatsapp")
+@login_required
 def send_whatsapp(qid):
     try:
-        response = requests.get(
-            f"http://44.208.164.236:5000/api/quotations/{qid}",
-            timeout=5
+        response = cloud_request(
+            "GET",
+            f"/quotations?id={qid}"
         )
         
         if response.status_code == 200:
             q_data = response.json()
-            # TEMP DEMO
-            print("Sending WhatsApp for quotation:", q_data["quotation_number"])
-            flash("WhatsApp sent successfully (demo).", "success")
+            if isinstance(q_data, list) and q_data:
+                q_data = next((item for item in q_data if str(item.get('id')) == str(qid)), None)
+            
+            if q_data:
+                # TEMP DEMO
+                print("Sending WhatsApp for quotation:", q_data.get("quotation_number"))
+                flash("WhatsApp sent successfully (demo).", "success")
+            else:
+                flash("Quotation not found", "error")
         else:
             flash("Quotation not found", "error")
     except Exception as e:
         flash(f"Error sending WhatsApp: {str(e)}", "error")
     
     return redirect(url_for("quotation_list"))
+
+@app.route("/quotations/<int:qid>/edit", methods=["GET", "POST"])
+@login_required
+def edit_quotation(qid):
+    if request.method == "POST":
+        try:
+            payload = {
+                "quotation_number": request.form.get("quotation_number"),
+                "quotation_date": request.form.get("quotation_date"),
+                "status": request.form.get("status"),
+                "grand_total": float(request.form.get("grand_total", 0) or 0),
+                "validity_days": int(request.form.get("validity_days", 15)),
+                "sales_person": request.form.get("sales_person"),
+                "reference_id": request.form.get("reference_id"),
+                "terms": request.form.get("terms")
+            }
+            
+            response = cloud_request(
+                "PUT",
+                f"/quotations/{qid}",
+                json=payload
+            )
+            
+            if response is None:
+                flash("API connection error", "error")
+            elif response.status_code == 200:
+                flash("Quotation updated successfully!", "success")
+                return redirect(url_for("quotation_list"))
+            else:
+                # Try fallback with query param
+                response = cloud_request("PUT", f"/quotations?id={qid}", json=payload)
+                if response and response.status_code == 200:
+                    flash("Quotation updated successfully!", "success")
+                    return redirect(url_for("quotation_list"))
+                flash(f"Failed to update quotation: {response.status_code}", "error")
+        except Exception as e:
+            flash(f"Error updating quotation: {str(e)}", "error")
+            
+    q_data = fetch_cloud_quotation_by_id(qid)
+    if not q_data:
+        flash("Quotation not found", "error")
+        return redirect(url_for("quotation_list"))
+    
+    # Convert to SimpleNamespace for consistency in template
+    q = SimpleNamespace(
+        id=q_data["id"],
+        quotation_number=q_data["quotation_number"],
+        quotation_date=datetime.strptime(q_data["quotation_date"], "%Y-%m-%d") if q_data.get("quotation_date") else None,
+        validity_days=q_data.get("validity_days", 15),
+        status=q_data.get("status"),
+        sales_person=q_data.get("sales_person", ""),
+        reference_id=q_data.get("reference_id", ""),
+        terms=q_data.get("terms", "")
+    )
+    
+    return render_template("quotation_form.html", q=q, is_edit=True)
 
 
 
