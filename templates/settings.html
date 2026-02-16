@@ -3,6 +3,12 @@
 {% block title %}Settings - Revolutionary Invoice System{% endblock %}
 
 {% block content %}
+<style>
+    .position-relative {
+    overflow: visible;
+}
+
+</style>
 <div class="container-fluid">
     <!-- Header -->
     <div class="row mb-4">
@@ -47,11 +53,11 @@
                             <i data-feather="user" class="me-1"></i> User Profile
                         </a>
                     </li>
-                    <li class="nav-item">
+                    <!-- <li class="nav-item">
                         <a class="nav-link" href="#ai" data-bs-toggle="pill">
                             <i data-feather="cpu" class="me-1"></i> AI Settings
                         </a>
-                    </li>
+                    </li> -->
                     <!-- <li class="nav-item">
                         <a class="nav-link" href="#blockchain" data-bs-toggle="pill">
                             <i data-feather="shield" class="me-1"></i> Blockchain
@@ -344,7 +350,7 @@
                 </div>
 
                 <!-- AI Settings -->
-                <div class="tab-pane fade" id="ai">
+                <!-- <div class="tab-pane fade" id="ai">
                     <div class="glass-card p-4">
                         <h5 class="fw-bold mb-4">
                             <i data-feather="cpu" class="me-2 text-primary"></i>
@@ -476,7 +482,7 @@
                             </div>
                         </form>
                     </div>
-                </div>
+                </div> -->
 
                 <!-- Blockchain Settings 
                 <div class="tab-pane fade" id="blockchain">
@@ -616,14 +622,14 @@
                                         <div class="mb-3">
                                             <label for="defaultTaxRate" class="form-label">Default Tax Rate (%)</label>
                                             <input type="number" class="form-control glass-input" id="defaultTaxRate"
-                                                value="18" min="0" max="50" step="0.01">
+                                                 min="0" max="50" step="0.01">
                                         </div>
 
                                         <div class="mb-3">
                                             <label for="paymentTerms" class="form-label">Default Payment Terms
                                                 (Days)</label>
                                             <input type="number" class="form-control glass-input" id="paymentTerms"
-                                                value="30" min="1" max="365">
+                                                value="30" min="1" max="365" disabled>
                                         </div>
 
                                         <div class="mb-3">
@@ -632,49 +638,47 @@
                                                 value="AI-INV" maxlength="10">
                                         </div>
 
-                                        <div class="mb-3">
-                                            <label for="defaultCurrency" class="form-label">Default Currency</label>
-                                            <select class="form-select glass-input" id="defaultCurrency">
-                                                <option value="INR" selected>INR (₹)</option>
-                                                <option value="USD">USD ($)</option>
-                                                <option value="EUR">EUR (€)</option>
-                                                <option value="GBP">GBP (£)</option>
-                                            </select>
-                                        </div>
+                                       <div class="mb-3 position-relative">
+                                        <label for="defaultCurrency" class="form-label">Default Currency</label>
+                                        <select class="form-select glass-input" id="defaultCurrency">
+                                            <option>Loading currencies...</option>
+                                        </select>
+                                    </div>
+
                                     </div>
                                 </div>
 
-                                <div class="col-md-6">
+                                <div class="col-md-6" >
                                     <div class="mb-4">
                                         <h6 class="fw-bold mb-3">Feature Settings</h6>
                                         <div class="form-check form-switch mb-2">
-                                            <input class="form-check-input" type="checkbox" id="qrCodePayments" checked>
+                                            <input class="form-check-input" type="checkbox" id="qrCodePayments" checked disabled>
                                             <label class="form-check-label" for="qrCodePayments">
                                                 Generate QR Codes for Payments
                                             </label>
                                         </div>
                                         <div class="form-check form-switch mb-2">
                                             <input class="form-check-input" type="checkbox" id="digitalWatermark"
-                                                checked>
+                                                checked disabled>
                                             <label class="form-check-label" for="digitalWatermark">
                                                 Add Digital Watermark
                                             </label>
                                         </div>
                                         <div class="form-check form-switch mb-2">
-                                            <input class="form-check-input" type="checkbox" id="autoNumbering" checked>
+                                            <input class="form-check-input" type="checkbox" id="autoNumbering" checked disabled>
                                             <label class="form-check-label" for="autoNumbering">
                                                 Auto-generate Invoice Numbers
                                             </label>
                                         </div>
                                         <div class="form-check form-switch mb-2">
                                             <input class="form-check-input" type="checkbox" id="emailNotifications"
-                                                checked>
+                                                checked disabled>
                                             <label class="form-check-label" for="emailNotifications">
                                                 Send Email Notifications
                                             </label>
                                         </div>
                                         <div class="form-check form-switch mb-2">
-                                            <input class="form-check-input" type="checkbox" id="autoReminders" checked>
+                                            <input class="form-check-input" type="checkbox" id="autoReminders" checked disabled>
                                             <label class="form-check-label" for="autoReminders">
                                                 Automated Payment Reminders
                                             </label>
@@ -973,6 +977,27 @@ Subject to local jurisdiction only.</textarea>
         return false;
     };
 </script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const select = document.getElementById("defaultCurrency");
+    select.innerHTML = "";
+
+    const currencies = Intl.supportedValuesOf('currency');
+
+    currencies.sort().forEach(code => {
+        const option = document.createElement("option");
+        option.value = code;
+        option.textContent = code;
+
+        if (code === "INR") {
+            option.selected = true;
+        }
+
+        select.appendChild(option);
+    });
+});
+</script>
+
 
 <script>
     console.log('Settings page script loaded v3.2 - Main Logic');
@@ -1147,25 +1172,70 @@ fetch("http://44.208.164.236:5000/api/user/profile")
                 saveBtn.disabled = false;
                 showNotification('Failed to save settings: ' + error.message, 'danger');
             });
+            // Save invoice settings to cloud
+            fetch("http://44.208.164.236:5000/api/settings", {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    defaultTaxRate: settings.invoice.defaultTaxRate,
+                    paymentTerms: settings.invoice.paymentTerms,
+                    invoicePrefix: settings.invoice.invoicePrefix,
+                    defaultCurrency: settings.invoice.defaultCurrency,
+                    qrCodePayments: settings.invoice.qrCodePayments,
+                    digitalWatermark: settings.invoice.digitalWatermark,
+                    autoNumbering: settings.invoice.autoNumbering,
+                    defaultTerms: settings.invoice.defaultTerms
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                console.log("Invoice settings updated:", data);
+            })
+            .catch(error => {
+                console.error("Invoice update failed:", error);
+            });
+
     }
 
-    function resetSettings() {
-        if (confirm('Are you sure you want to reset all settings to defaults? This action cannot be undone.')) {
-            // Reset all forms
-            document.querySelectorAll('form').forEach(form => form.reset());
-
-            // Reset specific values
-            document.getElementById('aiConfidenceThreshold').value = 0.7;
-            document.getElementById('defaultTaxRate').value = 18;
-            document.getElementById('paymentTerms').value = 30;
-            document.getElementById('themePreference').value = 'auto';
-
-            // Apply default theme
-            applyTheme('auto');
-
-            showNotification('Settings reset to defaults', 'info');
-        }
+   function resetSettings() {
+    if (!confirm('Are you sure you want to reset all settings to defaults?')) {
+        return;
     }
+
+    // Define cloud defaults
+    const defaultSettings = {
+        defaultTaxRate: 18,
+        paymentTerms: 30,
+        invoicePrefix: "AI-INV",
+        defaultCurrency: "INR"
+    };
+
+    // Update UI
+    document.getElementById('defaultTaxRate').value = 18;
+    document.getElementById('paymentTerms').value = 30;
+    document.getElementById('themePreference').value = 'light';
+
+    applyTheme('light');
+
+    // 🔥 Send defaults to cloud
+    fetch("http://44.208.164.236:5000/api/settings", {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(defaultSettings)
+    })
+    .then(res => res.json())
+    .then(data => {
+        showNotification('Settings reset and synced to cloud', 'success');
+    })
+    .catch(error => {
+        console.error("Reset failed:", error);
+        showNotification('Cloud reset failed', 'danger');
+    });
+}
 
     function collectFormData(formId) {
         const form = document.getElementById(formId);

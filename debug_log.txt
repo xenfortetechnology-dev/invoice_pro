@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-TIMESTAMP: 2026-02-16 12:04:42.293039
-=======
-TIMESTAMP: 2026-02-16 12:00:37.370031
->>>>>>> 52a5a5ad86d216a73ca3747111f341cb9f23eec5
+TIMESTAMP: 2026-02-16 13:23:08.308455
 FILTERS: Search='', Status='All Status', Client='All Clients', From='None', To='None'
 TOTAL INVOICES FETCHED: 2483
 INV [0]: Num='ai-inv-20260215-001-463', Client='seenu', ID='2496'
