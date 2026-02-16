@@ -38,7 +38,7 @@ from models import BankDetails
 from datetime import date
 from sqlalchemy import func
 from app import db
-from models import Invoice
+from models import Invoice, DeletedQuotation
 
 import ai_services
 import ai_client 
@@ -49,6 +49,22 @@ import requests
 analytics_engine = AnalyticsEngine(db.session)
 from report_generator import AnalyticsReportGenerator
 report_generator = AnalyticsReportGenerator()
+
+# ===== HELPER FOR DESKTOP DOWNLOADS =====
+def save_pdf_to_downloads(buffer, filename):
+    """Save PDF buffer to local Downloads folder (Reliable for Desktop EXE)"""
+    try:
+        downloads_path = os.path.join(os.path.expanduser("~"), "Downloads")
+        if not os.path.exists(downloads_path):
+            os.makedirs(downloads_path)
+        
+        file_path = os.path.join(downloads_path, filename)
+        with open(file_path, "wb") as f:
+            f.write(buffer.getvalue())
+        return file_path
+    except Exception as e:
+        logging.error(f"Error saving PDF to downloads: {e}")
+        return None
 
 # ===== CLOUD API HELPER FUNCTIONS =====
 CLOUD_API_BASE = os.environ.get("CLOUD_API_BASE", "http://44.208.164.236:5000/api")
@@ -114,6 +130,44 @@ def fetch_cloud_challans():
     except Exception as e:
         logging.error(f"Cloud API error (challans): {e}")
         return []
+
+def fetch_cloud_quotations():
+    """Fetch all quotations from cloud database"""
+    try:
+        response = requests.get(f"{CLOUD_API_BASE}/quotations", timeout=5)
+        if response.status_code == 200:
+            return response.json()
+        logging.warning(f"Cloud API returned status {response.status_code}")
+        return []
+    except Exception as e:
+        logging.error(f"Cloud API error (quotations): {e}")
+        return []
+
+def fetch_cloud_quotation_by_id(qid):
+    """Fetch single quotation from cloud database by ID (with query param pattern)"""
+    try:
+        # Cloud API uses ?id=NN pattern or returns a list
+        # Note: Probing shows it often returns the full list even with ?id=
+        response = requests.get(f"{CLOUD_API_BASE}/quotations?id={qid}", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if isinstance(data, list):
+                # Search for correct ID in list since API might ignore query param
+                for item in data:
+                    if item.get("id") == int(qid):
+                        return item
+            elif isinstance(data, dict):
+                return data
+        
+        # Fallback to full list filtering if needed
+        quotations = fetch_cloud_quotations()
+        for q in quotations:
+            if q.get('id') == int(qid):
+                return q
+        return None
+    except Exception as e:
+        logging.error(f"Cloud API error (quotation by ID): {e}")
+        return None
 
 def login_required(f):
     """Decorator to require login for routes"""
@@ -713,6 +767,11 @@ def invoice_pdf(id):
         logging.info(f"PDF buffer size: {buffer_size} bytes")
         
         filename = f'Invoice_{invoice.invoice_number}.pdf'
+        
+        # 🔥 Save to local Downloads for Desktop EXE support
+        saved_path = save_pdf_to_downloads(pdf_buffer, filename)
+        if saved_path:
+            flash(f"PDF saved to: {saved_path}", "success")
         
         response = Response(
             pdf_buffer.getvalue(),
@@ -1856,9 +1915,18 @@ def delivery_challan():
         flash(f"API connection error: {str(e)}", "error")
         data = []
 
+    # Fetch all clients from cloud API to get phone numbers
+    clients_data = fetch_cloud_clients()
+    # Create a mapping of client_id to client data for quick lookup
+    client_map = {client.get('id'): client for client in clients_data}
+
     challan_list = []
 
     for c in data:
+        # Get client details from the client_map
+        client_id = c.get("client_id")
+        client_info = client_map.get(client_id, {})
+        
         challan_obj = SimpleNamespace(
             id=c["id"],
             challan_number=c["challan_number"],
@@ -1876,7 +1944,9 @@ def delivery_challan():
             ) if c.get("created_at") else None,
 
             client=SimpleNamespace(
-                name=c.get("client_name")
+                id=client_id,
+                name=c.get("client_name") or client_info.get("name", "Unknown"),
+                phone=client_info.get("phone", "")
             ),
 
             status=c["status"],
@@ -2844,15 +2914,11 @@ def create_quotation():
 # Preview
 # -------------------------
 @app.route("/quotations/preview/<int:qid>")
+@login_required
 def quotation_preview(qid):
-    try:
-        response = requests.get(
-            f"http://44.208.164.236:5000/api/quotations/{qid}",
-            timeout=5
-        )
-        
-        if response.status_code == 200:
-            q_data = response.json()
+    q_data = fetch_cloud_quotation_by_id(qid)
+    if q_data:
+        try:
             q = SimpleNamespace(
                 id=q_data["id"],
                 quotation_number=q_data["quotation_number"],
@@ -2874,7 +2940,7 @@ def quotation_preview(qid):
                 validity_days=q_data.get("validity_days"),
                 expiry_date=datetime.strptime(
                     q_data["expiry_date"], "%Y-%m-%d"
-                ) if q_data.get("expiry_date") else None,
+                ) if q_data.get("expiry_date") and q_data["expiry_date"] != "None" else None,
                 delivery_timeline=q_data.get("delivery_timeline", ""),
                 project_scope=q_data.get("project_scope", ""),
                 milestones=q_data.get("milestones", ""),
@@ -2884,11 +2950,12 @@ def quotation_preview(qid):
                 terms=q_data.get("terms", "")
             )
             return render_template("quotation_preview.html", q=q)
-        else:
-            flash("Quotation not found", "error")
+        except Exception as e:
+            logging.error(f"Error parsing quotation details: {e}")
+            flash(f"Error parsing quotation: {str(e)}", "error")
             return redirect(url_for("quotation_list"))
-    except Exception as e:
-        flash(f"Error loading quotation: {str(e)}", "error")
+    else:
+        flash("Quotation not found", "error")
         return redirect(url_for("quotation_list"))
 
 
@@ -2900,16 +2967,17 @@ def quotation_preview(qid):
 def quotation_list():
 
     try:
-        response = requests.get(
-            "http://44.208.164.236:5000/api/quotations",
-            timeout=5
-        )
-
-        if response.status_code == 200:
-            data = response.json()
-        else:
-            flash("Failed to load quotations from API", "error")
+        data = fetch_cloud_quotations()
+        if not data:
+            flash("No quotations found or API unavailable", "info")
             data = []
+
+        # local tracking workaround for blocked Cloud API
+        try:
+            deleted_ids = [dq.quotation_id for dq in DeletedQuotation.query.all()]
+            data = [q for q in data if q["id"] not in deleted_ids]
+        except Exception as db_err:
+            logging.error(f"Error filtering deleted quotations: {db_err}")
 
     except Exception as e:
         flash(f"API connection error: {str(e)}", "error")
@@ -2949,16 +3017,13 @@ def quotation_list():
 # Duplicate
 # -------------------------
 @app.route("/quotations/duplicate/<int:qid>")
+@login_required
 def duplicate_quotation(qid):
     try:
         # Fetch original quotation from API
-        response = requests.get(
-            f"http://44.208.164.236:5000/api/quotations/{qid}",
-            timeout=5
-        )
+        q_data = fetch_cloud_quotation_by_id(qid)
         
-        if response.status_code == 200:
-            q_data = response.json()
+        if q_data:
             
             # Create duplicate via API
             new_payload = {
@@ -3030,34 +3095,55 @@ def cancel_quotation(qid):
 
 
 @app.route("/quotations/<int:qid>/delete")
+@login_required
 def delete_quotation(qid):
+    """Delete quotation via Local tracking (Workaround for blocked Cloud API)"""
     try:
+        # 1. Attempt Cloud API call for future-proofing
+        # Using short timeout to not hang UI
         response = requests.delete(
-            f"http://44.208.164.236:5000/api/quotations/{qid}",
-            timeout=5
+            f"{CLOUD_API_BASE}/quotations?id={qid}",
+            timeout=2
         )
         
-        if response.status_code == 200:
+        if response.status_code in (200, 204):
             flash("Quotation deleted successfully!", "success")
         else:
-            flash("Failed to delete quotation", "error")
+            # 2. If Cloud API fails (as expected), add to local DeletedQuotation table
+            logging.warning(f"Cloud Deletion unavailable (Status {response.status_code}). Using local workaround for ID {qid}.")
+            
+            existing = DeletedQuotation.query.filter_by(quotation_id=qid).first()
+            if not existing:
+                new_deleted = DeletedQuotation(quotation_id=qid)
+                db.session.add(new_deleted)
+                db.session.commit()
+            
+            flash("Quotation marked as deleted.", "success")
+            
     except Exception as e:
-        flash(f"Error deleting quotation: {str(e)}", "error")
+        logging.error(f"Error handling deletion, falling back to local: {e}")
+        # Even on connection error, track it locally
+        try:
+            existing = DeletedQuotation.query.filter_by(quotation_id=qid).first()
+            if not existing:
+                new_deleted = DeletedQuotation(quotation_id=qid)
+                db.session.add(new_deleted)
+                db.session.commit()
+            flash("Quotation marked as deleted (Local workaround).", "success")
+        except Exception as db_err:
+            flash(f"Error marking quotation as deleted: {str(db_err)}", "error")
     
     return redirect(url_for("quotation_list"))
 
 @app.route("/quotations/<int:qid>/pdf")
+@login_required
 def quotation_pdf(qid):
+    """Generate PDF for quotation - returns direct download response"""
     try:
         # Fetch quotation from API
-        response = requests.get(
-            f"http://44.208.164.236:5000/api/quotations/{qid}",
-            timeout=5
-        )
+        q_data = fetch_cloud_quotation_by_id(qid)
         
-        if response.status_code == 200:
-            q_data = response.json()
-            
+        if q_data:
             # Convert API data to SimpleNamespace for PDF generator
             quotation = SimpleNamespace(
                 id=q_data["id"],
@@ -3080,41 +3166,45 @@ def quotation_pdf(qid):
                 validity_days=q_data.get("validity_days"),
                 expiry_date=datetime.strptime(
                     q_data["expiry_date"], "%Y-%m-%d"
-                ) if q_data.get("expiry_date") else None,
+                ) if q_data.get("expiry_date") and q_data["expiry_date"] != "None" else None,
                 delivery_timeline=q_data.get("delivery_timeline", ""),
                 project_scope=q_data.get("project_scope", ""),
                 milestones=q_data.get("milestones", ""),
                 warranty=q_data.get("warranty", ""),
                 revision_policy=q_data.get("revision_policy", ""),
                 dependencies=q_data.get("dependencies", ""),
-                terms=q_data.get("terms", "")
+                terms=q_data.get("terms", ""),
+                line_items=[] # Quotations currently don't have separate line items in this API version
             )
             
+            # Use specific quotation PDF generator
             pdf_buffer = generate_quotation_pdf(quotation)
-            filename = f"Quotation_{quotation.quotation_number.replace('-', '_')}.pdf"
-            filepath = _save_buffer_to_downloads(pdf_buffer, filename)
+            pdf_buffer.seek(0)
             
-            if filepath:
-                return jsonify({
-                    'success': True,
-                    'message': f'Quotation PDF generated and saved to Downloads: {filename}',
-                    'filename': filename
-                })
-            else:
-                return jsonify({
-                    'success': False,
-                    'message': 'Failed to save PDF to system Downloads folder.'
-                }), 500
+            filename = f'Quotation_{quotation.quotation_number}.pdf'
+            
+            # 🔥 Save to local Downloads for Desktop EXE support
+            saved_path = save_pdf_to_downloads(pdf_buffer, filename)
+            if saved_path:
+                flash(f"PDF saved to: {saved_path}", "success")
+            
+            # Return as attachment for direct browser download
+            return Response(
+                pdf_buffer.getvalue(),
+                mimetype='application/pdf',
+                headers={
+                    'Content-Disposition': f'attachment; filename="{filename}"',
+                    'Content-Type': 'application/pdf'
+                }
+            )
         else:
-            return jsonify({
-                'success': False,
-                'message': 'Quotation not found in API'
-            }), 404
+            flash("Quotation not found on Cloud API", "error")
+            return redirect(url_for("quotation_list"))
+            
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': f'Error generating PDF: {str(e)}'
-        }), 500
+        logging.error(f"Quotation PDF generation failed: {e}", exc_info=True)
+        flash(f"Failed to generate PDF: {str(e)}", "error")
+        return redirect(url_for("quotation_list"))
 
 
 @app.route("/quotations/<int:qid>/convert")
@@ -3457,6 +3547,11 @@ def challan_pdf(id):
         pdf_buffer.seek(0)
         
         filename = f'Challan_{challan.challan_number}.pdf'
+        
+        # 🔥 Save to local Downloads for Desktop EXE support
+        saved_path = save_pdf_to_downloads(pdf_buffer, filename)
+        if saved_path:
+            flash(f"PDF saved to: {saved_path}", "success")
         
         return send_file(
             pdf_buffer,

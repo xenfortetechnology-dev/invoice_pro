@@ -39,9 +39,10 @@
                      <a href="/quotations/preview/{{ q.id }}" class="btn btn-sm btn-info text-white" title="Preview">
                         <i data-feather="eye" size="14"></i>
                      </a>
-                     <button onclick="downloadQuotationPDF({{ q.id }})" class="btn btn-sm btn-primary" title="PDF">
+                     <a href="javascript:void(0)" onclick="downloadQuotationPDF('{{ q.id }}')"
+                        class="btn btn-sm btn-primary" title="PDF">
                         <i data-feather="file-text" size="14"></i>
-                     </button>
+                     </a>
                      <a href="/quotations/{{ q.id }}/convert" class="btn btn-sm btn-success" title="Convert">
                         <i data-feather="refresh-cw" size="14"></i>
                      </a>
@@ -88,20 +89,41 @@
       }, 5000);
    }
 
-   async function downloadQuotationPDF(qid) {
-      showToast('Generating Quotation PDF...', 'info');
-      try {
-         const response = await fetch(`/quotations/${qid}/pdf`);
-         const data = await response.json();
-         if (data.success) {
-            showToast(data.message, 'success');
-         } else {
-            showToast(data.message || 'Export failed', 'error');
-         }
-      } catch (error) {
-         showToast('System error during export', 'error');
-         console.error('Export error:', error);
-      }
+   function downloadQuotationPDF(qid) {
+      showToast('Generating Quotation PDF...', 'primary');
+
+      fetch(`/quotations/${qid}/pdf?t=${new Date().getTime()}`)
+         .then(response => {
+            if (response.ok) {
+               return response.blob().then(blob => {
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.style.display = 'none';
+                  a.href = url;
+                  // extracting filename from content-disposition header if available, or default
+                  const disposition = response.headers.get('Content-Disposition');
+                  let filename = `Quotation_${qid}.pdf`;
+                  if (disposition && disposition.indexOf('attachment') !== -1) {
+                     const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                     const matches = filenameRegex.exec(disposition);
+                     if (matches != null && matches[1]) {
+                        filename = matches[1].replace(/['"]/g, '');
+                     }
+                  }
+                  a.download = filename;
+                  document.body.appendChild(a);
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+                  showToast('PDF Downloaded Successfully!', 'success');
+               });
+            } else {
+               showToast('Failed to download PDF.', 'error');
+            }
+         })
+         .catch(error => {
+            console.error('Download error:', error);
+            showToast('An error occurred during download.', 'error');
+         });
    }
 
    document.addEventListener('DOMContentLoaded', () => {

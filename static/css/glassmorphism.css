@@ -80,9 +80,12 @@
   .sidebar{
     background-color:var(--body-bg);
   }
-  .dropdown-item{
-    color: var(--text-primary-light);
+  .dropdown-menu{
+    background-color: var(--text-primary-dark) !important;
 
+  }
+  .dropdown-item{
+    color: var(--text-primary-light) !important;
   }
   .dropdown-item:hover{
     color: var(--text-primary-dark);
@@ -120,7 +123,25 @@
 }
 
 
+/* Analytics */
 
+/* .dropdown-item
+{
+  color: var(--text-primary-light) !important;
+} */
+
+/* delivery */
+
+.card-header{
+  color: var(--text-primary-light) !important;
+}
+
+.form-label{
+  color: var(--text-primary-light) !important;
+}
+.badge{
+  color: var(--text-primary-light) !important;
+}
 /*  AI Assistant*/
 
 .message-bubble{

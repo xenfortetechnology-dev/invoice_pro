@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Any
 from sqlalchemy import func
 from extensions import db
 
-from models import Invoice, Client, InvoiceLineItem, AIInteraction, InventoryItem
+# from models import Invoice, Client, InvoiceLineItem, AIInteraction, InventoryItem
 # from openai import OpenAI
 import ai_client
 
@@ -26,6 +26,7 @@ class AIInvoiceAssistant:
     def analyze_client_history(self, client_id: int) -> Dict[str, Any]:
         """Analyze client's invoice history to provide insights"""
         try:
+            from models import Client, Invoice
             db_client = Client.query.get(client_id)
             if not db_client:
                 return {"error": "Client not found"}
@@ -99,6 +100,7 @@ class AIInvoiceAssistant:
     def suggest_invoice_items(self, client_id: int, context: str = "") -> List[Dict[str, Any]]:
         """AI-powered item suggestions based on client history and context"""
         try:
+            from models import Client, Invoice, InventoryItem
             db_client = Client.query.get(client_id)
             if not db_client:
                 return []
@@ -194,6 +196,7 @@ class AIInvoiceAssistant:
             if not ai_client.AI_AVAILABLE:
                 return items
             
+            from models import Client
             db_client = Client.query.get(client_id)
             market_data = self._get_market_pricing_data()
             
@@ -232,6 +235,7 @@ class AIInvoiceAssistant:
     
     def _get_market_pricing_data(self) -> Dict:
         """Get market pricing context from recent invoices"""
+        from models import Invoice, InvoiceLineItem
         recent_items = db.session.query(InvoiceLineItem.description, 
                                       func.avg(InvoiceLineItem.unit_price).label('avg_price'))\
             .join(Invoice)\
@@ -264,6 +268,7 @@ class PredictiveAnalytics:
                 month_start = current_date.replace(day=1) - timedelta(days=30*i)
                 month_end = month_start + timedelta(days=30)
                 
+                from models import Invoice
                 revenue = db.session.query(func.sum(Invoice.total_amount))\
                     .filter(Invoice.invoice_date.between(month_start.date(), month_end.date()))\
                     .filter(Invoice.payment_status == 'Paid').scalar() or 0
@@ -383,6 +388,7 @@ class PredictiveAnalytics:
 
         try:
             # Get payment data
+            from models import Client, Invoice
             payment_data = db.session.query(
                 Client.name,
                 Client.id,
@@ -501,6 +507,7 @@ class InventoryAI:
     def forecast_demand(self, item_id: int, days_ahead: int = 30) -> Dict[str, Any]:
         """Forecast demand for inventory items"""
         try:
+            from models import InventoryItem, Invoice, InvoiceLineItem
             item = InventoryItem.query.get(item_id)
             if not item:
                 return {"error": "Item not found"}
