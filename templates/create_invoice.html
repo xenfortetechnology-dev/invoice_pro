@@ -392,6 +392,9 @@ Subject to local jurisdiction only.</textarea>
     let itemCounter = 0;
     let lineItems = [];
     let defaultTaxRate = 0;
+    let invoicePrefix = "INV";
+    let currencySymbol = "₹";
+    let defaultTerms = "";
 
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -403,6 +406,24 @@ document.addEventListener("DOMContentLoaded", function () {
             if (data.success) {
                 defaultTaxRate = parseFloat(data.default_tax_rate) || 0;
                 console.log("Default Tax Loaded:", defaultTaxRate);
+                 invoicePrefix = data.invoice_prefix || "INV";
+
+            const currency = data.default_currency || "INR";
+            defaultTerms = data.default_terms || "";
+
+            // Set currency symbol
+            if (currency === "USD") currencySymbol = "$";
+            else if (currency === "EUR") currencySymbol = "€";
+            else if (currency === "GBP") currencySymbol = "£";
+            else currencySymbol = "₹";
+
+            // Apply terms automatically
+            const termsField = document.getElementById("terms_conditions");
+            if (termsField) {
+                termsField.value = defaultTerms;
+            }
+
+            console.log("Cloud invoice defaults loaded");
             }
         })
         .catch(err => {
@@ -633,11 +654,11 @@ if (igstInput) {
 
         const totalAmount = subtotal + totalCgst + totalSgst + totalIgst;
 
-        document.getElementById('subtotalAmount').textContent = `₹${subtotal.toFixed(2)}`;
-        document.getElementById('cgstAmount').textContent = `₹${totalCgst.toFixed(2)}`;
-        document.getElementById('sgstAmount').textContent = `₹${totalSgst.toFixed(2)}`;
-        document.getElementById('igstAmount').textContent = `₹${totalIgst.toFixed(2)}`;
-        document.getElementById('totalAmount').textContent = `₹${totalAmount.toFixed(2)}`;
+        document.getElementById('subtotalAmount').textContent = `${currencySymbol}${subtotal.toFixed(2)}`;
+        document.getElementById('cgstAmount').textContent = `${currencySymbol}${subtotal.toFixed(2)}`;
+        document.getElementById('sgstAmount').textContent = `${currencySymbol}${subtotal.toFixed(2)}`;
+        document.getElementById('igstAmount').textContent = `${currencySymbol}${subtotal.toFixed(2)}`;
+        document.getElementById('totalAmount').textContent = `${currencySymbol}${subtotal.toFixed(2)}`;
 
         document.getElementById('amountInWords').textContent =
             `${convertNumberToWords(Math.floor(totalAmount))} Rupees Only`;
