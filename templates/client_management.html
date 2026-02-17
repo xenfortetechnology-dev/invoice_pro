@@ -55,7 +55,7 @@
 
     <!-- Client Stats -->
     <div class="row mb-4">
-        <div class="col-md-3">
+        <div class="col-md">
             <div class="glass-card p-4 metric-card">
                 <div class="d-flex align-items-center">
                     <div class="metric-icon bg-primary bg-opacity-10 text-primary rounded-circle p-3 me-3">
@@ -72,7 +72,7 @@
             </div>
         </div>
 
-        <div class="col-md-3">
+        <div class="col-md">
             <div class="glass-card p-4 metric-card">
                 <div class="d-flex align-items-center">
                     <div class="metric-icon bg-success bg-opacity-10 text-success rounded-circle p-3 me-3">
@@ -88,7 +88,7 @@
             </div>
         </div>
 
-        <div class="col-md-3">
+        <div class="col-md">
             <div class="glass-card p-4 metric-card">
                 <div class="d-flex align-items-center">
                     <div class="metric-icon bg-warning bg-opacity-10 text-warning rounded-circle p-3 me-3">
@@ -105,7 +105,7 @@
         </div>
 
         <!-- 
-        <div class="col-md-3">
+        <div class="col-md">
             <div class="glass-card p-4 metric-card">
                 <div class="d-flex align-items-center">
                     <div class="metric-icon bg-info bg-opacity-10 text-info rounded-circle p-3 me-3">
@@ -393,9 +393,9 @@
 </div>
 
 <!-- Client Details Modal -->
-<div class="modal fade" id="clientDetailsModal" tabindex="-1">
+<div class="modal fade glass-modal" id="clientDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content glass-modal">
+        <div class="modal-content">
             <div class="modal-header border-0">
                 <h5 class="modal-title">Client Details</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -606,12 +606,12 @@
             const clearBtn = document.getElementById('clearFilterBtn');
             // ... clear logic ...
         }
-        
+
         // Dark mode adjustments for pagination
         const paginationLinks = document.querySelectorAll('.pagination .page-link');
         paginationLinks.forEach(link => {
             if (!link.classList.contains('active')) {
-                link.classList.add('text-primary'); 
+                link.classList.add('text-primary');
             }
         });
     });
