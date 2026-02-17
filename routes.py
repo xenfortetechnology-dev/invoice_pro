@@ -525,9 +525,11 @@ def create_invoice():
                     "client_id": client_id,
                     "invoice_date": invoice_date_str,
                     "total_amount": total_amount,
-                    "payment_status": "Unpaid"
+                    "payment_status": "Unpaid",
+                    "line_items": line_items_data   
                 }
             )
+
 
 
             if response.status_code in (200, 201):
