@@ -1979,7 +1979,10 @@ def preview_challan():
 @login_required
 def delivery_challan():
     try:
-        response = cloud_request("GET", "/invoices")
+        response = cloud_request("GET", "/challans")
+        print("STATUS:", response.status_code)
+        print("RESPONSE TEXT:", response.text)
+
 
 
         if response.status_code == 200:
