@@ -615,7 +615,7 @@ Subject to local jurisdiction only.</textarea>
         const sgstAmount = (lineAmount * sgstPercent) / 100;
         const igstAmount = (lineAmount * igstPercent) / 100;
 
-        const totalAmount = lineAmount + cgstAmount + sgstAmount + igstAmount;
+        const totalAmount = lineAmount + igstAmount;
 
         if (igstInput) {
             igstInput.value = igstPercent.toFixed(2);
@@ -653,13 +653,13 @@ Subject to local jurisdiction only.</textarea>
             totalIgst += igstAmount;
         });
 
-        const totalAmount = subtotal + totalCgst + totalSgst + totalIgst;
+        const totalAmount = subtotal + totalIgst;
 
         document.getElementById('subtotalAmount').textContent = `${currencySymbol}${subtotal.toFixed(2)}`;
-        document.getElementById('cgstAmount').textContent = `${currencySymbol}${subtotal.toFixed(2)}`;
-        document.getElementById('sgstAmount').textContent = `${currencySymbol}${subtotal.toFixed(2)}`;
-        document.getElementById('igstAmount').textContent = `${currencySymbol}${subtotal.toFixed(2)}`;
-        document.getElementById('totalAmount').textContent = `${currencySymbol}${subtotal.toFixed(2)}`;
+        document.getElementById('cgstAmount').textContent = `${currencySymbol}${totalCgst.toFixed(2)}`;
+        document.getElementById('sgstAmount').textContent = `${currencySymbol}${totalSgst.toFixed(2)}`;
+        document.getElementById('igstAmount').textContent = `${currencySymbol}${totalIgst.toFixed(2)}`;
+        document.getElementById('totalAmount').textContent = `${currencySymbol}${totalAmount.toFixed(2)}`;
 
         document.getElementById('amountInWords').textContent =
             `${convertNumberToWords(Math.floor(totalAmount))} Rupees Only`;
