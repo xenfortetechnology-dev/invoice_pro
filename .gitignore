@@ -12,6 +12,7 @@ env/
 venv/
 myenv/
 billing-api/
+scripts/
 
 # --------------------
 # Environment variables
