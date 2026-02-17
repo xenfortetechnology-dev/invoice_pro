@@ -24,7 +24,7 @@
          </thead>
          <tbody>
             {% for q in quotations.items %}
-            <tr>
+            <tr class="quotation-row d-none">
                <td class="ps-3">{{ loop.index }}</td>
                <td class="fw-bold">{{ q.quotation_number }}</td>
                <td>
@@ -67,6 +67,20 @@
             {% endfor %}
          </tbody>
       </table>
+   </div>
+
+   <div id="pagination-controls" class="d-flex justify-content-between align-items-center mt-3 d-none">
+      <div class="text-muted small">
+         Showing <span id="qStart">1</span> - <span id="qEnd">10</span> of <span id="qTotal">0</span>
+      </div>
+      <div class="btn-group">
+         <button id="prevQ" class="btn btn-sm btn-outline-primary" disabled>
+            <i data-feather="chevron-left" size="14"></i> Previous
+         </button>
+         <button id="nextQ" class="btn btn-sm btn-outline-primary">
+            Next <i data-feather="chevron-right" size="14"></i>
+         </button>
+      </div>
    </div>
 </div>
 
@@ -133,6 +147,80 @@
 
    document.addEventListener('DOMContentLoaded', () => {
       feather.replace();
+
+      // Quotation List Pagination Logic
+      const itemsPerPage = 10;
+      let currentPage = 0;
+      const rows = document.querySelectorAll('.quotation-row');
+      const totalItems = rows.length;
+
+      if (totalItems > itemsPerPage) {
+         const paginationControls = document.getElementById('pagination-controls');
+         const nextBtn = document.getElementById('nextQ');
+         const prevBtn = document.getElementById('prevQ');
+         const startSpan = document.getElementById('qStart');
+         const endSpan = document.getElementById('qEnd');
+         const totalSpan = document.getElementById('qTotal');
+
+         paginationControls.classList.remove('d-none');
+         totalSpan.textContent = totalItems;
+
+         // Add fade-in style
+         const fadeStyle = document.createElement('style');
+         fadeStyle.textContent = `
+            .fade-in {
+                animation: fadeIn 0.4s ease-in-out;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(5px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+         `;
+         document.head.appendChild(fadeStyle);
+
+         function updateVisibility() {
+            const start = currentPage * itemsPerPage;
+            const end = Math.min(start + itemsPerPage, totalItems);
+
+            rows.forEach((row, index) => {
+               if (index >= start && index < end) {
+                  row.classList.remove('d-none');
+                  row.classList.add('fade-in');
+               } else {
+                  row.classList.add('d-none');
+                  row.classList.remove('fade-in');
+               }
+            });
+
+            startSpan.textContent = start + 1;
+            endSpan.textContent = end;
+
+            prevBtn.disabled = currentPage === 0;
+            nextBtn.disabled = end >= totalItems;
+
+            // Re-run feather to ensure icons in new rows look right if they were hidden
+            feather.replace();
+         }
+
+         nextBtn.addEventListener('click', () => {
+            if ((currentPage + 1) * itemsPerPage < totalItems) {
+               currentPage++;
+               updateVisibility();
+            }
+         });
+
+         prevBtn.addEventListener('click', () => {
+            if (currentPage > 0) {
+               currentPage--;
+               updateVisibility();
+            }
+         });
+
+         updateVisibility();
+      } else {
+         // If few items, just show them all
+         rows.forEach(row => row.classList.remove('d-none'));
+      }
    });
 </script>
 {% endblock %}

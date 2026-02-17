@@ -11,6 +11,8 @@ __pycache__/
 env/
 venv/
 myenv/
+billing-api/
+scripts/
 
 # --------------------
 # Environment variables
