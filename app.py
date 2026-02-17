@@ -199,3 +199,7 @@ def inject_today():
     return {'today': datetime.now()}
 
 __all__ = ["app", "db", "mail"]
+
+from email_service import send_email
+
+send_email("dharanimenaga229@gmail.com", "Test Mail", "It is working!")

@@ -475,7 +475,6 @@ def invoice_management():
         date_from=date_from,
         date_to=date_to
     )
-
 @app.route('/create_invoice', methods=['GET', 'POST'])
 @login_required
 def create_invoice():
@@ -484,10 +483,6 @@ def create_invoice():
         try:
             client_id = request.form.get('client_id')
             invoice_date_str = request.form.get('invoice_date')
-            due_date_str = request.form.get('due_date')
-            notes = request.form.get('notes', '')
-            terms_conditions = request.form.get('terms_conditions', '')
-            invoice_format = request.form.get("invoice_format", "default")
 
             invoice_number = generate_invoice_number()
 
@@ -523,17 +518,116 @@ def create_invoice():
                 }
             )
 
+            # ✅ SUCCESS BLOCK
+            if response and response.status_code in (200, 201):
+                print("INVOICE SUCCESS BLOCK ENTERED")
 
-            if response.status_code in (200, 201):
-                flash("Invoice created successfully (Cloud DB)", "success")
+                try:
+                    from email_service import send_email
+
+                    # 🔹 Fetch Company Details
+                    company_response = cloud_request("GET", "/company")
+
+                    if not company_response or company_response.status_code != 200:
+                        print("Company API failed")
+                        flash("Invoice created but company fetch failed", "warning")
+                        return redirect(url_for("invoice_management"))
+
+                    company_data = company_response.json()
+                    company_name = company_data.get("name")
+                    company_email = company_data.get("email")
+                    company_phone = company_data.get("phone")
+
+                    # 🔹 Fetch ALL Clients (since /clients/<id> not supported)
+                    client_response = cloud_request("GET", "/clients")
+
+                    if not client_response or client_response.status_code != 200:
+                        print("Client API failed")
+                        flash("Invoice created but client fetch failed", "warning")
+                        return redirect(url_for("invoice_management"))
+
+                    clients = client_response.json()
+
+                    # 🔹 Find correct client manually
+                    client_data = next(
+                        (c for c in clients if str(c.get("id")) == str(client_id)),
+                        None
+                    )
+
+                    if not client_data:
+                        print("Client not found")
+                        flash("Invoice created but client not found", "warning")
+                        return redirect(url_for("invoice_management"))
+
+                    client_name = client_data.get("name")
+                    client_email = client_data.get("email")
+
+                    if not client_email:
+                        print("Client email not found")
+                        flash("Invoice created but client email not found", "warning")
+                        return redirect(url_for("invoice_management"))
+
+                    # 🔹 Prepare Email
+                    subject = f"Invoice {invoice_number} from {company_name}"
+
+                    body = f"""
+                    <h2>Invoice Notification</h2>
+
+                    <p>Dear {client_name},</p>
+
+                    <p>Your invoice has been generated. Below are the details:</p>
+
+                    <table border="1" cellpadding="8" cellspacing="0">
+                        <tr>
+                            <td><b>Invoice Number</b></td>
+                            <td>{invoice_number}</td>
+                        </tr>
+                        <tr>
+                            <td><b>Date</b></td>
+                            <td>{invoice_date_str}</td>
+                        </tr>
+                        <tr>
+                            <td><b>Total Amount</b></td>
+                            <td>₹ {total_amount}</td>
+                        </tr>
+                    </table>
+
+                    <br>
+
+                    <h3>Company Details</h3>
+                    <p>
+                        <b>{company_name}</b><br>
+                        Email: {company_email}<br>
+                        Phone: {company_phone}
+                    </p>
+
+                    <br>
+                    <p>Regards,<br>{company_name}</p>
+                    """
+
+                    print("Sending email to:", client_email)
+
+                    email_status = send_email(client_email, subject, body)
+
+                    if email_status:
+                        flash("Invoice created and email sent to client ✅", "success")
+                    else:
+                        flash("Invoice created but email failed ❌", "danger")
+
+                except Exception as e:
+                    print("Notification error:", e)
+                    flash("Invoice created but email error occurred", "danger")
+
                 return redirect(url_for("invoice_management"))
+
             else:
-                flash(f"API Error: {response.text}", "error")
+                flash("Invoice creation failed", "danger")
 
         except Exception as e:
-            flash(f"API connection error: {str(e)}", "error")
+            print("MAIN ERROR:", e)
+            flash(f"API connection error: {str(e)}", "danger")
 
-    # GET request - fetch clients from cloud database
+    # GET request
     client_list = fetch_cloud_clients()
     clients = [SimpleNamespace(**c) for c in client_list]
 
@@ -542,6 +636,8 @@ def create_invoice():
         clients=clients,
         today=datetime.now()
     )
+
+
 
 @app.route('/invoice/preview', methods=['POST'])
 @login_required
@@ -3897,6 +3993,15 @@ def challan_pdf(id):
         logging.error(f"Challan PDF generation failed: {e}")
         flash(f'Error generating PDF: {str(e)}', 'error')
         return redirect(url_for('delivery_challan'))
+@app.route("/test_email")
+def test_email():
+    from email_service import send_email
+    send_email(
+        "dharanimenaga229@gmail.com",
+        "Test Invoice Email",
+        "<h3>This is a test email.</h3>"
+    )
+    return "Test Email Sent"
 
 
 
