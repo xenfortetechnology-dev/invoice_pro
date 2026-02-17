@@ -302,10 +302,16 @@ def invoice_management():
     # Get list of unique client IDs from ALL invoice data (before filtering)
     client_ids = list(set(int(inv["client_id"]) for inv in data if inv.get("client_id")))
     
-    # Fetch local client data for risk scores and names
+    # Fetch cloud client data for dropdown
+    cloud_clients_data = fetch_cloud_clients()
+    cloud_clients = [SimpleNamespace(**c) for c in cloud_clients_data]
+    
+    # Fetch local client data for risk scores only
     local_clients = Client.query.filter(Client.id.in_(client_ids)).all()
     client_risk_map = {c.id: c.ai_risk_score for c in local_clients}
-    client_name_map = {c.id: c.name for c in local_clients} # Use local names if available
+    
+    # Create client name map from cloud data
+    client_name_map = {c.id: c.name for c in cloud_clients}
 
     # --- FILTERING LOGIC ---
     search_query = request.args.get('search', '').lower().strip()
@@ -471,7 +477,7 @@ def invoice_management():
         search=search_query,
         status_filter=status_filter,
         client_filter=client_filter,
-        clients=local_clients, # Ensure this is passed for the dropdown
+        clients=cloud_clients, # Pass cloud clients for the dropdown
         date_from=date_from,
         date_to=date_to
     )
@@ -953,12 +959,27 @@ def edit_invoice(id):
         flash('Invoice not found', 'error')
         return redirect(url_for('invoice_management'))
     
+    # Fetch client data for this invoice
+    client_data = fetch_cloud_client_by_id(invoice_data.get('client_id'))
+    if not client_data:
+        flash('Client not found', 'error')
+        return redirect(url_for('invoice_management'))
+    
+    # Create client object
+    client = SimpleNamespace(
+        id=client_data.get('id'),
+        name=client_data.get('name', 'N/A'),
+        email=client_data.get('email', ''),
+        phone=client_data.get('phone', '')
+    )
+    
     # Create invoice object with all fields needed by edit form
     invoice = SimpleNamespace(
         id=invoice_data.get('id'),
         invoice_number=invoice_data.get('invoice_number', 'N/A'),
         invoice_date=invoice_data.get('invoice_date'),
         client_id=invoice_data.get('client_id'),
+        client=client,  # Add client object for template
         total_amount=invoice_data.get('total_amount', 0),
         payment_status=invoice_data.get('payment_status', 'Unpaid'),
         notes=invoice_data.get('notes', ''),
