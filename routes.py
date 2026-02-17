@@ -1156,7 +1156,7 @@ def client_management():
             email=c.get('email'),
             phone=c.get('phone'),
             contact_person=c.get('name'), # Default
-            client_type='Regular', # Default for cloud
+            client_type=c.get('client_type', 'Regular'), # Default for cloud
             lead_stage='New', # Default for cloud
             total_business=total_business,
             gstin="N/A",
