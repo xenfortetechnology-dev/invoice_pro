@@ -69,15 +69,16 @@ def cloud_request(method, endpoint, **kwargs):
     else:
         logging.warning(f"No token in session for {method} {endpoint}")
 
+    kwargs.setdefault("timeout", 10)
     try:
         response = requests.request(
             method,
             f"{CLOUD_API_BASE}{endpoint}",
             headers=headers,
-            timeout=5,
             **kwargs
         )
-        logging.debug(f"API Response: {method} {endpoint} - Status: {response.status_code}")
+        if response:
+            logging.debug(f"API Response: {method} {endpoint} - Status: {response.status_code}")
         return response
     except Exception as e:
         logging.error(f"Cloud request error: {e}")
@@ -156,10 +157,13 @@ def fetch_cloud_invoice_by_id(invoice_id):
 def fetch_cloud_challans():
     """Fetch all delivery challans from cloud database"""
     try:
-        response = requests.get(f"{CLOUD_API_BASE}/challans", timeout=5)
-        if response.status_code == 200:
+        response = cloud_request("GET", "/challans")
+        if response and response.status_code == 200:
             return response.json()
-        logging.warning(f"Cloud API returned status {response.status_code}")
+        if response:
+            logging.warning(f"Cloud API returned status {response.status_code}")
+        else:
+            logging.warning("Cloud API request returned None")
         return []
     except Exception as e:
         logging.error(f"Cloud API error (challans): {e}")
@@ -4066,28 +4070,173 @@ def convert_challan_to_invoice(id):
             'line_items': invoice_items
         }
         
-        response = requests.post(
-            f"{CLOUD_API_BASE}/invoices",
+        response = cloud_request(
+            "POST",
+            "/invoices",
             json=invoice_data,
             timeout=10
         )
         
-        if response.status_code in (200, 201):
+        if response and response.status_code in (200, 201):
             # Update challan status to Billed
-            requests.put(
-                f"{CLOUD_API_BASE}/challans/{id}",
+            cloud_request(
+                "PUT",
+                f"/challans/{id}",
                 json={'status': 'Billed'},
                 timeout=5
             )
             flash(f'Challan {challan_data.get("challan_number", "")} converted to invoice successfully!', 'success')
             return redirect(url_for('invoice_management'))
         else:
-            flash(f'Failed to create invoice: {response.text}', 'error')
+            error_msg = response.text if response else "Cloud server not reachable"
+            flash(f'Failed to create invoice: {error_msg}', 'error')
             return redirect(url_for('delivery_challan'))
         
     except Exception as e:
         logging.error(f"Conversion failed: {e}")
         flash(f'Error converting challan: {str(e)}', 'error')
+        return redirect(url_for('delivery_challan'))
+
+@app.route('/convert_multiple_challans_to_invoice')
+@login_required
+def convert_multiple_challans_to_invoice():
+    try:
+        challan_ids_str = request.args.get('challan_ids', '')
+        consolidation_option = request.args.get('consolidation_option', 'merge')
+        due_date = request.args.get('due_date', '')
+        notes = request.args.get('notes', '')
+
+        if not challan_ids_str:
+            flash('No challans selected.', 'error')
+            return redirect(url_for('delivery_challan'))
+
+        challan_ids = [int(id_str.strip()) for id_str in challan_ids_str.split(',') if id_str.strip()]
+        
+        challans = []
+        for cid in challan_ids:
+            c_data = fetch_cloud_challan_by_id(cid)
+            if c_data:
+                challans.append(c_data)
+            else:
+                flash(f'Challan ID {cid} not found.', 'error')
+                return redirect(url_for('delivery_challan'))
+
+        if not challans:
+            flash('No valid challans found.', 'error')
+            return redirect(url_for('delivery_challan'))
+
+        # Verify all challans belong to the same client
+        client_id = challans[0].get('client_id')
+        for c in challans:
+            if c.get('client_id') != client_id:
+                flash('All selected challans must belong to the same client.', 'error')
+                return redirect(url_for('delivery_challan'))
+
+        # Consolidate line items
+        consolidated_items = []
+        item_map = {} # Used for 'merge' option
+
+        for c in challans:
+            c_num = c.get('challan_number', 'Unknown')
+            for item in c.get('line_items', []):
+                qty = float(item.get('quantity', 0))
+                price = float(item.get('unit_price', 0))
+                desc = item.get('description', '').strip()
+                hsn = item.get('hsn_code', '').strip()
+                unit = item.get('unit', '')
+
+                if consolidation_option == 'merge':
+                    key = (desc, hsn, price)
+                    if key in item_map:
+                        item_map[key]['quantity'] += qty
+                        item_map[key]['total_amount'] += (qty * price)
+                    else:
+                        item_map[key] = {
+                            'hsn_code': hsn,
+                            'description': desc,
+                            'quantity': qty,
+                            'unit': unit,
+                            'unit_price': price,
+                            'total_amount': qty * price
+                        }
+                else: # 'group' option
+                    consolidated_items.append({
+                        'hsn_code': hsn,
+                        'description': f"[{c_num}] {desc}",
+                        'quantity': qty,
+                        'unit': unit,
+                        'unit_price': price,
+                        'total_amount': qty * price
+                    })
+
+        if consolidation_option == 'merge':
+            for i, (key, item) in enumerate(item_map.items(), 1):
+                item['sr_no'] = i
+                consolidated_items.append(item)
+        else:
+            for i, item in enumerate(consolidated_items, 1):
+                item['sr_no'] = i
+
+        total_amt = sum(item['total_amount'] for item in consolidated_items)
+
+        # Determine next invoice number
+        cloud_invoices = fetch_cloud_invoices()
+        current_year = datetime.now().year
+        max_seq = 0
+        if cloud_invoices:
+            for inv in cloud_invoices:
+                inv_num = inv.get('invoice_number', '')
+                if inv_num and inv_num.startswith(f'INV-{current_year}-'):
+                    try:
+                        seq = int(inv_num.split('-')[-1])
+                        if seq > max_seq:
+                            max_seq = seq
+                    except:
+                        pass
+        
+        new_seq = max_seq + 1
+        invoice_number = f"INV-{current_year}-{new_seq:04d}"
+
+        source_challans = ", ".join([c.get('challan_number', '') for c in challans])
+        invoice_data = {
+            'invoice_number': invoice_number,
+            'client_id': client_id,
+            'invoice_date': datetime.now().strftime('%Y-%m-%d'),
+            'due_date': due_date if due_date else None,
+            'notes': f"Consolidated from Challans: {source_challans}. {notes}".strip(),
+            'terms_conditions': 'Standard Terms Applied',
+            'total_amount': total_amt,
+            'subtotal': total_amt,
+            'payment_status': 'Unpaid',
+            'line_items': consolidated_items
+        }
+
+        response = cloud_request(
+            "POST",
+            "/invoices",
+            json=invoice_data,
+            timeout=10
+        )
+
+        if response and response.status_code in (200, 201):
+            # Update all challans' status to Billed
+            for cid in challan_ids:
+                cloud_request(
+                    "PUT",
+                    f"/challans/{cid}",
+                    json={'status': 'Billed'},
+                    timeout=5
+                )
+            flash(f'Consolidated Challan {invoice_number} generated successfully!', 'success')
+            return redirect(url_for('invoice_management'))
+        else:
+            error_msg = response.text if response else "Cloud server not reachable"
+            flash(f'Failed to generate consolidated challan: {error_msg}', 'error')
+            return redirect(url_for('delivery_challan'))
+
+    except Exception as e:
+        logging.error(f"Consolidated conversion failed: {e}")
+        flash(f'Error generating consolidated challan: {str(e)}', 'error')
         return redirect(url_for('delivery_challan'))
 
 @app.route('/delete_challan/<int:id>', methods=['POST'])
