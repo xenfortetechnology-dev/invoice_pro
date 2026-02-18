@@ -138,14 +138,16 @@ def fetch_cloud_invoices():
 
 
 def fetch_cloud_invoice_by_id(invoice_id):
-    """Fetch single invoice from cloud database by ID"""
+    """Fetch single invoice from cloud API by ID"""
     try:
-        # First fetch all invoices, then filter by ID
-        invoices = fetch_cloud_invoices()
-        for invoice in invoices:
-            if invoice.get('id') == int(invoice_id):
-                return invoice
+        response = cloud_request("GET", f"/invoices/{invoice_id}")
+
+        if response and response.status_code == 200:
+            return response.json()
+
+        logging.error(f"Failed to fetch invoice {invoice_id}: {response.status_code if response else 'No response'}")
         return None
+
     except Exception as e:
         logging.error(f"Cloud API error (invoice by ID): {e}")
         return None
@@ -768,78 +770,105 @@ def preview_invoice():
         logging.error(f"Preview failed: {e}")
         return f"Error creating preview: {str(e)}", 500
 
-
 @app.route('/invoice/<int:id>')
 @login_required
 def invoice_detail(id):
-    """Detailed invoice view (fetch from cloud)"""
-    # Fetch invoice from cloud API
+
     invoice_data = fetch_cloud_invoice_by_id(id)
+
     if not invoice_data:
         flash('Invoice not found', 'error')
         return redirect(url_for('invoice_management'))
-    
-    # Fetch client data from cloud API
+
     client_data = fetch_cloud_client_by_id(invoice_data.get('client_id'))
+
     if not client_data:
         flash('Client not found', 'error')
         return redirect(url_for('invoice_management'))
-    
-    # Create invoice object with all required fields
+
+    # 🔥 FIX HERE — FETCH LINE ITEMS
+    line_items_data = invoice_data.get("line_items", [])
+        
+    line_items = []
+    subtotal = 0
+    total_cgst = 0
+    total_sgst = 0
+    total_igst = 0
+
+    for i, item in enumerate(line_items_data, 1):
+
+        quantity = float(item.get("quantity", 0))
+        unit_price = float(item.get("unit_price", 0))
+        tax_amount = float(item.get("tax_amount", 0))
+        total_amount = float(item.get("total_amount", 0))
+        tax_percentage = float(item.get("tax_percentage", 0))
+
+        line_total = quantity * unit_price
+
+        # 🔥 If IGST is used (interstate)
+        if item.get("igst_percentage"):
+            igst_amount = tax_amount
+            cgst_amount = 0
+            sgst_amount = 0
+        else:
+            # Split CGST + SGST equally
+            cgst_amount = tax_amount / 2
+            sgst_amount = tax_amount / 2
+            igst_amount = 0
+
+        subtotal += line_total
+        total_cgst += cgst_amount
+        total_sgst += sgst_amount
+        total_igst += igst_amount
+
+        line_items.append(SimpleNamespace(
+            sr_no=i,
+            hsn_code=item.get("hsn_code", ""),  # ✅ FIX
+            description=item.get("description"),
+            quantity=quantity,
+            unit=item.get("unit", "Nos"),       # ✅ FIX
+            unit_price=unit_price,
+            cgst_amount=cgst_amount,
+            sgst_amount=sgst_amount,
+            igst_amount=igst_amount,            # ✅ FIX
+            total_amount=total_amount
+        ))
+
+
+
     invoice = SimpleNamespace(
         id=invoice_data.get('id'),
-        invoice_number=invoice_data.get('invoice_number', 'N/A'),
-        invoice_date=datetime.strptime(invoice_data.get('invoice_date'), '%Y-%m-%d').date() if invoice_data.get('invoice_date') else datetime.now().date(),
-        due_date=None,
-        total_amount=invoice_data.get('total_amount', 0),
-        payment_status=invoice_data.get('payment_status', 'Unpaid'),
-        notes='',
-        terms_conditions='',
-        line_items=[],
-        subtotal=invoice_data.get('total_amount', 0),
-        cgst=0,
-        sgst=0,
-        igst=0,
+        invoice_number=invoice_data.get('invoice_number'),
+        invoice_date=datetime.strptime(invoice_data.get('invoice_date'), '%Y-%m-%d'),
+        total_amount=invoice_data.get('total_amount'),
+        payment_status=invoice_data.get('payment_status'),
+        line_items=line_items,
+        subtotal=subtotal,
+        cgst=total_cgst,
+        sgst=total_sgst,
+        igst=total_igst,
         invoice_format='default'
     )
-    
+
+
     invoice.client = SimpleNamespace(
-        name=client_data.get('name', 'N/A'),
-        email=client_data.get('email', ''),
-        phone=client_data.get('phone', ''),
-        address='',
-        gstin='',
-        pan=''
+        name=client_data.get('name'),
+        email=client_data.get('email'),
+        phone=client_data.get('phone'),
+        address=''
     )
- 
-    # Blockchain verification (skip for cloud data)
-    blockchain_verification = {}
-    
-    # AI insights (skip for cloud data)
-    ai_insights = {}
 
-    # Select template
-    template_map = {
-    "default": "invoice_detail.html",
-    "excel_customer_A": "invoice_excel_customer_A.html"
-    }
-
-    template_name = template_map.get(
-        invoice.invoice_format,
-        "invoice_detail.html"
-    )
-   
     company = Company.query.first()
     bank = BankDetails.query.first()
 
     return render_template(
-        template_name,
+        "invoice_detail.html",
         invoice=invoice,
         company=company,
         bank=bank,
-        blockchain_verification=blockchain_verification,
-        ai_insights=ai_insights
-)
+        blockchain_verification={},
+        ai_insights={}
+    )
 
 
 @app.route('/invoice/<int:id>/download-pdf')
