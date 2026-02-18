@@ -838,7 +838,7 @@ def invoice_detail(id):
             cgst_amount=cgst_amount,
             sgst_amount=sgst_amount,
             igst_amount=igst_amount,            # ✅ FIX
-            total_amount=total_amount
+            total_amount=item.get("total_amount", 0)
         ))
 
 
