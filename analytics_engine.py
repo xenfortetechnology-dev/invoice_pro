@@ -9,6 +9,8 @@ from app import db
 from models import Client, Invoice, InvoiceLineItem, User, AIInteraction, ExpenseTracking, InventoryItem
 import requests
 import os
+from flask import session
+
 
 CLOUD_API_BASE = os.environ.get("CLOUD_API_BASE", "http://44.208.164.236:5000/api")
 
@@ -754,15 +756,26 @@ class AnalyticsEngine:
             return 0.0
 
     def get_lead_stats(self):
-        """Get lead statistics from Cloud API"""
+
         try:
-            # Fetch clients from Cloud API
-            response = requests.get(f"{CLOUD_API_BASE}/clients", timeout=5)
+            headers = {}
+
+            token = session.get("token")
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+
+            response = requests.get(
+                f"{CLOUD_API_BASE}/clients",
+                headers=headers,
+                timeout=30
+            )
+
             if response.status_code == 200:
                 clients = response.json()
             else:
                 logging.warning(f"Cloud API returned status {response.status_code} for clients")
                 clients = []
+
         except Exception as e:
             logging.error(f"Cloud API error in get_lead_stats: {e}")
             clients = []
@@ -770,20 +783,25 @@ class AnalyticsEngine:
         stats = {"new": 0, "discussion": 0, "quoted": 0, "closed": 0}
 
         for client in clients:
-            # Cloud API client object structure inspection (from previous checks)
-            # It seems 'lead_stage' might not be populate in the cloud mock/real data or defaults to something?
-            # If not present, we assume 'New'
-            stage = client.get('lead_stage', 'New') 
-            
-            stage_lower = stage.lower() if stage else "new"
-            if "new" in stage_lower:
+
+            stage = client.get("lead_stage", "New").lower()
+
+            if stage == "new":
                 stats["new"] += 1
-            elif "discussion" in stage_lower:
+
+            elif stage in ["qualified", "discussion"]:
                 stats["discussion"] += 1
-            elif "quote" in stage_lower or "proposal" in stage_lower:
+
+            elif stage in ["quoted", "proposal"]:
                 stats["quoted"] += 1
-            elif "closed" in stage_lower or "won" in stage_lower:
+
+            elif stage in ["closed", "won"]:
                 stats["closed"] += 1
+
+            else:
+                stats["new"] += 1
+
+        print("Lead stats computed:", stats)
 
         return stats
 
