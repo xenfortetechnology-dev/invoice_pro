@@ -308,17 +308,18 @@ Subject to local jurisdiction only.</textarea>
 
             <div class="modal-body">
                 <div class="form-check mb-2">
-                    <input class="form-check-input" type="radio" name="format_choice" value="excel_customer_A">
+                    <input class="form-check-input" id="format_1" type="radio" name="format_choice"
+                        value="excel_customer_A">
 
-                    <label class="form-check-label">
+                    <label for="format_1" class="form-check-label">
                         Format 1
                     </label>
 
                 </div>
 
                 <div class="form-check">
-                    <input class="form-check-input" type="radio" name="format_choice" value="default">
-                    <label class="form-check-label">
+                    <input class="form-check-input" id="format_2" type="radio" name="format_choice" value="default">
+                    <label for="format_2" class="form-check-label">
                         Format 2
                     </label>
 
@@ -397,59 +398,59 @@ Subject to local jurisdiction only.</textarea>
     let defaultTerms = "";
 
 
-document.addEventListener("DOMContentLoaded", function () {
+    document.addEventListener("DOMContentLoaded", function () {
 
-    // 1️⃣ Load default tax
-    fetch("http://44.208.164.236:5000/api/settings/default-tax")
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                defaultTaxRate = parseFloat(data.default_tax_rate) || 0;
-                console.log("Default Tax Loaded:", defaultTaxRate);
-                 invoicePrefix = data.invoice_prefix || "INV";
+        // 1️⃣ Load default tax
+        fetch("http://44.208.164.236:5000/api/settings/default-tax")
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    defaultTaxRate = parseFloat(data.default_tax_rate) || 0;
+                    console.log("Default Tax Loaded:", defaultTaxRate);
+                    invoicePrefix = data.invoice_prefix || "INV";
 
-            const currency = data.default_currency || "INR";
-            defaultTerms = data.default_terms || "";
+                    const currency = data.default_currency || "INR";
+                    defaultTerms = data.default_terms || "";
 
-            // Set currency symbol
-            if (currency === "USD") currencySymbol = "$";
-            else if (currency === "EUR") currencySymbol = "€";
-            else if (currency === "GBP") currencySymbol = "£";
-            else currencySymbol = "₹";
+                    // Set currency symbol
+                    if (currency === "USD") currencySymbol = "$";
+                    else if (currency === "EUR") currencySymbol = "€";
+                    else if (currency === "GBP") currencySymbol = "£";
+                    else currencySymbol = "₹";
 
-            // Apply terms automatically
-            const termsField = document.getElementById("terms_conditions");
-            if (termsField) {
-                termsField.value = defaultTerms;
-            }
+                    // Apply terms automatically
+                    const termsField = document.getElementById("terms_conditions");
+                    if (termsField) {
+                        termsField.value = defaultTerms;
+                    }
 
-            console.log("Cloud invoice defaults loaded");
-            }
-        })
-        .catch(err => {
-            console.error("Failed to load default tax:", err);
+                    console.log("Cloud invoice defaults loaded");
+                }
+            })
+            .catch(err => {
+                console.error("Failed to load default tax:", err);
+            });
+
+        // 2️⃣ Initialize Tom Select
+        new TomSelect('#client_id', {
+            create: false,
+            sortField: { field: "text", direction: "asc" },
+            placeholder: "Select a client...",
+            maxOptions: null
         });
 
-    // 2️⃣ Initialize Tom Select
-    new TomSelect('#client_id', {
-        create: false,
-        sortField: { field: "text", direction: "asc" },
-        placeholder: "Select a client...",
-        maxOptions: null
+        // 3️⃣ Add Item Button
+        document.getElementById('addItemBtn')
+            .addEventListener('click', addItemRow);
+
+        // 4️⃣ Form submit
+        document.getElementById('invoiceForm')
+            .addEventListener('submit', function (e) {
+                e.preventDefault();
+                saveInvoice();
+            });
+
     });
-
-    // 3️⃣ Add Item Button
-    document.getElementById('addItemBtn')
-        .addEventListener('click', addItemRow);
-
-    // 4️⃣ Form submit
-    document.getElementById('invoiceForm')
-        .addEventListener('submit', function (e) {
-            e.preventDefault();
-            saveInvoice();
-        });
-
-});
 
 
     // Add a new invoice item row
@@ -591,21 +592,21 @@ document.addEventListener("DOMContentLoaded", function () {
         let sgstInput = row.querySelector('[name="sgst_percentage"]');
         let igstInput = row.querySelector('[name="igst_percentage"]');
 
-       let cgstPercent = parseFloat(cgstInput.value) || 0;
+        let cgstPercent = parseFloat(cgstInput.value) || 0;
 
-// Always mirror CGST into SGST
-let sgstPercent = cgstPercent;
+        // Always mirror CGST into SGST
+        let sgstPercent = cgstPercent;
 
-if (sgstInput) {
-    sgstInput.value = sgstPercent.toFixed(2);
-}
+        if (sgstInput) {
+            sgstInput.value = sgstPercent.toFixed(2);
+        }
 
-// IGST = CGST + SGST
-let igstPercent = cgstPercent + sgstPercent;
+        // IGST = CGST + SGST
+        let igstPercent = cgstPercent + sgstPercent;
 
-if (igstInput) {
-    igstInput.value = igstPercent.toFixed(2);
-}
+        if (igstInput) {
+            igstInput.value = igstPercent.toFixed(2);
+        }
 
 
         const lineAmount = quantity * unitPrice;
@@ -614,7 +615,7 @@ if (igstInput) {
         const sgstAmount = (lineAmount * sgstPercent) / 100;
         const igstAmount = (lineAmount * igstPercent) / 100;
 
-        const totalAmount = lineAmount + cgstAmount + sgstAmount + igstAmount;
+        const totalAmount = lineAmount + igstAmount;
 
         if (igstInput) {
             igstInput.value = igstPercent.toFixed(2);
@@ -652,13 +653,13 @@ if (igstInput) {
             totalIgst += igstAmount;
         });
 
-        const totalAmount = subtotal + totalCgst + totalSgst + totalIgst;
+        const totalAmount = subtotal + totalIgst;
 
         document.getElementById('subtotalAmount').textContent = `${currencySymbol}${subtotal.toFixed(2)}`;
-        document.getElementById('cgstAmount').textContent = `${currencySymbol}${subtotal.toFixed(2)}`;
-        document.getElementById('sgstAmount').textContent = `${currencySymbol}${subtotal.toFixed(2)}`;
-        document.getElementById('igstAmount').textContent = `${currencySymbol}${subtotal.toFixed(2)}`;
-        document.getElementById('totalAmount').textContent = `${currencySymbol}${subtotal.toFixed(2)}`;
+        document.getElementById('cgstAmount').textContent = `${currencySymbol}${totalCgst.toFixed(2)}`;
+        document.getElementById('sgstAmount').textContent = `${currencySymbol}${totalSgst.toFixed(2)}`;
+        document.getElementById('igstAmount').textContent = `${currencySymbol}${totalIgst.toFixed(2)}`;
+        document.getElementById('totalAmount').textContent = `${currencySymbol}${totalAmount.toFixed(2)}`;
 
         document.getElementById('amountInWords').textContent =
             `${convertNumberToWords(Math.floor(totalAmount))} Rupees Only`;
@@ -848,6 +849,6 @@ if (igstInput) {
 </script>
 
 <!-- Voice Commands Script (Script-based Pattern Matching - No AI) -->
-<script src="{{ url_for('static', filename='Js/voice-commands.js') }}"></script>
+<script src="{{ url_for('static', filename='js/voice-commands.js') }}"></script>
 
 {% endblock %}

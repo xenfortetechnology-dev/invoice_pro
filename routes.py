@@ -302,10 +302,16 @@ def invoice_management():
     # Get list of unique client IDs from ALL invoice data (before filtering)
     client_ids = list(set(int(inv["client_id"]) for inv in data if inv.get("client_id")))
     
-    # Fetch local client data for risk scores and names
+    # Fetch cloud client data for dropdown
+    cloud_clients_data = fetch_cloud_clients()
+    cloud_clients = [SimpleNamespace(**c) for c in cloud_clients_data]
+    
+    # Fetch local client data for risk scores only
     local_clients = Client.query.filter(Client.id.in_(client_ids)).all()
     client_risk_map = {c.id: c.ai_risk_score for c in local_clients}
-    client_name_map = {c.id: c.name for c in local_clients} # Use local names if available
+    
+    # Create client name map from cloud data
+    client_name_map = {c.id: c.name for c in cloud_clients}
 
     # --- FILTERING LOGIC ---
     search_query = request.args.get('search', '').lower().strip()
@@ -471,7 +477,7 @@ def invoice_management():
         search=search_query,
         status_filter=status_filter,
         client_filter=client_filter,
-        clients=local_clients, # Ensure this is passed for the dropdown
+        clients=cloud_clients, # Pass cloud clients for the dropdown
         date_from=date_from,
         date_to=date_to
     )
@@ -514,7 +520,8 @@ def create_invoice():
                     "client_id": client_id,
                     "invoice_date": invoice_date_str,
                     "total_amount": total_amount,
-                    "payment_status": "Unpaid"
+                    "payment_status": "Unpaid",
+                    "line_items": line_items_data   
                 }
             )
 
@@ -1049,12 +1056,27 @@ def edit_invoice(id):
         flash('Invoice not found', 'error')
         return redirect(url_for('invoice_management'))
     
+    # Fetch client data for this invoice
+    client_data = fetch_cloud_client_by_id(invoice_data.get('client_id'))
+    if not client_data:
+        flash('Client not found', 'error')
+        return redirect(url_for('invoice_management'))
+    
+    # Create client object
+    client = SimpleNamespace(
+        id=client_data.get('id'),
+        name=client_data.get('name', 'N/A'),
+        email=client_data.get('email', ''),
+        phone=client_data.get('phone', '')
+    )
+    
     # Create invoice object with all fields needed by edit form
     invoice = SimpleNamespace(
         id=invoice_data.get('id'),
         invoice_number=invoice_data.get('invoice_number', 'N/A'),
         invoice_date=invoice_data.get('invoice_date'),
         client_id=invoice_data.get('client_id'),
+        client=client,  # Add client object for template
         total_amount=invoice_data.get('total_amount', 0),
         payment_status=invoice_data.get('payment_status', 'Unpaid'),
         notes=invoice_data.get('notes', ''),
@@ -1219,7 +1241,19 @@ def client_management():
         cloud_clients = []
         cloud_invoices = []
 
-    # Process Cloud Clients
+    # --- HYBRID MERGE ---
+    # Fetch all local clients to enrich cloud data
+    local_clients_map = {}
+    local_clients_name_map = {} # Fallback
+    try:
+        all_local = Client.query.all()
+        for lc in all_local:
+            if lc.email:
+                local_clients_map[lc.email.lower()] = lc
+            if lc.name:
+                local_clients_name_map[lc.name.lower()] = lc
+    except Exception as e:
+        print(f"Local fetch error: {e}")
     for c in cloud_clients:
         # Create a unified object
         # Metric Calculation
@@ -1243,6 +1277,27 @@ def client_management():
         risk_level = "High" if is_high_risk else "Low"
         is_high_value = total_business > 100000
 
+        # Override from Local DB if exists
+        c_email = c.get('email', '').lower() if c.get('email') else None
+        c_name = c.get('name', '').lower() if c.get('name') else None
+        
+        loc = None
+        if c_email and c_email in local_clients_map:
+            loc = local_clients_map[c_email]
+        elif c_name and c_name in local_clients_name_map:
+             loc = local_clients_name_map[c_name]
+        
+        c_type = 'Regular' 
+        c_gstin = 'N/A'
+        c_pan = 'N/A'
+        c_contact = c.get('name')
+
+        if loc:
+            c_type = loc.client_type or 'Regular'
+            c_gstin = loc.gstin or 'N/A'
+            c_pan = loc.pan or 'N/A'
+            c_contact = loc.contact_person or c.get('name')
+
         # Use simple ID (integer) as we are only using cloud now
         client_obj = SimpleNamespace(
             id=c['id'],
@@ -1251,12 +1306,12 @@ def client_management():
             name=c.get('name'),
             email=c.get('email'),
             phone=c.get('phone'),
-            contact_person=c.get('name'), # Default
-            client_type='Regular', # Default for cloud
+            contact_person=c_contact, # Enhanced
+            client_type=c_type, # Enhanced
             lead_stage='New', # Default for cloud
             total_business=total_business,
-            gstin="N/A",
-            pan="N/A",
+            gstin=c_gstin, # Enhanced
+            pan=c_pan, # Enhanced
             risk_level=risk_level,
             high_value=is_high_value,
             created_at=datetime.utcnow() # Mock
@@ -1356,7 +1411,46 @@ def create_client():
 
 
             if response.status_code in (200, 201):
-                flash('Client created successfully in Cloud!', 'success')
+                # --- HYBRID: Save details locally as well ---
+                try:
+                    email = request.form.get('email')
+                    name = request.form.get('name')
+                    local_client = None
+
+                    # Try to find existing by Email
+                    if email:
+                        local_client = Client.query.filter_by(email=email).first()
+                    
+                    # Fallback: Try to find by Name if not found yet
+                    if not local_client and name:
+                        local_client = Client.query.filter_by(name=name).first()
+                        
+                    # Create new if still not found
+                    if not local_client:
+                        local_client = Client(name=name, email=email)
+                        db.session.add(local_client)
+                    
+                    # Update fields not supported by cloud
+                    local_client.client_type = request.form.get('client_type')
+                    local_client.contact_person = request.form.get('contact_person')
+                    local_client.address = request.form.get('address')
+                    local_client.city = request.form.get('city')
+                    local_client.state = request.form.get('state')
+                    local_client.pincode = request.form.get('pincode')
+                    local_client.gstin = request.form.get('gstin')
+                    local_client.pan = request.form.get('pan')
+                    local_client.lead_stage = request.form.get('lead_stage')
+                    local_client.notes = request.form.get('notes')
+                    local_client.phone = request.form.get('phone') # Sync phone too
+                    
+                    if email: local_client.email = email 
+                    
+                    db.session.commit()
+                    logging.info(f"Hybrid: Synced client '{local_client.name}' to local DB.")
+                except Exception as e:
+                    logging.error(f"Hybrid Sync Error: {e}")
+
+                flash('Client created successfully in Cloud (& Local)!', 'success')
                 return redirect(url_for('client_management'))
             else:
                  flash(f'Error creating client: {response.text}', 'error')
@@ -2054,7 +2148,10 @@ def preview_challan():
 @login_required
 def delivery_challan():
     try:
-        response = cloud_request("GET", "/invoices")
+        response = cloud_request("GET", "/challans")
+        print("STATUS:", response.status_code)
+        print("RESPONSE TEXT:", response.text)
+
 
 
         if response.status_code == 200:

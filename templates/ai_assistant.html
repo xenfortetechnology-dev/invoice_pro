@@ -420,11 +420,11 @@
         // Voice input button
         document.getElementById('voiceInputBtn').addEventListener('click', startVoiceInput);
 
-        // Start voice chat button
-        document.getElementById('startVoiceChat').addEventListener('click', startVoiceChat);
+        // Start voice chat button (may not exist on every page variant)
+        document.getElementById('startVoiceChat')?.addEventListener('click', startVoiceChat);
 
         // Clear chat button
-        document.getElementById('clearChat').addEventListener('click', clearChat);
+        document.getElementById('clearChat')?.addEventListener('click', clearChat);
     }
 
     function sendMessage() {
