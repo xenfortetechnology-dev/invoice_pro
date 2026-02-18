@@ -3192,6 +3192,65 @@ def create_quotation():
         flash(f"API connection error: {str(e)}", "error")
 
     return redirect(url_for("quotation_form"))
+
+@app.route("/quotations/<int:qid>/delete", methods=["POST"])
+@login_required
+def delete_quotation(qid):
+    try:
+        response = requests.delete(
+            f"{CLOUD_API_BASE}/quotations/{qid}",
+            headers={"Authorization": f"Bearer {session.get('token')}"},
+            timeout=5
+        )
+
+        if response.status_code == 200:
+            flash("Quotation deleted successfully!", "success")
+        else:
+            flash(f"Failed: {response.text}", "error")
+
+
+    except Exception as e:
+        flash(f"Cloud API error: {str(e)}", "error")
+
+    return redirect(url_for("quotation_list"))
+
+
+# @app.route("/quotations/<int:qid>/edit", methods=["POST"])
+# @login_required
+# def edit_quotation(qid):
+#     try:
+#         payload = {
+#             "quotation_date": request.form.get("quotation_date"),
+#             "status": request.form.get("status"),
+#             "grand_total": request.form.get("grand_total")
+#         }
+
+#         print("CLOUD URL:", f"{CLOUD_API_BASE}/quotations/{qid}")
+#         print("TOKEN:", session.get("token"))
+#         print("PAYLOAD:", payload)
+
+#         response = requests.put(
+#             f"{CLOUD_API_BASE}/quotations/{qid}",
+#             json=payload,
+#             headers={"Authorization": f"Bearer {session.get('token')}"},
+#             timeout=5
+#         )
+
+#         print("STATUS:", response.status_code)
+#         print("RESPONSE:", response.text)
+
+
+#         if response.status_code == 200:
+#             flash("Quotation updated successfully!", "success")
+#         else:
+#             flash(f"Failed: {response.text}", "error")
+
+
+#     except Exception as e:
+#         flash(f"Cloud API error: {str(e)}", "error")
+
+#     return redirect(url_for("quotation_list"))
+
 # -------------------------
 # Preview
 # -------------------------
@@ -3385,7 +3444,7 @@ def cancel_quotation(qid):
     
     return redirect(url_for("quotation_list"))
 
-
+'''
 @app.route("/quotations/<int:qid>/delete")
 @login_required
 def delete_quotation(qid):
@@ -3425,7 +3484,7 @@ def delete_quotation(qid):
         except Exception as db_err:
             flash(f"Error marking quotation as deleted: {str(db_err)}", "error")
     
-    return redirect(url_for("quotation_list"))
+    return redirect(url_for("quotation_list"))'''
 
 @app.route("/quotations/<int:qid>/pdf")
 @login_required
@@ -3587,7 +3646,7 @@ def edit_quotation(qid):
     if request.method == "POST":
         try:
             payload = {
-                "quotation_number": request.form.get("quotation_number"),
+                
                 "quotation_date": request.form.get("quotation_date"),
                 "status": request.form.get("status"),
                 "grand_total": float(request.form.get("grand_total", 0) or 0),
