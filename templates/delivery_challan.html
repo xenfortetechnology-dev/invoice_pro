@@ -25,7 +25,7 @@
                     <i class="fas fa-plus me-1"></i>Create New Challan
                 </a>
                 <button id="generateConsolidatedInvoiceBtn" class="btn btn-success" disabled>
-                    <i class="fas fa-file-invoice me-1"></i>Generate Consolidated Invoice
+                    <i class="fas fa-file-invoice me-1"></i>Generate Consolidated Challan
                 </button>
             </div>
         </div>
@@ -208,7 +208,7 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Generate Consolidated Invoice</h5>
+                    <h5 class="modal-title">Generate Consolidated Challan</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -217,7 +217,7 @@
                         <input class="form-check-input" type="radio" name="consolidationOption" id="mergeItems"
                             value="merge" checked>
                         <label class="form-check-label" for="mergeItems">
-                            Merge all line items into one invoice
+                            Merge all line items into one consolidated challan
                         </label>
                     </div>
                     <div class="form-check">
@@ -239,7 +239,7 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-success" id="confirmConsolidatedInvoiceBtn">Generate
-                        Invoice</button>
+                        Challan</button>
                 </div>
             </div>
         </div>
