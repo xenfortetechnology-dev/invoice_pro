@@ -44,6 +44,7 @@ import ai_services
 import ai_client 
 from types import SimpleNamespace
 import requests
+from flask import session
 
 # Initialize analytics engine
 analytics_engine = AnalyticsEngine(db.session)
@@ -2301,12 +2302,12 @@ def update_challan_status(id):
         logging.error(f"Cloud API update error: {e}")
         flash(f'Error updating status: {str(e)}', 'error')
         return redirect(url_for('delivery_challan'))
-
 @app.route('/crm')
 @login_required
 def crm():
     # 1. Fetch Stats
     lead_stats = analytics_engine.get_lead_stats()
+    print(f"\n🔍 [CRM DEBUG] Lead Stats: {lead_stats}")
     
     # 2. Fetch Clients (Cloud)
     clients_data = fetch_cloud_clients()
@@ -2422,6 +2423,7 @@ def crm():
         reminders=reminders,
         follow_ups=follow_ups
     )
+
 @app.route('/create-reminder')
 @login_required
 def create_reminder():
