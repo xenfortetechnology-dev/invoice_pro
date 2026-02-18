@@ -821,6 +821,8 @@ def invoice_detail(id):
         total_cgst += cgst_amount
         total_sgst += sgst_amount
         total_igst += igst_amount
+        igst_amount = cgst_amount + sgst_amount
+
 
         line_items.append(SimpleNamespace(
             sr_no=i,
