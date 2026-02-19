@@ -6,5 +6,13 @@ INV [0]: Num='inv-2547', Client='aravind', ID='2547'
 INV [1]: Num='inv-2536', Client='sam', ID='2536'
   -> MATCHED!
 INV [2]: Num='inv-2535', Client='aravind', ID='2535'
+TIMESTAMP: 2026-02-19 19:58:01.988326
+FILTERS: Search='', Status='All Status', Client='All Clients', From='None', To='None'
+TOTAL INVOICES FETCHED: 3
+INV [0]: Num='inv-2551', Client='sam', ID='2551'
+  -> MATCHED!
+INV [1]: Num='inv-2550', Client='sam', ID='2550'
+  -> MATCHED!
+INV [2]: Num='inv-2549', Client='sam', ID='2549'
   -> MATCHED!
 FINAL RESULT COUNT: 3
