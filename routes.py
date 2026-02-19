@@ -2293,32 +2293,51 @@ def update_challan_status(id):
     try:
         new_status = request.form.get('status')
         note = request.form.get('note')
-        
+
         if new_status:
-            # Build update payload
+
+            # Build payload
             update_data = {'status': new_status}
-            
-            # Add note to existing notes if provided
+
+            # Add note if provided
             if note:
                 challan_data = fetch_cloud_challan_by_id(id)
                 existing_notes = challan_data.get('notes', '') if challan_data else ''
-                update_data['notes'] = (existing_notes or "") + f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Status updated to {new_status}: {note}"
-            
+
+                update_data['notes'] = (
+                    (existing_notes or "") +
+                    f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M')}] "
+                    f"Status updated to {new_status}: {note}"
+                )
+
+            # ⭐ CLOUD CALL WITH TOKEN (IMPORTANT)
+            print("CLOUD URL:", f"{CLOUD_API_BASE}/challans/{id}")
+
             response = requests.put(
                 f"{CLOUD_API_BASE}/challans/{id}",
                 json=update_data,
+                headers={
+                    "Authorization": f"Bearer {session.get('token')}",
+                    "Content-Type": "application/json"
+                },
                 timeout=5
             )
+
+            print("STATUS:", response.status_code)
+            print("RESPONSE:", response.text)
+
             if response.status_code in (200, 204):
                 flash(f'Challan status updated to {new_status}', 'success')
             else:
                 flash(f'Failed to update status: {response.text}', 'error')
-        
+
         return redirect(url_for('delivery_challan'))
+
     except Exception as e:
         logging.error(f"Cloud API update error: {e}")
         flash(f'Error updating status: {str(e)}', 'error')
         return redirect(url_for('delivery_challan'))
+
 @app.route('/crm')
 @login_required
 def crm():
