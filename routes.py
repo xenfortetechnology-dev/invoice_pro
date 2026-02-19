@@ -492,24 +492,12 @@ def create_invoice():
 
             invoice_number = generate_invoice_number()
 
-            # Process line items
+            # Process line items — use pre-computed amounts from JS
             line_items_data = json.loads(request.form.get('line_items', '[]'))
 
-            subtotal = 0
-            total_tax = 0
-
-            for item in line_items_data:
-                qty = float(item.get("quantity", 0))
-                price = float(item.get("unit_price", 0))
-                tax = float(item.get("tax_percentage", 0))
-
-                line_total = qty * price
-                tax_amount = (line_total * tax) / 100
-
-                subtotal += line_total
-                total_tax += tax_amount
-
-            total_amount = subtotal + total_tax
+            total_amount = sum(
+                float(item.get("total_amount", 0)) for item in line_items_data
+            )
 
             # 🔥 SEND TO CLOUD API
             response = cloud_request(
@@ -521,7 +509,9 @@ def create_invoice():
                     "invoice_date": invoice_date_str,
                     "total_amount": total_amount,
                     "payment_status": "Unpaid",
-                    "line_items": line_items_data   
+                    "notes": request.form.get("notes", ""),
+                    "terms_conditions": request.form.get("terms_conditions", ""),
+                    "line_items": line_items_data
                 }
             )
 
@@ -692,16 +682,18 @@ def preview_invoice():
             
             cgst_percentage = float(item_data.get('cgst_percentage', 0.0))
             sgst_percentage = float(item_data.get('sgst_percentage', 0.0))
-            igst_percentage = float(item_data.get('igst_percentage', 0.0))
+            # IGST = CGST + SGST — it's their combined representation, not a 3rd tax
+            igst_percentage = cgst_percentage + sgst_percentage
 
             line_total = quantity * unit_price
-            
+
             cgst_amount = (line_total * cgst_percentage) / 100
             sgst_amount = (line_total * sgst_percentage) / 100
-            igst_amount = (line_total * igst_percentage) / 100
-            
-            tax_amount = cgst_amount + sgst_amount + igst_amount
-            
+            igst_amount = cgst_amount + sgst_amount   # IGST = CGST + SGST
+
+            # Row total = amount + CGST + SGST (equivalently: amount + IGST)
+            item_total = line_total + cgst_amount + sgst_amount
+
             # Create SimpleNamespace object instead of InvoiceLineItem model
             li = SimpleNamespace(
                 sr_no=i,
@@ -716,15 +708,18 @@ def preview_invoice():
                 cgst_amount=cgst_amount,
                 sgst_amount=sgst_amount,
                 igst_amount=igst_amount,
-                total_amount=line_total + tax_amount
+                total_amount=item_total
             )
-            
+
             line_items.append(li)
 
             subtotal += line_total
             total_cgst += cgst_amount
             total_sgst += sgst_amount
             total_igst += igst_amount
+
+        # Grand total = subtotal + CGST + SGST (IGST is CGST+SGST combined, not extra)
+        grand_total = subtotal + total_cgst + total_sgst
 
         # Create SimpleNamespace invoice instead of Invoice model
         invoice = SimpleNamespace(
@@ -737,8 +732,8 @@ def preview_invoice():
             subtotal=subtotal,
             cgst=total_cgst,
             sgst=total_sgst,
-            igst=total_igst,
-            total_amount=subtotal + total_cgst + total_sgst + total_igst,
+            igst=total_igst,           # = total_cgst + total_sgst
+            total_amount=grand_total,
             invoice_format=invoice_format,
             line_items=line_items,
             payment_status='Unpaid'
@@ -803,22 +798,15 @@ def invoice_detail(id):
 
         line_total = quantity * unit_price
 
-        # 🔥 If IGST is used (interstate)
-        if item.get("igst_percentage"):
-            igst_amount = tax_amount
-            cgst_amount = 0
-            sgst_amount = 0
-        else:
-            # Split CGST + SGST equally
-            cgst_amount = tax_amount / 2
-            sgst_amount = tax_amount / 2
-            igst_amount = 0
+        # CGST = SGST = tax/2, IGST = CGST + SGST (combined display)
+        cgst_amount = tax_amount / 2
+        sgst_amount = tax_amount / 2
+        igst_amount = cgst_amount + sgst_amount  # = tax_amount
 
         subtotal += line_total
         total_cgst += cgst_amount
         total_sgst += sgst_amount
         total_igst += igst_amount
-        igst_amount = cgst_amount + sgst_amount
 
 
         line_items.append(SimpleNamespace(
@@ -840,13 +828,13 @@ def invoice_detail(id):
         id=invoice_data.get('id'),
         invoice_number=invoice_data.get('invoice_number'),
         invoice_date=datetime.strptime(invoice_data.get('invoice_date'), '%Y-%m-%d'),
-        total_amount=invoice_data.get('total_amount'),
+        total_amount=subtotal + total_cgst + total_sgst,   # grand total = subtotal + CGST + SGST
         payment_status=invoice_data.get('payment_status'),
         line_items=line_items,
         subtotal=subtotal,
         cgst=total_cgst,
         sgst=total_sgst,
-        igst=total_igst,
+        igst=total_igst,   # = total_cgst + total_sgst, shown in IGST column
         invoice_format='default'
     )
 
@@ -886,41 +874,53 @@ def download_invoice_pdf(id):
         if not client_data:
             return jsonify({'success': False, 'error': 'Client not found'}), 404
 
-        # Build line_items list from cloud data
-        raw_items = invoice_data.get('line_items', [])
-        line_items = [
-            SimpleNamespace(
+        # Build line_items with per-row cgst/sgst/igst amounts for the template
+        line_items = []
+        subtotal = 0
+        total_cgst = 0
+        total_sgst = 0
+        total_igst = 0
+        for i, item in enumerate(raw_items):
+            qty = item.get('quantity', 0)
+            price = item.get('unit_price', 0)
+            line_total = qty * price
+            tax_amt = item.get('tax_amount', 0)  # total tax stored = cgst + sgst
+            cgst_amt = round(tax_amt / 2, 2)
+            sgst_amt = round(tax_amt / 2, 2)
+            igst_amt = cgst_amt + sgst_amt
+            item_total = line_total + cgst_amt + sgst_amt
+            subtotal += line_total
+            total_cgst += cgst_amt
+            total_sgst += sgst_amt
+            total_igst += igst_amt
+            line_items.append(SimpleNamespace(
                 sr_no=item.get('sr_no', i + 1),
                 hsn_code=item.get('hsn_code', ''),
                 description=item.get('description', ''),
-                quantity=item.get('quantity', 0),
+                quantity=qty,
                 unit=item.get('unit', 'Nos'),
-                unit_price=item.get('unit_price', 0),
-                tax_percentage=item.get('tax_percentage', 0),
-                tax_amount=item.get('tax_amount', 0),
-                total_amount=item.get('total_amount', 0),
+                unit_price=price,
+                cgst_amount=cgst_amt,
+                sgst_amount=sgst_amt,
+                igst_amount=igst_amt,
+                total_amount=item_total,
                 cost_price=item.get('cost_price', 0)
-            )
-            for i, item in enumerate(raw_items)
-        ]
-
-        subtotal = sum(item.get('unit_price', 0) * item.get('quantity', 0) for item in raw_items)
-        total_tax = sum(item.get('tax_amount', 0) for item in raw_items)
+            ))
 
         invoice = SimpleNamespace(
             id=invoice_data.get('id'),
             invoice_number=invoice_data.get('invoice_number', 'N/A'),
             invoice_date=datetime.strptime(invoice_data.get('invoice_date'), '%Y-%m-%d').date() if invoice_data.get('invoice_date') else datetime.now().date(),
             due_date=None,
-            total_amount=invoice_data.get('total_amount', 0),
+            total_amount=subtotal + total_cgst + total_sgst,   # grand total = sub + CGST + SGST
             payment_status=invoice_data.get('payment_status', 'Unpaid'),
             notes=invoice_data.get('notes', ''),
             terms_conditions=invoice_data.get('terms_conditions', ''),
             line_items=line_items,
             subtotal=subtotal,
-            cgst=round(total_tax / 2, 2),
-            sgst=round(total_tax / 2, 2),
-            igst=0,
+            cgst=total_cgst,
+            sgst=total_sgst,
+            igst=total_igst,   # = CGST + SGST
             invoice_type='Invoice',
             blockchain_hash=None
         )

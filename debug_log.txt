@@ -1,242 +1,244 @@
-TIMESTAMP: 2026-02-19 15:04:17.159952
+TIMESTAMP: 2026-02-19 15:27:43.002221
 FILTERS: Search='', Status='All Status', Client='All Clients', From='None', To='None'
-TOTAL INVOICES FETCHED: 2512
-INV [0]: Num='inv-2543', Client='boyer, guzman and greer', ID='2543'
+TOTAL INVOICES FETCHED: 2514
+INV [0]: Num='inv-2546', Client='adam blaster', ID='2546'
   -> MATCHED!
-INV [1]: Num='inv-2542', Client='boyer, guzman and greer', ID='2542'
+INV [1]: Num='inv-2545', Client='adam blaster', ID='2545'
   -> MATCHED!
-INV [2]: Num='inv-2540', Client=' bbjnskdmksdc', ID='2540'
+INV [2]: Num='inv-2544', Client='adam basher', ID='2544'
   -> MATCHED!
-INV [3]: Num='inv-2539', Client='aravind', ID='2539'
+INV [3]: Num='inv-2543', Client='boyer, guzman and greer', ID='2543'
   -> MATCHED!
-INV [4]: Num='inv-2538', Client='seenu', ID='2538'
+INV [4]: Num='inv-2540', Client=' bbjnskdmksdc', ID='2540'
   -> MATCHED!
-INV [7]: Num='inv-2532', Client='seenu1', ID='2532'
+INV [6]: Num='inv-2538', Client='seenu', ID='2538'
   -> MATCHED!
-INV [8]: Num='inv-2531', Client='seenu1', ID='2531'
+INV [9]: Num='inv-2532', Client='seenu1', ID='2532'
   -> MATCHED!
-INV [9]: Num='inv-2530', Client='seenu1', ID='2530'
+INV [10]: Num='inv-2531', Client='seenu1', ID='2531'
   -> MATCHED!
-INV [12]: Num='inv-2527', Client='seenu', ID='2527'
+INV [11]: Num='inv-2530', Client='seenu1', ID='2530'
   -> MATCHED!
-INV [17]: Num='inv-2522', Client='seenu1', ID='2522'
+INV [14]: Num='inv-2527', Client='seenu', ID='2527'
   -> MATCHED!
-INV [20]: Num='inv-2509', Client='seenu1', ID='2509'
+INV [19]: Num='inv-2522', Client='seenu1', ID='2522'
   -> MATCHED!
-INV [21]: Num='inv-2508', Client='seenu1', ID='2508'
+INV [22]: Num='inv-2509', Client='seenu1', ID='2509'
   -> MATCHED!
-INV [22]: Num='inv-2507', Client='seenu1', ID='2507'
+INV [23]: Num='inv-2508', Client='seenu1', ID='2508'
   -> MATCHED!
-INV [29]: Num='ai-inv-20260215-001-463', Client='seenu', ID='2496'
+INV [24]: Num='inv-2507', Client='seenu1', ID='2507'
   -> MATCHED!
-INV [30]: Num='ai-inv-20260215-001-301', Client='seenu', ID='2495'
+INV [31]: Num='ai-inv-20260215-001-463', Client='seenu', ID='2496'
   -> MATCHED!
-INV [78]: Num='inv-2026-3408', Client='seenu', ID='2445'
+INV [32]: Num='ai-inv-20260215-001-301', Client='seenu', ID='2495'
   -> MATCHED!
-INV [79]: Num='inv-2026-3407', Client='seenu', ID='2444'
+INV [80]: Num='inv-2026-3408', Client='seenu', ID='2445'
   -> MATCHED!
-INV [97]: Num='inv-2026-3389', Client='seenu', ID='2426'
+INV [81]: Num='inv-2026-3407', Client='seenu', ID='2444'
   -> MATCHED!
-INV [178]: Num='inv-2026-3308', Client='seenu', ID='2345'
+INV [99]: Num='inv-2026-3389', Client='seenu', ID='2426'
   -> MATCHED!
-INV [206]: Num='inv-2026-3280', Client='seenu', ID='2317'
+INV [180]: Num='inv-2026-3308', Client='seenu', ID='2345'
   -> MATCHED!
-INV [279]: Num='inv-2026-3207', Client='seenu', ID='2244'
+INV [208]: Num='inv-2026-3280', Client='seenu', ID='2317'
   -> MATCHED!
-INV [280]: Num='inv-2026-3206', Client='seenu', ID='2243'
+INV [281]: Num='inv-2026-3207', Client='seenu', ID='2244'
   -> MATCHED!
-INV [281]: Num='inv-2026-3205', Client='seenu', ID='2242'
+INV [282]: Num='inv-2026-3206', Client='seenu', ID='2243'
   -> MATCHED!
-INV [301]: Num='inv-2026-3185', Client='seenu', ID='2222'
+INV [283]: Num='inv-2026-3205', Client='seenu', ID='2242'
   -> MATCHED!
-INV [302]: Num='inv-2026-3184', Client='seenu', ID='2221'
+INV [303]: Num='inv-2026-3185', Client='seenu', ID='2222'
   -> MATCHED!
-INV [303]: Num='inv-2026-3183', Client='seenu', ID='2220'
+INV [304]: Num='inv-2026-3184', Client='seenu', ID='2221'
   -> MATCHED!
-INV [382]: Num='inv-2026-3104', Client='seenu', ID='2141'
+INV [305]: Num='inv-2026-3183', Client='seenu', ID='2220'
   -> MATCHED!
-INV [383]: Num='inv-2026-3103', Client='seenu', ID='2140'
+INV [384]: Num='inv-2026-3104', Client='seenu', ID='2141'
   -> MATCHED!
-INV [406]: Num='inv-2026-3080', Client='seenu', ID='2117'
+INV [385]: Num='inv-2026-3103', Client='seenu', ID='2140'
   -> MATCHED!
-INV [407]: Num='inv-2026-3079', Client='seenu', ID='2116'
+INV [408]: Num='inv-2026-3080', Client='seenu', ID='2117'
   -> MATCHED!
-INV [408]: Num='inv-2026-3078', Client='seenu', ID='2115'
+INV [409]: Num='inv-2026-3079', Client='seenu', ID='2116'
   -> MATCHED!
-INV [487]: Num='inv-2026-2999', Client='seenu', ID='2036'
+INV [410]: Num='inv-2026-3078', Client='seenu', ID='2115'
   -> MATCHED!
-INV [488]: Num='inv-2026-2998', Client='seenu', ID='2035'
+INV [489]: Num='inv-2026-2999', Client='seenu', ID='2036'
   -> MATCHED!
-INV [489]: Num='inv-2026-2997', Client='seenu', ID='2034'
+INV [490]: Num='inv-2026-2998', Client='seenu', ID='2035'
   -> MATCHED!
-INV [517]: Num='inv-2026-2969', Client='seenu', ID='2006'
+INV [491]: Num='inv-2026-2997', Client='seenu', ID='2034'
   -> MATCHED!
-INV [518]: Num='inv-2026-2968', Client='seenu', ID='2005'
+INV [519]: Num='inv-2026-2969', Client='seenu', ID='2006'
   -> MATCHED!
-INV [519]: Num='inv-2026-2967', Client='seenu', ID='2004'
+INV [520]: Num='inv-2026-2968', Client='seenu', ID='2005'
   -> MATCHED!
-INV [586]: Num='inv-2026-2900', Client='seenu', ID='1937'
+INV [521]: Num='inv-2026-2967', Client='seenu', ID='2004'
   -> MATCHED!
-INV [587]: Num='inv-2026-2899', Client='seenu', ID='1936'
+INV [588]: Num='inv-2026-2900', Client='seenu', ID='1937'
   -> MATCHED!
-INV [613]: Num='inv-2026-2873', Client='seenu', ID='1910'
+INV [589]: Num='inv-2026-2899', Client='seenu', ID='1936'
   -> MATCHED!
-INV [614]: Num='inv-2026-2872', Client='seenu', ID='1909'
+INV [615]: Num='inv-2026-2873', Client='seenu', ID='1910'
   -> MATCHED!
-INV [686]: Num='inv-2026-2800', Client='seenu', ID='1837'
+INV [616]: Num='inv-2026-2872', Client='seenu', ID='1909'
   -> MATCHED!
-INV [712]: Num='inv-2026-2774', Client='seenu', ID='1811'
+INV [688]: Num='inv-2026-2800', Client='seenu', ID='1837'
   -> MATCHED!
-INV [787]: Num='inv-2026-2699', Client='seenu', ID='1736'
+INV [714]: Num='inv-2026-2774', Client='seenu', ID='1811'
   -> MATCHED!
-INV [807]: Num='inv-2026-2679', Client='seenu', ID='1716'
+INV [789]: Num='inv-2026-2699', Client='seenu', ID='1736'
   -> MATCHED!
-INV [878]: Num='inv-2026-2608', Client='seenu', ID='1645'
+INV [809]: Num='inv-2026-2679', Client='seenu', ID='1716'
   -> MATCHED!
-INV [904]: Num='inv-2026-2582', Client='seenu', ID='1619'
+INV [880]: Num='inv-2026-2608', Client='seenu', ID='1645'
   -> MATCHED!
-INV [905]: Num='inv-2026-2581', Client='seenu', ID='1618'
+INV [906]: Num='inv-2026-2582', Client='seenu', ID='1619'
   -> MATCHED!
-INV [906]: Num='inv-2026-2580', Client='seenu', ID='1617'
+INV [907]: Num='inv-2026-2581', Client='seenu', ID='1618'
   -> MATCHED!
-INV [973]: Num='inv-2026-2513', Client='seenu', ID='1550'
+INV [908]: Num='inv-2026-2580', Client='seenu', ID='1617'
   -> MATCHED!
-INV [974]: Num='inv-2026-2512', Client='seenu', ID='1549'
+INV [975]: Num='inv-2026-2513', Client='seenu', ID='1550'
   -> MATCHED!
-INV [975]: Num='inv-2026-2511', Client='seenu', ID='1548'
+INV [976]: Num='inv-2026-2512', Client='seenu', ID='1549'
   -> MATCHED!
-INV [996]: Num='inv-2026-2490', Client='seenu', ID='1527'
+INV [977]: Num='inv-2026-2511', Client='seenu', ID='1548'
   -> MATCHED!
-INV [997]: Num='inv-2026-2489', Client='seenu', ID='1526'
+INV [998]: Num='inv-2026-2490', Client='seenu', ID='1527'
   -> MATCHED!
-INV [1079]: Num='inv-2026-2407', Client='seenu', ID='1444'
+INV [999]: Num='inv-2026-2489', Client='seenu', ID='1526'
   -> MATCHED!
-INV [1080]: Num='inv-2026-2406', Client='seenu', ID='1443'
+INV [1081]: Num='inv-2026-2407', Client='seenu', ID='1444'
   -> MATCHED!
-INV [1081]: Num='inv-2026-2405', Client='seenu', ID='1442'
+INV [1082]: Num='inv-2026-2406', Client='seenu', ID='1443'
   -> MATCHED!
-INV [1106]: Num='inv-2026-2380', Client='seenu', ID='1417'
+INV [1083]: Num='inv-2026-2405', Client='seenu', ID='1442'
   -> MATCHED!
-INV [1107]: Num='inv-2026-2379', Client='seenu', ID='1416'
+INV [1108]: Num='inv-2026-2380', Client='seenu', ID='1417'
   -> MATCHED!
-INV [1108]: Num='inv-2026-2378', Client='seenu', ID='1415'
+INV [1109]: Num='inv-2026-2379', Client='seenu', ID='1416'
   -> MATCHED!
-INV [1190]: Num='inv-2026-2296', Client='seenu', ID='1333'
+INV [1110]: Num='inv-2026-2378', Client='seenu', ID='1415'
   -> MATCHED!
-INV [1191]: Num='inv-2026-2295', Client='seenu', ID='1332'
+INV [1192]: Num='inv-2026-2296', Client='seenu', ID='1333'
   -> MATCHED!
-INV [1217]: Num='inv-2026-2269', Client='seenu', ID='1306'
+INV [1193]: Num='inv-2026-2295', Client='seenu', ID='1332'
   -> MATCHED!
-INV [1218]: Num='inv-2026-2268', Client='seenu', ID='1305'
+INV [1219]: Num='inv-2026-2269', Client='seenu', ID='1306'
   -> MATCHED!
-INV [1219]: Num='inv-2026-2267', Client='seenu', ID='1304'
+INV [1220]: Num='inv-2026-2268', Client='seenu', ID='1305'
   -> MATCHED!
-INV [1287]: Num='inv-2199', Client='seenu', ID='1236'
+INV [1221]: Num='inv-2026-2267', Client='seenu', ID='1304'
   -> MATCHED!
-INV [1288]: Num='inv-2198', Client='seenu', ID='1235'
+INV [1289]: Num='inv-2199', Client='seenu', ID='1236'
   -> MATCHED!
-INV [1306]: Num='inv-2180', Client='seenu', ID='1217'
+INV [1290]: Num='inv-2198', Client='seenu', ID='1235'
   -> MATCHED!
-INV [1307]: Num='inv-2179', Client='seenu', ID='1216'
+INV [1308]: Num='inv-2180', Client='seenu', ID='1217'
   -> MATCHED!
-INV [1372]: Num='inv-2114', Client='seenu', ID='1151'
+INV [1309]: Num='inv-2179', Client='seenu', ID='1216'
   -> MATCHED!
-INV [1373]: Num='inv-2113', Client='seenu', ID='1150'
+INV [1374]: Num='inv-2114', Client='seenu', ID='1151'
   -> MATCHED!
-INV [1390]: Num='inv-2096', Client='seenu', ID='1133'
+INV [1375]: Num='inv-2113', Client='seenu', ID='1150'
   -> MATCHED!
-INV [1448]: Num='inv-2038', Client='seenu', ID='1075'
+INV [1392]: Num='inv-2096', Client='seenu', ID='1133'
   -> MATCHED!
-INV [1449]: Num='inv-2037', Client='seenu', ID='1074'
+INV [1450]: Num='inv-2038', Client='seenu', ID='1075'
   -> MATCHED!
-INV [1467]: Num='inv-2019', Client='seenu', ID='1056'
+INV [1451]: Num='inv-2037', Client='seenu', ID='1074'
   -> MATCHED!
-INV [1468]: Num='inv-2018', Client='seenu', ID='1055'
+INV [1469]: Num='inv-2019', Client='seenu', ID='1056'
   -> MATCHED!
-INV [1529]: Num='inv-1957', Client='seenu', ID='994'
+INV [1470]: Num='inv-2018', Client='seenu', ID='1055'
   -> MATCHED!
-INV [1549]: Num='inv-1937', Client='seenu', ID='974'
+INV [1531]: Num='inv-1957', Client='seenu', ID='994'
   -> MATCHED!
-INV [1550]: Num='inv-1936', Client='seenu', ID='973'
+INV [1551]: Num='inv-1937', Client='seenu', ID='974'
   -> MATCHED!
-INV [1606]: Num='inv-1880', Client='seenu', ID='917'
+INV [1552]: Num='inv-1936', Client='seenu', ID='973'
   -> MATCHED!
-INV [1607]: Num='inv-1879', Client='seenu', ID='916'
+INV [1608]: Num='inv-1880', Client='seenu', ID='917'
   -> MATCHED!
-INV [1627]: Num='inv-1859', Client='seenu', ID='896'
+INV [1609]: Num='inv-1879', Client='seenu', ID='916'
   -> MATCHED!
-INV [1628]: Num='inv-1858', Client='seenu', ID='895'
+INV [1629]: Num='inv-1859', Client='seenu', ID='896'
   -> MATCHED!
-INV [1692]: Num='inv-1794', Client='seenu', ID='831'
+INV [1630]: Num='inv-1858', Client='seenu', ID='895'
   -> MATCHED!
-INV [1693]: Num='inv-1793', Client='seenu', ID='830'
+INV [1694]: Num='inv-1794', Client='seenu', ID='831'
   -> MATCHED!
-INV [1712]: Num='inv-1774', Client='seenu', ID='811'
+INV [1695]: Num='inv-1793', Client='seenu', ID='830'
   -> MATCHED!
-INV [1771]: Num='inv-1715', Client='seenu', ID='752'
+INV [1714]: Num='inv-1774', Client='seenu', ID='811'
   -> MATCHED!
-INV [1792]: Num='inv-1694', Client='seenu', ID='731'
+INV [1773]: Num='inv-1715', Client='seenu', ID='752'
   -> MATCHED!
-INV [1857]: Num='inv-1629', Client='seenu', ID='666'
+INV [1794]: Num='inv-1694', Client='seenu', ID='731'
   -> MATCHED!
-INV [1858]: Num='inv-1628', Client='seenu', ID='665'
+INV [1859]: Num='inv-1629', Client='seenu', ID='666'
   -> MATCHED!
-INV [1875]: Num='inv-1611', Client='seenu', ID='648'
+INV [1860]: Num='inv-1628', Client='seenu', ID='665'
   -> MATCHED!
-INV [1939]: Num='inv-1547', Client='seenu', ID='584'
+INV [1877]: Num='inv-1611', Client='seenu', ID='648'
   -> MATCHED!
-INV [1963]: Num='inv-1523', Client='seenu', ID='560'
+INV [1941]: Num='inv-1547', Client='seenu', ID='584'
   -> MATCHED!
-INV [2017]: Num='inv-1469', Client='seenu', ID='506'
+INV [1965]: Num='inv-1523', Client='seenu', ID='560'
   -> MATCHED!
-INV [2036]: Num='inv-1450', Client='seenu', ID='487'
+INV [2019]: Num='inv-1469', Client='seenu', ID='506'
   -> MATCHED!
-INV [2037]: Num='inv-1449', Client='seenu', ID='486'
+INV [2038]: Num='inv-1450', Client='seenu', ID='487'
   -> MATCHED!
-INV [2095]: Num='inv-1391', Client='seenu', ID='428'
+INV [2039]: Num='inv-1449', Client='seenu', ID='486'
   -> MATCHED!
-INV [2096]: Num='inv-1390', Client='seenu', ID='427'
+INV [2097]: Num='inv-1391', Client='seenu', ID='428'
   -> MATCHED!
-INV [2116]: Num='inv-1370', Client='seenu', ID='407'
+INV [2098]: Num='inv-1390', Client='seenu', ID='427'
   -> MATCHED!
-INV [2117]: Num='inv-1369', Client='seenu', ID='406'
+INV [2118]: Num='inv-1370', Client='seenu', ID='407'
   -> MATCHED!
-INV [2170]: Num='inv-1316', Client='seenu', ID='353'
+INV [2119]: Num='inv-1369', Client='seenu', ID='406'
   -> MATCHED!
-INV [2190]: Num='inv-1296', Client='seenu', ID='333'
+INV [2172]: Num='inv-1316', Client='seenu', ID='353'
   -> MATCHED!
-INV [2191]: Num='inv-1295', Client='seenu', ID='332'
+INV [2192]: Num='inv-1296', Client='seenu', ID='333'
   -> MATCHED!
-INV [2242]: Num='inv-1244', Client='seenu', ID='281'
+INV [2193]: Num='inv-1295', Client='seenu', ID='332'
   -> MATCHED!
-INV [2270]: Num='inv-1216', Client='seenu', ID='253'
+INV [2244]: Num='inv-1244', Client='seenu', ID='281'
   -> MATCHED!
-INV [2288]: Num='inv-1198', Client='seenu', ID='235'
+INV [2272]: Num='inv-1216', Client='seenu', ID='253'
   -> MATCHED!
-INV [2303]: Num='inv-1183', Client='seenu', ID='220'
+INV [2290]: Num='inv-1198', Client='seenu', ID='235'
   -> MATCHED!
-INV [2342]: Num='inv-1144', Client='seenu', ID='181'
+INV [2305]: Num='inv-1183', Client='seenu', ID='220'
   -> MATCHED!
-INV [2356]: Num='inv-1130', Client='seenu', ID='167'
+INV [2344]: Num='inv-1144', Client='seenu', ID='181'
   -> MATCHED!
-INV [2369]: Num='inv-1117', Client='seenu', ID='154'
+INV [2358]: Num='inv-1130', Client='seenu', ID='167'
   -> MATCHED!
-INV [2370]: Num='inv-1116', Client='seenu', ID='153'
+INV [2371]: Num='inv-1117', Client='seenu', ID='154'
   -> MATCHED!
-INV [2396]: Num='inv-1090', Client='seenu', ID='127'
+INV [2372]: Num='inv-1116', Client='seenu', ID='153'
   -> MATCHED!
-INV [2432]: Num='inv-1054', Client='seenu', ID='91'
+INV [2398]: Num='inv-1090', Client='seenu', ID='127'
   -> MATCHED!
-INV [2448]: Num='inv-1038', Client='seenu', ID='75'
+INV [2434]: Num='inv-1054', Client='seenu', ID='91'
   -> MATCHED!
-INV [2463]: Num='inv-1023', Client='seenu', ID='59'
+INV [2450]: Num='inv-1038', Client='seenu', ID='75'
   -> MATCHED!
-INV [2478]: Num='inv-1008', Client='seenu', ID='44'
+INV [2465]: Num='inv-1023', Client='seenu', ID='59'
   -> MATCHED!
-INV [2502]: Num='ai-inv-20260211-001-708', Client='seenu', ID='11'
+INV [2480]: Num='inv-1008', Client='seenu', ID='44'
   -> MATCHED!
-INV [2503]: Num='ai-inv-20260211-001-757', Client='seenu', ID='10'
+INV [2504]: Num='ai-inv-20260211-001-708', Client='seenu', ID='11'
   -> MATCHED!
-INV [2504]: Num='ai-inv-20260211-001-949', Client='seenu', ID='9'
+INV [2505]: Num='ai-inv-20260211-001-757', Client='seenu', ID='10'
   -> MATCHED!
-FINAL RESULT COUNT: 2512
+INV [2506]: Num='ai-inv-20260211-001-949', Client='seenu', ID='9'
+  -> MATCHED!
+FINAL RESULT COUNT: 2514
