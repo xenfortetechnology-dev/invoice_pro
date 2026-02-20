@@ -510,14 +510,8 @@ def create_invoice():
                     "invoice_date": invoice_date_str,
                     "total_amount": total_amount,
                     "payment_status": "Unpaid",
-<<<<<<< HEAD
                     "line_items": line_items_data,
                     "invoice_format": invoice_format
-=======
-                    "notes": request.form.get("notes", ""),
-                    "terms_conditions": request.form.get("terms_conditions", ""),
-                    "line_items": line_items_data
->>>>>>> 4212fb1b5cf02ec6e3629a87fb3a6b8265e8bf5b
                 }
             )
 
