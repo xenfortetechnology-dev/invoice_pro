@@ -816,6 +816,7 @@ def invoice_detail(id):
             quantity=quantity,
             unit=item.get("unit", "Nos"),       # ✅ FIX
             unit_price=unit_price,
+            tax_percentage=item.get("tax_percentage", 18), # Used by pdf_generator.py
             cgst_amount=cgst_amount,
             sgst_amount=sgst_amount,
             igst_amount=igst_amount,            # ✅ FIX
@@ -875,6 +876,7 @@ def download_invoice_pdf(id):
             return jsonify({'success': False, 'error': 'Client not found'}), 404
 
         # Build line_items with per-row cgst/sgst/igst amounts for the template
+        raw_items = invoice_data.get('line_items', [])
         line_items = []
         subtotal = 0
         total_cgst = 0
@@ -900,6 +902,7 @@ def download_invoice_pdf(id):
                 quantity=qty,
                 unit=item.get('unit', 'Nos'),
                 unit_price=price,
+                tax_percentage=item.get('tax_percentage', 18), # Used by PDF generator
                 cgst_amount=cgst_amt,
                 sgst_amount=sgst_amt,
                 igst_amount=igst_amt,
