@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Create Quotation{% endblock %}
+{% block title %}{{ 'Edit' if is_edit else 'Create' }} Quotation{% endblock %}
 {% block content %}
 <div class="container-fluid py-4">
 
@@ -10,11 +10,15 @@
             <div class="card-header fw-bold">{{ 'Edit' if is_edit else 'Create' }} Quotation</div>
             <div class="card-body row g-3">
 
-                <input type="hidden" name="quotation_number" value="{{ quotation_no }}" readonly>
+                <!-- Hidden: quotation_number only for create (server will auto-generate) -->
+                {% if not is_edit %}
+                <input type="hidden" name="quotation_number" value="">
+                {% endif %}
 
                 <div class="col-md-3">
                     <label>Quotation No</label>
-                    <input class="form-control" value="{{ quotation_no }}" readonly>
+                    <input class="form-control" value="{{ q.quotation_number if q and is_edit else 'Auto-generated' }}"
+                        readonly>
                 </div>
 
                 <div class="col-md-3">
@@ -31,18 +35,16 @@
 
                 <div class="col-md-3">
                     <label>Expiry Date</label>
-                    <input id="expiry_preview" class="form-control" readonly>
+                    <input id="expiry_preview" class="form-control" readonly
+                        value="{{ q.expiry_date.strftime('%Y-%m-%d') if q and q.expiry_date else '' }}">
                 </div>
 
                 <div class="col-md-4">
                     <label>Status</label>
                     <select name="status" class="form-select">
-                        <option>Draft</option>
-                        <option>Sent</option>
-                        <option>Viewed</option>
-                        <option>Accepted</option>
-                        <option>Rejected</option>
-                        <option>Expired</option>
+                        {% for s in ['Draft','Sent','Viewed','Accepted','Rejected','Expired'] %}
+                        <option {% if q and q.status==s %}selected{% endif %}>{{ s }}</option>
+                        {% endfor %}
                     </select>
                 </div>
 
@@ -64,39 +66,47 @@
             <div class="card-header fw-bold">Pricing Summary</div>
             <div class="card-body row g-3">
 
-                {% for field in
-                ['subtotal','discount','taxable','cgst','sgst','igst','shipping','rounding','grand_total'] %}
-                <input type="hidden" name="{{ field }}" id="{{ field }}">
-                {% endfor %}
+                <!-- Hidden fields submitted with form — populated by JS -->
+                <input type="hidden" name="subtotal" id="subtotal">
+                <input type="hidden" name="discount" id="discount">
+                <input type="hidden" name="taxable_value" id="taxable_value">
+                <input type="hidden" name="cgst" id="cgst">
+                <input type="hidden" name="sgst" id="sgst">
+                <input type="hidden" name="igst" id="igst">
+                <input type="hidden" name="shipping" id="shipping">
+                <input type="hidden" name="rounding" id="rounding">
+                <input type="hidden" name="grand_total" id="grand_total">
 
                 <div class="col-md-3">
                     <label>Subtotal</label>
-                    <input class="form-control calc" id="ui_subtotal" value="0">
+                    <input class="form-control calc" id="ui_subtotal" value="{{ q.subtotal if q else '0' }}">
                 </div>
 
                 <div class="col-md-3">
                     <label>Discount</label>
-                    <input class="form-control calc" id="ui_discount" value="0">
+                    <input class="form-control calc" id="ui_discount" value="{{ q.discount if q else '0' }}">
                 </div>
 
                 <div class="col-md-3">
                     <label>Tax %</label>
-                    <input class="form-control calc" id="ui_tax" value="18">
+                    <input class="form-control calc" id="ui_tax"
+                        value="{{ q.tax_percent if q and q.tax_percent else '18' }}">
                 </div>
 
                 <div class="col-md-3">
                     <label>Shipping</label>
-                    <input class="form-control calc" id="ui_shipping" value="0">
+                    <input class="form-control calc" id="ui_shipping" value="{{ q.shipping if q else '0' }}">
                 </div>
 
                 <div class="col-md-3">
                     <label>Rounding</label>
-                    <input class="form-control calc" id="ui_rounding" value="0">
+                    <input class="form-control calc" id="ui_rounding" value="{{ q.rounding if q else '0' }}">
                 </div>
 
                 <div class="col-md-3">
                     <label>Grand Total</label>
-                    <input class="form-control fw-bold" id="ui_total" readonly>
+                    <input class="form-control fw-bold" id="ui_total" readonly
+                        value="{{ q.grand_total if q else '0.00' }}">
                 </div>
 
             </div>
@@ -104,40 +114,48 @@
 
         <!-- ================= DELIVERY & TERMS ================= -->
         <div class="card shadow mb-3">
-            <div class="card-header fw-bold">Delivery & Project Terms</div>
+            <div class="card-header fw-bold">Delivery &amp; Project Terms</div>
             <div class="card-body row g-3">
 
                 <!-- Delivery Timeline -->
                 <div class="col-md-4">
                     <label>Delivery Timeline</label>
                     <select name="delivery_timeline" class="form-select" required>
-                        <option value="7 Working Days">7 Working Days</option>
-                        <option value="15 Working Days" selected>15 Working Days</option>
-                        <option value="30 Working Days">30 Working Days</option>
-                        <option value="45 Working Days">45 Working Days</option>
+                        {% for tl in ['7 Working Days','15 Working Days','30 Working Days','45 Working Days'] %}
+                        <option value="{{ tl }}" {% if q and q.delivery_timeline==tl %}selected{% endif %}>{{ tl }}
+                        </option>
+                        {% endfor %}
+                        {% if q and q.delivery_timeline and q.delivery_timeline not in ['7 Working Days','15 Working
+                        Days','30 Working Days','45 Working Days'] %}
+                        <option value="{{ q.delivery_timeline }}" selected>{{ q.delivery_timeline }}</option>
+                        {% endif %}
                     </select>
                 </div>
 
                 <!-- Project Scope -->
                 <div class="col-md-4">
                     <label>Project Scope</label>
-                    <input type="text" name="project_scope" class="form-control" placeholder="">
+                    <input type="text" name="project_scope" class="form-control"
+                        value="{{ q.project_scope if q else '' }}">
                 </div>
 
                 <!-- Milestones -->
                 <div class="col-md-4">
                     <label>Milestones</label>
-                    <input type="text" name="milestones" class="form-control" placeholder="">
+                    <input type="text" name="milestones" class="form-control" value="{{ q.milestones if q else '' }}">
                 </div>
 
                 <!-- Warranty -->
                 <div class="col-md-4">
                     <label>Support / Warranty</label>
                     <select name="warranty" class="form-select">
-                        <option>30 Days Free Support</option>
-                        <option>3 Months Support</option>
-                        <option>6 Months Support</option>
-                        <option>1 Year Support</option>
+                        {% for w in ['30 Days Free Support','3 Months Support','6 Months Support','1 Year Support'] %}
+                        <option {% if q and q.warranty==w %}selected{% endif %}>{{ w }}</option>
+                        {% endfor %}
+                        {% if q and q.warranty and q.warranty not in ['30 Days Free Support','3 Months Support','6
+                        Months Support','1 Year Support'] %}
+                        <option selected>{{ q.warranty }}</option>
+                        {% endif %}
                     </select>
                 </div>
 
@@ -145,27 +163,31 @@
                 <div class="col-md-4">
                     <label>Revision Policy</label>
                     <select name="revision_policy" class="form-select">
-                        <option>2 Free Revisions</option>
-                        <option>3 Free Revisions</option>
-                        <option>Unlimited Revisions (30 Days)</option>
+                        {% for r in ['2 Free Revisions','3 Free Revisions','Unlimited Revisions (30 Days)'] %}
+                        <option {% if q and q.revision_policy==r %}selected{% endif %}>{{ r }}</option>
+                        {% endfor %}
+                        {% if q and q.revision_policy and q.revision_policy not in ['2 Free Revisions','3 Free
+                        Revisions','Unlimited Revisions (30 Days)'] %}
+                        <option selected>{{ q.revision_policy }}</option>
+                        {% endif %}
                     </select>
                 </div>
 
                 <!-- Dependencies -->
                 <div class="col-md-4">
                     <label>Dependencies</label>
-                    <input type="text" name="dependencies" class="form-control" placeholder="">
+                    <input type="text" name="dependencies" class="form-control"
+                        value="{{ q.dependencies if q else '' }}">
                 </div>
-
-
 
             </div>
         </div>
-        <!-- Terms Template -->
-        <div class="col-md-12">
-            <label>Terms & Conditions</label>
 
-            <select class="form-select mb-2" onchange="loadTerms(this.value)" required>
+        <!-- Terms Template -->
+        <div class="col-md-12 mb-3">
+            <label>Terms &amp; Conditions</label>
+
+            <select class="form-select mb-2" onchange="loadTerms(this.value)">
                 <option value="">Select Terms Template</option>
                 <option value="standard">Standard Terms</option>
                 <option value="corporate">Corporate Terms</option>
@@ -178,9 +200,8 @@
         </div>
 
         <!-- ================= ACTIONS ================= -->
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 mb-4">
             <button class="btn btn-success">{{ 'Update' if is_edit else 'Save' }} Quotation</button>
-
             <a href="{{ url_for('quotation_list') }}" class="btn btn-secondary">View Quotations</a>
         </div>
 
@@ -189,10 +210,9 @@
 
 <script src="/static/js/quotation.js"></script>
 <script>
-    quotation_date.addEventListener("change", calculateExpiry);
-    validity_days.addEventListener("change", calculateExpiry);
-    document.querySelectorAll(".calc").forEach(i => i.addEventListener("input", calculate));
-    calculate();
+    // calculateExpiry runs automatically on load via quotation.js.
+    // Trigger it once now with current values in case date is pre-filled.
+    calculateExpiry();
 </script>
 
 {% endblock %}

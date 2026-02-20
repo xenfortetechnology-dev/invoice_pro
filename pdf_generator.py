@@ -163,9 +163,9 @@ def generate_invoice_pdf(invoice):
                 Paragraph(item.description.replace('\n', '<br/>'), normal_style),
                 f"{item.quantity:g}",
                 item.unit,
-                f"₹{item.unit_price:,.2f}",
+                f"Rs. {item.unit_price:,.2f}",
                 f"{item.tax_percentage:g}%",
-                f"₹{item.total_amount:,.2f}"
+                f"Rs. {item.total_amount:,.2f}"
             ])
 
         # Add empty rows to maintain table structure
@@ -196,13 +196,13 @@ def generate_invoice_pdf(invoice):
 
         # Tax summary and totals
         tax_data = [
-            ['', '', 'Subtotal:', f"₹{invoice.subtotal:,.2f}"],
-            ['', '', 'CGST:', f"₹{invoice.cgst:,.2f}"],
-            ['', '', 'SGST:', f"₹{invoice.sgst:,.2f}"],
-            ['', '', 'IGST:', f"₹{invoice.igst:,.2f}"],
-            ['', '', 'Round Off:', '₹0.00'],
+            ['', '', 'Subtotal:', f"Rs. {invoice.subtotal:,.2f}"],
+            ['', '', 'CGST:', f"Rs. {invoice.cgst:,.2f}"],
+            ['', '', 'SGST:', f"Rs. {invoice.sgst:,.2f}"],
+            ['', '', 'IGST:', f"Rs. {invoice.igst:,.2f}"],
+            ['', '', 'Round Off:', 'Rs. 0.00'],
             ['', '', Paragraph('<b>Total Amount:</b>', header_style), 
-             Paragraph(f'<b>₹{invoice.total_amount:,.2f}</b>', header_style)]
+             Paragraph(f'<b>Rs. {invoice.total_amount:,.2f}</b>', header_style)]
         ]
         
         tax_table = Table(tax_data, colWidths=[2*inch, 2*inch, 1.5*inch, 1.5*inch])
@@ -575,7 +575,7 @@ def generate_quotation_pdf(q):
     info_data = [
         ["Quotation No", q.quotation_number, "Status", q.status],
         ["Quotation Date", str(q.quotation_date), "Sales Person", q.sales_person],
-        ["Validity (Days)", str(q.validity_days), "Grand Total", f"₹ {q.grand_total:,.2f}"],
+        ["Validity (Days)", str(q.validity_days), "Grand Total", f"Rs. {q.grand_total:,.2f}"],
     ]
 
     info_table = Table(info_data, colWidths=[90, 180, 90, 150])
@@ -593,14 +593,14 @@ def generate_quotation_pdf(q):
 
     # ================= PRICING SUMMARY =================
     pricing_data = [
-        ["Subtotal", f"₹ {q.subtotal:,.2f}"],
-        ["Discount", f"₹ {q.discount:,.2f}"],
-        ["Taxable Value", f"₹ {q.taxable_value:,.2f}"],
-        ["CGST", f"₹ {q.cgst:,.2f}"],
-        ["SGST", f"₹ {q.sgst:,.2f}"],
-        ["Shipping", f"₹ {q.shipping:,.2f}"],
-        ["Rounding", f"₹ {q.rounding:,.2f}"],
-        ["Grand Total", f"₹ {q.grand_total:,.2f}"],
+        ["Subtotal", f"Rs. {q.subtotal:,.2f}"],
+        ["Discount", f"Rs. {q.discount:,.2f}"],
+        ["Taxable Value", f"Rs. {q.taxable_value:,.2f}"],
+        ["CGST", f"Rs. {q.cgst:,.2f}"],
+        ["SGST", f"Rs. {q.sgst:,.2f}"],
+        ["Shipping", f"Rs. {q.shipping:,.2f}"],
+        ["Rounding", f"Rs. {q.rounding:,.2f}"],
+        ["Grand Total", f"Rs. {q.grand_total:,.2f}"],
     ]
 
     pricing_table = Table(pricing_data, colWidths=[200, 150])
@@ -698,7 +698,7 @@ class AnalyticsReportGenerator:
         elements.append(Paragraph("Revenue Trends", styles["Heading2"]))
         revenue_table = [["Month", "Revenue"]]
         for r in revenue["monthly_data"]:
-            revenue_table.append([r["month"], f"₹{r['revenue']}"])
+            revenue_table.append([r["month"], f"Rs. {r['revenue']}"])
         elements.append(Table(revenue_table))
         elements.append(Spacer(1, 10))
 
@@ -706,7 +706,7 @@ class AnalyticsReportGenerator:
         elements.append(Paragraph("Profitability Analysis", styles["Heading2"]))
         profit_table = [["Month", "Profit"]]
         for p in profit["monthly_trends"]:
-            profit_table.append([p["month"], f"₹{p['profit']}"])
+            profit_table.append([p["month"], f"Rs. {p['profit']}"])
         elements.append(Table(profit_table))
         elements.append(Spacer(1, 10))
 
@@ -714,7 +714,7 @@ class AnalyticsReportGenerator:
         elements.append(Paragraph("Payment Status", styles["Heading2"]))
         payment_table = [["Status", "Amount"]]
         for pay in payments["payment_status_distribution"]:
-            payment_table.append([pay["status"], f"₹{pay['amount']}"])
+            payment_table.append([pay["status"], f"Rs. {pay['amount']}"])
         elements.append(Table(payment_table))
         elements.append(Spacer(1, 10))
 
@@ -722,10 +722,9 @@ class AnalyticsReportGenerator:
         elements.append(Paragraph("Top Clients", styles["Heading2"]))
         client_table = [["Client", "Revenue", "Invoices"]]
         for c in clients["top_clients"]:
-            client_table.append([c["name"], f"₹{c['total_revenue']}", c["invoice_count"]])
+            client_table.append([c["name"], f"Rs. {c['total_revenue']}", c["invoice_count"]])
         elements.append(Table(client_table))
 
         pdf.build(elements)
         buffer.seek(0)
         return buffer
-

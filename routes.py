@@ -197,32 +197,25 @@ def fetch_cloud_quotations():
         return []
 
 def fetch_cloud_quotation_by_id(qid):
-    """Fetch single quotation from cloud database by ID (with query param pattern)"""
+    """Fetch single quotation from cloud database by ID — full detail endpoint"""
     try:
-        # Standardize qid to string for reliable comparison
-        qid_str = str(qid)
-        
-        # Cloud API uses ?id=NN pattern or returns a list
-        response = cloud_request("GET", f"/quotations?id={qid_str}")
+        response = cloud_request("GET", f"/quotations/{qid}")
         if response and response.status_code == 200:
             data = response.json()
+            # API returns a single dict for the /quotations/<id> endpoint
+            if isinstance(data, dict) and "id" in data:
+                return data
+            # Fallback: if list returned (shouldn't happen), find by id
             if isinstance(data, list):
-                # Search for correct ID in list since API might ignore query param
                 for item in data:
-                    if str(item.get("id")) == qid_str:
+                    if str(item.get("id")) == str(qid):
                         return item
-            elif isinstance(data, dict):
-                if str(data.get("id")) == qid_str:
-                    return data
-        
-        # Fallback to full list filtering if needed
-        quotations = fetch_cloud_quotations()
-        for q in quotations:
-            if str(q.get('id')) == qid_str:
-                return q
+
+        logging.error(f"Failed to fetch quotation {qid}: {response.status_code if response else 'No response'}")
         return None
     except Exception as e:
         logging.error(f"Cloud API error (quotation by ID): {e}")
+        return None
         return None
 
 from functools import wraps
@@ -500,24 +493,12 @@ def create_invoice():
 
             invoice_number = generate_invoice_number()
 
-            # Process line items
+            # Process line items — use pre-computed amounts from JS
             line_items_data = json.loads(request.form.get('line_items', '[]'))
 
-            subtotal = 0
-            total_tax = 0
-
-            for item in line_items_data:
-                qty = float(item.get("quantity", 0))
-                price = float(item.get("unit_price", 0))
-                tax = float(item.get("tax_percentage", 0))
-
-                line_total = qty * price
-                tax_amount = (line_total * tax) / 100
-
-                subtotal += line_total
-                total_tax += tax_amount
-
-            total_amount = subtotal + total_tax
+            total_amount = sum(
+                float(item.get("total_amount", 0)) for item in line_items_data
+            )
 
             # 🔥 SEND TO CLOUD API (FIXED INDENTATION)
             response = cloud_request(
@@ -529,8 +510,14 @@ def create_invoice():
                     "invoice_date": invoice_date_str,
                     "total_amount": total_amount,
                     "payment_status": "Unpaid",
+<<<<<<< HEAD
                     "line_items": line_items_data,
                     "invoice_format": invoice_format
+=======
+                    "notes": request.form.get("notes", ""),
+                    "terms_conditions": request.form.get("terms_conditions", ""),
+                    "line_items": line_items_data
+>>>>>>> 4212fb1b5cf02ec6e3629a87fb3a6b8265e8bf5b
                 }
             )
 
@@ -695,16 +682,18 @@ def preview_invoice():
             
             cgst_percentage = float(item_data.get('cgst_percentage', 0.0))
             sgst_percentage = float(item_data.get('sgst_percentage', 0.0))
-            igst_percentage = float(item_data.get('igst_percentage', 0.0))
+            # IGST = CGST + SGST — it's their combined representation, not a 3rd tax
+            igst_percentage = cgst_percentage + sgst_percentage
 
             line_total = quantity * unit_price
-            
+
             cgst_amount = (line_total * cgst_percentage) / 100
             sgst_amount = (line_total * sgst_percentage) / 100
-            igst_amount = (line_total * igst_percentage) / 100
-            
-            tax_amount = cgst_amount + sgst_amount + igst_amount
-            
+            igst_amount = cgst_amount + sgst_amount   # IGST = CGST + SGST
+
+            # Row total = amount + CGST + SGST (equivalently: amount + IGST)
+            item_total = line_total + cgst_amount + sgst_amount
+
             # Create SimpleNamespace object instead of InvoiceLineItem model
             li = SimpleNamespace(
                 sr_no=i,
@@ -719,15 +708,18 @@ def preview_invoice():
                 cgst_amount=cgst_amount,
                 sgst_amount=sgst_amount,
                 igst_amount=igst_amount,
-                total_amount=line_total + tax_amount
+                total_amount=item_total
             )
-            
+
             line_items.append(li)
 
             subtotal += line_total
             total_cgst += cgst_amount
             total_sgst += sgst_amount
             total_igst += igst_amount
+
+        # Grand total = subtotal + CGST + SGST (IGST is CGST+SGST combined, not extra)
+        grand_total = subtotal + total_cgst + total_sgst
 
         # Create SimpleNamespace invoice instead of Invoice model
         invoice = SimpleNamespace(
@@ -740,8 +732,8 @@ def preview_invoice():
             subtotal=subtotal,
             cgst=total_cgst,
             sgst=total_sgst,
-            igst=total_igst,
-            total_amount=subtotal + total_cgst + total_sgst + total_igst,
+            igst=total_igst,           # = total_cgst + total_sgst
+            total_amount=grand_total,
             invoice_format=invoice_format,
             line_items=line_items,
             payment_status='Unpaid'
@@ -833,6 +825,7 @@ def invoice_detail(id):
             quantity=quantity,
             unit=item.get("unit", "Nos"),
             unit_price=unit_price,
+            tax_percentage=item.get("tax_percentage", 18), # Used by pdf_generator.py
             cgst_amount=cgst_amount,
             sgst_amount=sgst_amount,
             igst_amount=igst_amount,
@@ -846,7 +839,7 @@ def invoice_detail(id):
         id=invoice_data.get('id'),
         invoice_number=invoice_data.get('invoice_number'),
         invoice_date=datetime.strptime(invoice_data.get('invoice_date'), '%Y-%m-%d'),
-        total_amount=invoice_data.get('total_amount'),
+        total_amount=subtotal + total_cgst + total_sgst,   # grand total = subtotal + CGST + SGST
         payment_status=invoice_data.get('payment_status'),
         line_items=line_items,
         subtotal=subtotal,
@@ -890,69 +883,100 @@ def invoice_detail(id):
 def download_invoice_pdf(id):
     """Download PDF directly to user's Downloads folder (fetch from cloud)"""
     try:
-        # Fetch invoice from cloud API
+        # Fetch full invoice detail (with line_items) from cloud API
         invoice_data = fetch_cloud_invoice_by_id(id)
         if not invoice_data:
             return jsonify({'success': False, 'error': 'Invoice not found'}), 404
-        
+
         # Fetch client data
         client_data = fetch_cloud_client_by_id(invoice_data.get('client_id'))
         if not client_data:
             return jsonify({'success': False, 'error': 'Client not found'}), 404
-        
-        # Create invoice object for PDF generation with all required fields
+
+        # Build line_items with per-row cgst/sgst/igst amounts for the template
+        raw_items = invoice_data.get('line_items', [])
+        line_items = []
+        subtotal = 0
+        total_cgst = 0
+        total_sgst = 0
+        total_igst = 0
+        for i, item in enumerate(raw_items):
+            qty = item.get('quantity', 0)
+            price = item.get('unit_price', 0)
+            line_total = qty * price
+            tax_amt = item.get('tax_amount', 0)  # total tax stored = cgst + sgst
+            cgst_amt = round(tax_amt / 2, 2)
+            sgst_amt = round(tax_amt / 2, 2)
+            igst_amt = cgst_amt + sgst_amt
+            item_total = line_total + cgst_amt + sgst_amt
+            subtotal += line_total
+            total_cgst += cgst_amt
+            total_sgst += sgst_amt
+            total_igst += igst_amt
+            line_items.append(SimpleNamespace(
+                sr_no=item.get('sr_no', i + 1),
+                hsn_code=item.get('hsn_code', ''),
+                description=item.get('description', ''),
+                quantity=qty,
+                unit=item.get('unit', 'Nos'),
+                unit_price=price,
+                tax_percentage=item.get('tax_percentage', 18), # Used by PDF generator
+                cgst_amount=cgst_amt,
+                sgst_amount=sgst_amt,
+                igst_amount=igst_amt,
+                total_amount=item_total,
+                cost_price=item.get('cost_price', 0)
+            ))
+
         invoice = SimpleNamespace(
             id=invoice_data.get('id'),
             invoice_number=invoice_data.get('invoice_number', 'N/A'),
             invoice_date=datetime.strptime(invoice_data.get('invoice_date'), '%Y-%m-%d').date() if invoice_data.get('invoice_date') else datetime.now().date(),
             due_date=None,
-            total_amount=invoice_data.get('total_amount', 0),
+            total_amount=subtotal + total_cgst + total_sgst,   # grand total = sub + CGST + SGST
             payment_status=invoice_data.get('payment_status', 'Unpaid'),
-            notes='',
-            terms_conditions='',
-            line_items=[],
-            subtotal=invoice_data.get('total_amount', 0),
-            cgst=0,
-            sgst=0,
-            igst=0,
-            invoice_type='Invoice',  # Required by PDF generator
-            blockchain_hash=None  # Required by PDF generator
+            notes=invoice_data.get('notes', ''),
+            terms_conditions=invoice_data.get('terms_conditions', ''),
+            line_items=line_items,
+            subtotal=subtotal,
+            cgst=total_cgst,
+            sgst=total_sgst,
+            igst=total_igst,   # = CGST + SGST
+            invoice_type='Invoice',
+            blockchain_hash=None
         )
-        
+
         invoice.client = SimpleNamespace(
             name=client_data.get('name', 'N/A'),
             email=client_data.get('email', ''),
             phone=client_data.get('phone', ''),
-            address='',
-            city='',
+            address=client_data.get('address', ''),
+            city=client_data.get('city', ''),
             state='',
             pincode='',
             gstin='',
             pan='',
-            contact_person=''  # Required by PDF generator
+            contact_person=''
         )
-        
-        logging.info(f"Generating PDF for invoice {id}: {invoice_data.get('invoice_number')}")
-        
+
+        logging.info(f"Generating PDF for invoice {id}: {invoice_data.get('invoice_number')} with {len(line_items)} items")
+
         pdf_buffer = generate_invoice_pdf(invoice)
         pdf_buffer.seek(0)
-        
-        # Get Downloads folder path
+
         from pathlib import Path
         downloads_folder = Path.home() / 'Downloads'
         downloads_folder.mkdir(exist_ok=True)
-        
-        # Create filename and save
+
         filename = f'Invoice_{invoice_data.get("invoice_number")}.pdf'
         filepath = downloads_folder / filename
-        
-        # Write PDF to file
+
         with open(filepath, 'wb') as f:
             f.write(pdf_buffer.getvalue())
-        
+
         logging.info(f"PDF saved to: {filepath}")
         return jsonify({'success': True, 'message': f'PDF saved to Downloads: {filename}', 'filepath': str(filepath)})
-        
+
     except Exception as e:
         logging.error(f"PDF download failed: {e}", exc_info=True)
         return jsonify({'success': False, 'error': f'Failed to save PDF: {str(e)}'}), 500
@@ -1028,17 +1052,14 @@ def bulk_delete_invoices():
 def delete_invoice1(id):
     """Delete invoice from cloud database (REST endpoint)"""
     try:
-        response = requests.delete(
-            f"{CLOUD_API_BASE}/invoices/{id}",
-            timeout=5
-        )
-        if response.status_code in (200, 204):
+        response = cloud_request("DELETE", f"/invoices/{id}")
+        if response and response.status_code in (200, 204):
             return jsonify({'success': True})
         else:
             return jsonify({
                 'success': False,
-                'error': f'Cloud API error: {response.text}'
-            }), response.status_code
+                'error': f'Cloud API error: {response.text if response else "No response"}'
+            }), (response.status_code if response else 500)
     except Exception as e:
         logging.error(f"Delete error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1052,14 +1073,12 @@ def delete_invoice1(id):
 @login_required
 def edit_invoice(id):
     """Edit invoice from cloud database"""
-    
+
     if request.method == 'POST':
         action = request.form.get('action', 'update')
-        
-        # Prepare update data
+
         update_data = {}
-        
-        # Handle specific actions
+
         if action == 'mark_paid':
             update_data['payment_status'] = 'Paid'
             flash_msg = 'Invoice marked as Paid!'
@@ -1067,7 +1086,6 @@ def edit_invoice(id):
             update_data['payment_status'] = 'Unpaid'
             flash_msg = 'Invoice marked as Unpaid!'
         else:
-            # Regular update
             if request.form.get('notes'):
                 update_data['notes'] = request.form.get('notes')
             if request.form.get('terms_conditions'):
@@ -1075,22 +1093,18 @@ def edit_invoice(id):
             if request.form.get('client_id'):
                 update_data['client_id'] = int(request.form.get('client_id'))
             flash_msg = 'Invoice updated successfully!'
-        
-        # Send update to cloud API
+
+        # Use cloud_request (with JWT token) instead of raw requests.put
         try:
-            response = requests.put(
-                f"{CLOUD_API_BASE}/invoices/{id}",
-                json=update_data,
-                timeout=5
-            )
-            if response.status_code in (200, 204):
+            response = cloud_request("PUT", f"/invoices/{id}", json=update_data)
+            if response and response.status_code in (200, 204):
                 flash(flash_msg, 'success')
             else:
-                flash(f'Failed to update invoice: {response.text}', 'error')
+                flash(f'Failed to update invoice: {response.text if response else "No response"}', 'error')
         except Exception as e:
             logging.error(f"Cloud API update error: {e}")
             flash(f'API connection error: {str(e)}', 'error')
-        
+
         return redirect(url_for('invoice_management'))
 
     # GET request — fetch invoice from cloud and show edit form
@@ -1098,37 +1112,34 @@ def edit_invoice(id):
     if not invoice_data:
         flash('Invoice not found', 'error')
         return redirect(url_for('invoice_management'))
-    
-    # Fetch client data for this invoice
+
     client_data = fetch_cloud_client_by_id(invoice_data.get('client_id'))
     if not client_data:
         flash('Client not found', 'error')
         return redirect(url_for('invoice_management'))
-    
-    # Create client object
+
     client = SimpleNamespace(
         id=client_data.get('id'),
         name=client_data.get('name', 'N/A'),
         email=client_data.get('email', ''),
         phone=client_data.get('phone', '')
     )
-    
-    # Create invoice object with all fields needed by edit form
+
     invoice = SimpleNamespace(
         id=invoice_data.get('id'),
         invoice_number=invoice_data.get('invoice_number', 'N/A'),
         invoice_date=invoice_data.get('invoice_date'),
         client_id=invoice_data.get('client_id'),
-        client=client,  # Add client object for template
+        client=client,
         total_amount=invoice_data.get('total_amount', 0),
         payment_status=invoice_data.get('payment_status', 'Unpaid'),
         notes=invoice_data.get('notes', ''),
         terms_conditions=invoice_data.get('terms_conditions', '')
     )
-    
+
     client_list = fetch_cloud_clients()
     clients = [SimpleNamespace(**c) for c in client_list]
-    
+
     return render_template('edit_invoice.html', invoice=invoice, clients=clients)
 
 
@@ -1162,22 +1173,39 @@ def duplicate_invoice(id):
 def send_invoice(id):
     """Send invoice via email to client (fetch from cloud)"""
     try:
-        # Fetch invoice from cloud API
         invoice_data = fetch_cloud_invoice_by_id(id)
         if not invoice_data:
             return jsonify({"success": False, "message": "❌ Invoice not found."}), 404
-        
-        # Fetch client data from cloud API
+
         client_data = fetch_cloud_client_by_id(invoice_data.get('client_id'))
         if not client_data:
             return jsonify({"success": False, "message": "❌ Client not found."}), 404
-        
-        recipient_email = client_data.get('email')
 
+        recipient_email = client_data.get('email')
         if not recipient_email:
             return jsonify({"success": False, "message": "❌ Client has no email address set."}), 400
 
-        # Create invoice object for email sending with all required fields
+        # Build line_items from cloud data
+        raw_items = invoice_data.get('line_items', [])
+        line_items = [
+            SimpleNamespace(
+                sr_no=item.get('sr_no', i + 1),
+                hsn_code=item.get('hsn_code', ''),
+                description=item.get('description', ''),
+                quantity=item.get('quantity', 0),
+                unit=item.get('unit', 'Nos'),
+                unit_price=item.get('unit_price', 0),
+                tax_percentage=item.get('tax_percentage', 0),
+                tax_amount=item.get('tax_amount', 0),
+                total_amount=item.get('total_amount', 0),
+                cost_price=item.get('cost_price', 0)
+            )
+            for i, item in enumerate(raw_items)
+        ]
+
+        subtotal = sum(item.get('unit_price', 0) * item.get('quantity', 0) for item in raw_items)
+        total_tax = sum(item.get('tax_amount', 0) for item in raw_items)
+
         invoice = SimpleNamespace(
             id=invoice_data.get('id'),
             invoice_number=invoice_data.get('invoice_number', 'N/A'),
@@ -1185,46 +1213,38 @@ def send_invoice(id):
             due_date=None,
             total_amount=invoice_data.get('total_amount', 0),
             payment_status=invoice_data.get('payment_status', 'Unpaid'),
-            notes='',
-            terms_conditions='',
-            line_items=[],
-            subtotal=invoice_data.get('total_amount', 0),
-            cgst=0,
-            sgst=0,
+            notes=invoice_data.get('notes', ''),
+            terms_conditions=invoice_data.get('terms_conditions', ''),
+            line_items=line_items,
+            subtotal=subtotal,
+            cgst=round(total_tax / 2, 2),
+            sgst=round(total_tax / 2, 2),
             igst=0,
-            invoice_type='Invoice',  # Required by PDF generator
-            blockchain_hash=None  # Required by PDF generator
+            invoice_type='Invoice',
+            blockchain_hash=None
         )
-        
+
         invoice.client = SimpleNamespace(
             name=client_data.get('name', 'N/A'),
             email=client_data.get('email', ''),
             phone=client_data.get('phone', ''),
-            address='',
-            city='',
+            address=client_data.get('address', ''),
+            city=client_data.get('city', ''),
             state='',
             pincode='',
             gstin='',
             pan='',
-            contact_person=''  # Required by PDF generator
+            contact_person=''
         )
-        
-        # Send the email
+
         send_invoice_email(invoice, recipient_email)
-        
         logging.info(f"Invoice {invoice_data.get('invoice_number')} sent to {recipient_email}")
-        
-        return jsonify({
-            "success": True, 
-            "message": f"✅ Invoice sent successfully to {recipient_email}!"
-        })
-        
+
+        return jsonify({"success": True, "message": f"✅ Invoice sent successfully to {recipient_email}!"})
+
     except Exception as e:
         logging.error(f"Failed to send invoice: {e}", exc_info=True)
-        return jsonify({
-            "success": False, 
-            "message": f"❌ Failed to send invoice: {str(e)}"
-        }), 500
+        return jsonify({"success": False, "message": f"❌ Failed to send invoice: {str(e)}"}), 500
 
 
 
@@ -2019,75 +2039,64 @@ def update_settings():
 def create_challan():
     if request.method == 'POST':
         try:
-            # Generate Challan Number
-            last_challan = DeliveryChallan.query.order_by(DeliveryChallan.id.desc()).first()
-            if last_challan and last_challan.challan_number.startswith('DC-'):
-                try:
-                    last_seq = int(last_challan.challan_number.split('-')[-1])
-                    new_seq = last_seq + 1
-                except:
-                    new_seq = 1
-            else:
-                new_seq = 1
-            
-            challan_number = f"DC-{datetime.now().year}-{new_seq:04d}"
-            
             client_id = request.form.get('client_id')
             challan_date_str = request.form.get('challan_date')
             delivery_date_str = request.form.get('delivery_date')
             vehicle_number = request.form.get('vehicle_number')
             transport_mode = request.form.get('transport_mode')
-            notes = request.form.get('notes')
-            
+            notes = request.form.get('notes', '')
             line_items_json = request.form.get('line_items')
-            
-            challan = DeliveryChallan(
-                challan_number=challan_number,
-                client_id=client_id,
-                challan_date=datetime.strptime(challan_date_str, '%Y-%m-%d').date() if challan_date_str else datetime.utcnow().date(),
-                delivery_date=datetime.strptime(delivery_date_str, '%Y-%m-%d').date() if delivery_date_str else None,
-                notes=notes,
-                status='Open'
-            )
-            
-            # Additional logic for vehicle/transport if needed, or store in notes/JSON
-            # For now appending to notes if not fields in model (Model only sees notes)
-            # Checked model: only notes. So let's prepend transport info to notes.
-            meta_notes = []
-            if transport_mode: meta_notes.append(f"Mode: {transport_mode}")
-            if vehicle_number: meta_notes.append(f"Vehicle: {vehicle_number}")
-            if meta_notes:
-                challan.notes = (challan.notes or "") + "\n" + " | ".join(meta_notes)
 
-            db.session.add(challan)
-            db.session.flush() # Get ID
-            
+            # Build notes with transport meta
+            meta_notes = []
+            if transport_mode:
+                meta_notes.append(f"Mode: {transport_mode}")
+            if vehicle_number:
+                meta_notes.append(f"Vehicle: {vehicle_number}")
+            if meta_notes:
+                notes = (notes or '') + ('\n' if notes else '') + ' | '.join(meta_notes)
+
+            line_items = []
             if line_items_json:
                 items = json.loads(line_items_json)
-                for item in items:
-                    line_item = ChallanLineItem(
-                        challan_id=challan.id,
-                        sr_no=item.get('sr_no'),
-                        hsn_code=item.get('hsn_code'),
-                        description=item.get('description'),
-                        quantity=item.get('quantity'),
-                        unit=item.get('unit'),
-                        unit_price=item.get('unit_price', 0),
-                        total_amount=float(item.get('quantity', 0)) * float(item.get('unit_price', 0))
-                    )
-                    db.session.add(line_item)
-            
-            db.session.commit()
-            flash(f'Delivery Challan {challan_number} created successfully!', 'success')
+                for idx, item in enumerate(items, start=1):
+                    line_items.append({
+                        'sr_no': item.get('sr_no', idx),
+                        'hsn_code': item.get('hsn_code', ''),
+                        'description': item.get('description', ''),
+                        'quantity': float(item.get('quantity', 0)),
+                        'unit': item.get('unit', 'Nos'),
+                        'unit_price': float(item.get('unit_price', 0)),
+                        'total_amount': float(item.get('quantity', 0)) * float(item.get('unit_price', 0))
+                    })
+
+            payload = {
+                'client_id': client_id,
+                'challan_date': challan_date_str,
+                'delivery_date': delivery_date_str,
+                'notes': notes,
+                'status': 'Open',
+                'line_items': line_items
+            }
+
+            response = cloud_request('POST', '/challans', json=payload)
+
+            if response and response.status_code in (200, 201):
+                resp_json = response.json()
+                challan_number = resp_json.get('challan_number', 'DC')
+                flash(f'Delivery Challan {challan_number} created successfully!', 'success')
+            else:
+                error = response.text if response else 'No response from server'
+                flash(f'Error creating challan: {error}', 'error')
+
             return redirect(url_for('delivery_challan'))
-            
+
         except Exception as e:
-            db.session.rollback()
             logging.error(f"Error creating challan: {e}")
             flash(f"Error creating challan: {e}", 'error')
-    
+
     client_list = fetch_cloud_clients()
-    clients = [SimpleNamespace(**c) for c in client_list]  # Show all clients
+    clients = [SimpleNamespace(**c) for c in client_list]
     return render_template("create_challan.html", clients=clients, today=datetime.now())
 
 @app.route('/challan/preview', methods=['POST'])
@@ -2283,38 +2292,73 @@ def delivery_challan():
     )
 
 
-@app.route('/challan/<int:id>/update_status', methods=['POST'])
+@app.route("/challan/<int:id>/delete", methods=['POST'])
+@login_required
+def delete_challan(id):
+    """Delete delivery challan from cloud database"""
+    try:
+        response = cloud_request("DELETE", f"/challans/{id}")
+        if response and response.status_code in (200, 204):
+            flash('Delivery Challan deleted successfully.', 'success')
+        else:
+            flash(f'Failed to delete challan: {response.text if response else "No response"}', 'error')
+    except Exception as e:
+        logging.error(f"Cloud API delete challan error: {e}")
+        flash(f'API connection error: {str(e)}', 'error')
+    return redirect(url_for('delivery_challan'))
+
+
+@app.route("/challan/<int:id>/status", methods=['POST'])
 @login_required
 def update_challan_status(id):
     try:
         new_status = request.form.get('status')
         note = request.form.get('note')
-        
+
         if new_status:
-            # Build update payload
+
+            # Build payload
             update_data = {'status': new_status}
-            
-            # Add note to existing notes if provided
+
+            # Add note if provided
             if note:
                 challan_data = fetch_cloud_challan_by_id(id)
                 existing_notes = challan_data.get('notes', '') if challan_data else ''
-                update_data['notes'] = (existing_notes or "") + f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Status updated to {new_status}: {note}"
-            
+
+                update_data['notes'] = (
+                    (existing_notes or "") +
+                    f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M')}] "
+                    f"Status updated to {new_status}: {note}"
+                )
+
+            # ⭐ CLOUD CALL WITH TOKEN (IMPORTANT)
+            print("CLOUD URL:", f"{CLOUD_API_BASE}/challans/{id}")
+
             response = requests.put(
                 f"{CLOUD_API_BASE}/challans/{id}",
                 json=update_data,
+                headers={
+                    "Authorization": f"Bearer {session.get('token')}",
+                    "Content-Type": "application/json"
+                },
                 timeout=5
             )
+
+            print("STATUS:", response.status_code)
+            print("RESPONSE:", response.text)
+
             if response.status_code in (200, 204):
                 flash(f'Challan status updated to {new_status}', 'success')
             else:
                 flash(f'Failed to update status: {response.text}', 'error')
-        
+
         return redirect(url_for('delivery_challan'))
+
     except Exception as e:
         logging.error(f"Cloud API update error: {e}")
         flash(f'Error updating status: {str(e)}', 'error')
         return redirect(url_for('delivery_challan'))
+
 @app.route('/crm')
 @login_required
 def crm():
@@ -3188,33 +3232,47 @@ def safe_float(value):
 @login_required
 def create_quotation():
     try:
-        # Start with minimal required fields to test
         payload = {
             "quotation_number": request.form.get("quotation_number"),
             "quotation_date": request.form.get("quotation_date"),
             "status": request.form.get("status", "Draft"),
-            "grand_total": float(request.form.get("grand_total", 0) or 0)
+            "grand_total": float(request.form.get("grand_total", 0) or 0),
+            "subtotal": float(request.form.get("subtotal", 0) or 0),
+            "discount": float(request.form.get("discount", 0) or 0),
+            "taxable_value": float(request.form.get("taxable_value", 0) or 0),
+            "cgst": float(request.form.get("cgst", 0) or 0),
+            "sgst": float(request.form.get("sgst", 0) or 0),
+            "igst": float(request.form.get("igst", 0) or 0),
+            "shipping": float(request.form.get("shipping", 0) or 0),
+            "rounding": float(request.form.get("rounding", 0) or 0),
+            "sales_person": request.form.get("sales_person"),
+            "reference_id": request.form.get("reference_id"),
+            "terms": request.form.get("terms"),
+            "delivery_timeline": request.form.get("delivery_timeline"),
+            "project_scope": request.form.get("project_scope"),
+            "milestones": request.form.get("milestones"),
+            "warranty": request.form.get("warranty"),
+            "revision_policy": request.form.get("revision_policy"),
+            "dependencies": request.form.get("dependencies"),
         }
-        
-        # Add optional fields only if they have values
+
         validity_days = request.form.get("validity_days")
         if validity_days:
             payload["validity_days"] = int(validity_days)
-            
-        sales_person = request.form.get("sales_person")
-        if sales_person:
-            payload["sales_person"] = sales_person
-            
-        reference_id = request.form.get("reference_id")
-        if reference_id:
-            payload["reference_id"] = reference_id
-            
-        terms = request.form.get("terms")
-        if terms:
-            payload["terms"] = terms
 
-        # Log the payload for debugging
-        logging.debug(f"Quotation payload: {json.dumps(payload, indent=2)}")
+        expiry_date = request.form.get("expiry_date")
+        if expiry_date:
+            payload["expiry_date"] = expiry_date
+
+        # Include line items if sent as JSON
+        line_items_json = request.form.get("line_items")
+        if line_items_json:
+            try:
+                payload["line_items"] = json.loads(line_items_json)
+            except Exception:
+                pass
+
+        logging.debug(f"Quotation payload: {json.dumps(payload, indent=2, default=str)}")
 
         response = cloud_request(
             "POST",
@@ -3241,59 +3299,15 @@ def create_quotation():
 @login_required
 def delete_quotation(qid):
     try:
-        response = requests.delete(
-            f"{CLOUD_API_BASE}/quotations/{qid}",
-            headers={"Authorization": f"Bearer {session.get('token')}"},
-            timeout=5
-        )
-
-        if response.status_code == 200:
+        response = cloud_request("DELETE", f"/quotations/{qid}")
+        if response and response.status_code in (200, 204):
             flash("Quotation deleted successfully!", "success")
         else:
-            flash(f"Failed: {response.text}", "error")
-
-
+            flash(f"Failed to delete quotation: {response.text if response else 'No response'}", "error")
     except Exception as e:
         flash(f"Cloud API error: {str(e)}", "error")
-
     return redirect(url_for("quotation_list"))
 
-
-# @app.route("/quotations/<int:qid>/edit", methods=["POST"])
-# @login_required
-# def edit_quotation(qid):
-#     try:
-#         payload = {
-#             "quotation_date": request.form.get("quotation_date"),
-#             "status": request.form.get("status"),
-#             "grand_total": request.form.get("grand_total")
-#         }
-
-#         print("CLOUD URL:", f"{CLOUD_API_BASE}/quotations/{qid}")
-#         print("TOKEN:", session.get("token"))
-#         print("PAYLOAD:", payload)
-
-#         response = requests.put(
-#             f"{CLOUD_API_BASE}/quotations/{qid}",
-#             json=payload,
-#             headers={"Authorization": f"Bearer {session.get('token')}"},
-#             timeout=5
-#         )
-
-#         print("STATUS:", response.status_code)
-#         print("RESPONSE:", response.text)
-
-
-#         if response.status_code == 200:
-#             flash("Quotation updated successfully!", "success")
-#         else:
-#             flash(f"Failed: {response.text}", "error")
-
-
-#     except Exception as e:
-#         flash(f"Cloud API error: {str(e)}", "error")
-
-#     return redirect(url_for("quotation_list"))
 
 # -------------------------
 # Preview
@@ -3332,7 +3346,21 @@ def quotation_preview(qid):
                 warranty=q_data.get("warranty", ""),
                 revision_policy=q_data.get("revision_policy", ""),
                 dependencies=q_data.get("dependencies", ""),
-                terms=q_data.get("terms", "")
+                terms=q_data.get("terms", ""),
+                line_items=[
+                    SimpleNamespace(
+                        sr_no=item.get("sr_no", i+1),
+                        hsn_code=item.get("hsn_code", ""),
+                        description=item.get("description", ""),
+                        quantity=item.get("quantity", 0),
+                        unit=item.get("unit", "Nos"),
+                        unit_price=item.get("unit_price", 0),
+                        tax_percentage=item.get("tax_percentage", 0),
+                        tax_amount=item.get("tax_amount", 0),
+                        total_amount=item.get("total_amount", 0)
+                    )
+                    for i, item in enumerate(q_data.get("line_items", []))
+                ]
             )
             return render_template("quotation_preview.html", q=q)
         except Exception as e:
@@ -3690,34 +3718,42 @@ def edit_quotation(qid):
     if request.method == "POST":
         try:
             payload = {
-                
                 "quotation_date": request.form.get("quotation_date"),
                 "status": request.form.get("status"),
-                "grand_total": float(request.form.get("grand_total", 0) or 0),
-                "validity_days": int(request.form.get("validity_days", 15)),
+                "validity_days": int(request.form.get("validity_days", 15) or 15),
                 "sales_person": request.form.get("sales_person"),
                 "reference_id": request.form.get("reference_id"),
-                "terms": request.form.get("terms")
+                "terms": request.form.get("terms"),
+                "delivery_timeline": request.form.get("delivery_timeline"),
+                "project_scope": request.form.get("project_scope"),
+                "milestones": request.form.get("milestones"),
+                "warranty": request.form.get("warranty"),
+                "revision_policy": request.form.get("revision_policy"),
+                "dependencies": request.form.get("dependencies"),
+                "subtotal": float(request.form.get("subtotal", 0) or 0),
+                "discount": float(request.form.get("discount", 0) or 0),
+                "taxable_value": float(request.form.get("taxable_value", 0) or 0),
+                "cgst": float(request.form.get("cgst", 0) or 0),
+                "sgst": float(request.form.get("sgst", 0) or 0),
+                "igst": float(request.form.get("igst", 0) or 0),
+                "shipping": float(request.form.get("shipping", 0) or 0),
+                "rounding": float(request.form.get("rounding", 0) or 0),
+                "grand_total": float(request.form.get("grand_total", 0) or 0),
             }
-            
+
             response = cloud_request(
                 "PUT",
                 f"/quotations/{qid}",
                 json=payload
             )
-            
+
             if response is None:
                 flash("API connection error", "error")
             elif response.status_code == 200:
                 flash("Quotation updated successfully!", "success")
                 return redirect(url_for("quotation_list"))
             else:
-                # Try fallback with query param
-                response = cloud_request("PUT", f"/quotations?id={qid}", json=payload)
-                if response and response.status_code == 200:
-                    flash("Quotation updated successfully!", "success")
-                    return redirect(url_for("quotation_list"))
-                flash(f"Failed to update quotation: {response.status_code}", "error")
+                flash(f"Failed to update quotation: {response.status_code} - {response.text}", "error")
         except Exception as e:
             flash(f"Error updating quotation: {str(e)}", "error")
             
@@ -3732,9 +3768,25 @@ def edit_quotation(qid):
         quotation_number=q_data["quotation_number"],
         quotation_date=datetime.strptime(q_data["quotation_date"], "%Y-%m-%d") if q_data.get("quotation_date") else None,
         validity_days=q_data.get("validity_days", 15),
+        expiry_date=datetime.strptime(q_data["expiry_date"], "%Y-%m-%d") if q_data.get("expiry_date") else None,
         status=q_data.get("status"),
         sales_person=q_data.get("sales_person", ""),
         reference_id=q_data.get("reference_id", ""),
+        subtotal=q_data.get("subtotal", 0),
+        discount=q_data.get("discount", 0),
+        taxable_value=q_data.get("taxable_value", 0),
+        cgst=q_data.get("cgst", 0),
+        sgst=q_data.get("sgst", 0),
+        igst=q_data.get("igst", 0),
+        shipping=q_data.get("shipping", 0),
+        rounding=q_data.get("rounding", 0),
+        grand_total=q_data.get("grand_total", 0),
+        delivery_timeline=q_data.get("delivery_timeline", ""),
+        project_scope=q_data.get("project_scope", ""),
+        milestones=q_data.get("milestones", ""),
+        warranty=q_data.get("warranty", ""),
+        revision_policy=q_data.get("revision_policy", ""),
+        dependencies=q_data.get("dependencies", ""),
         terms=q_data.get("terms", "")
     )
     
@@ -4246,23 +4298,7 @@ def convert_multiple_challans_to_invoice():
         flash(f'Error generating consolidated challan: {str(e)}', 'error')
         return redirect(url_for('delivery_challan'))
 
-@app.route('/delete_challan/<int:id>', methods=['POST'])
-@login_required
-def delete_challan(id):
-    try:
-        response = requests.delete(
-            f"{CLOUD_API_BASE}/challans/{id}",
-            timeout=5
-        )
-        if response.status_code in (200, 204):
-            flash('Delivery Challan deleted successfully.', 'success')
-        else:
-            flash(f'Failed to delete challan: {response.text}', 'error')
-    except Exception as e:
-        logging.error(f"Cloud API delete error: {e}")
-        flash(f'Error deleting challan: {str(e)}', 'error')
-    
-    return redirect(url_for('delivery_challan'))
+
 
 @app.route('/challan/<int:id>/pdf')
 @login_required

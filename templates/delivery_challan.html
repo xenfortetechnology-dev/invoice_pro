@@ -350,15 +350,18 @@
             new bootstrap.Modal(document.getElementById('convertModal')).show();
         }
 
-        function updateStatus(challanId, currentStatus) {
-            var form = document.getElementById('updateStatusForm');
-            form.action = '/challan/' + challanId + '/update_status';
+       function updateStatus(challanId, currentStatus) {
+    var form = document.getElementById('updateStatusForm');
 
-            var select = document.getElementById('newStatusSelect');
-            select.value = currentStatus;
+    // ✅ FIXED URL
+    form.action = '/challan/' + challanId + '/status';
 
-            new bootstrap.Modal(document.getElementById('updateStatusModal')).show();
-        }
+    var select = document.getElementById('newStatusSelect');
+    select.value = currentStatus;
+
+    new bootstrap.Modal(document.getElementById('updateStatusModal')).show();
+}
+
 
         function confirmConvert() {
             if (selectedChallanId) {

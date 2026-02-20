@@ -35,11 +35,11 @@
                 </div>
             </div>
         </div>
-    </div><br>
+    </div>
 
 
     <!-- Advanced Filters -->
-    <div class="row mb-4">
+    <div class="row mb-2">
         <div class="col-12">
             <div class="glass-card p-4">
 
@@ -112,268 +112,269 @@
             </div>
         </div>
     </div>
-    </form>
-</div>
-</div>
-</div>
-<br>
-<!-- Invoice List -->
-<div class="row">
-    <div class="col-12">
-        <div class="glass-card p-4">
-            {% if invoices.items %}
-            <!-- Bulk Actions -->
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div class="d-flex align-items-center">
-                    <input type="checkbox" class="form-check-input me-2" id="selectAll">
-                    <label for="selectAll" class="form-check-label">Select All</label>
-                    <div class="bulk-actions ms-3" style="display: none;">
-                        <button class="btn btn-outline-danger btn-sm me-2" onclick="bulkDelete()">
-                            <i data-feather="trash-2" size="14"></i> Delete Selected
-                        </button>
 
-                        <button class="btn btn-outline-primary btn-sm" onclick="bulkExport()">
-                            <i data-feather="download" size="14"></i> Export Selected
-                        </button>
+    <!-- Invoice List -->
+    <div class="row">
+        <div class="col-12">
+            <div class="glass-card p-4">
+                {% if invoices.items %}
+                <!-- Bulk Actions -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="d-flex align-items-center">
+                        <input type="checkbox" class="form-check-input me-2" id="selectAll">
+                        <label for="selectAll" class="form-check-label">Select All</label>
+                        <div class="bulk-actions ms-3" style="display: none;">
+                            <button class="btn btn-outline-danger btn-sm me-2" onclick="bulkDelete()">
+                                <i data-feather="trash-2" size="14"></i> Delete Selected
+                            </button>
+
+                            <button class="btn btn-outline-primary btn-sm" onclick="bulkExport()">
+                                <i data-feather="download" size="14"></i> Export Selected
+                            </button>
+                        </div>
+
                     </div>
-
+                    <div class="text-muted small">
+                        Showing {{ invoices.items|length }} of {{ invoices.total }} invoices
+                    </div>
                 </div>
-                <div class="text-muted small">
-                    Showing {{ invoices.items|length }} of {{ invoices.total }} invoices
-                </div>
-            </div>
 
-            <!-- Invoice Table -->
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead class="table-light">
-                        <tr>
-                            <th width="40">
+                <!-- Invoice Table -->
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="40">
 
-                            </th>
-                            <th>Invoice #</th>
-                            <th>Client</th>
-                            <th>Date</th>
-                            <th>Due Date</th>
-                            <th>Amount</th>
-                            <th>Status</th>
-                            <th>AI Insights</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for invoice in invoices.items %}
-                        <tr class="invoice-row" data-invoice-id="{{ invoice.id }}">
-                            <td>
-                                <input type="checkbox" class="form-check-input invoice-checkbox"
-                                    value="{{ invoice.id }}">
-                            </td>
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <a href="{{ url_for('invoice_detail', id=invoice.id) }}"
-                                        class="text-decoration-none fw-bold">
-                                        {{ invoice.invoice_number }}
-                                    </a>
-                                    <div class="ms-2">
-                                        {% if invoice.ai_generated %}
-                                        <span class="badge bg-success bg-opacity-10 text-success" title="AI Generated">
-                                            <i data-feather="cpu" size="12"></i>
-                                        </span>
-                                        {% endif %}
-                                        {% if invoice.voice_command_created %}
-                                        <span class="badge bg-info bg-opacity-10 text-info" title="Created via Voice">
-                                            <i data-feather="mic" size="12"></i>
-                                        </span>
-                                        {% endif %}
-                                        {% if invoice.blockchain_hash %}
-                                        <span class="badge bg-dark bg-opacity-10 text-dark" title="Blockchain Verified">
-                                            <i data-feather="shield" size="12"></i>
-                                        </span>
-                                        {% endif %}
+                                </th>
+                                <th>Invoice #</th>
+                                <th>Client</th>
+                                <th>Date</th>
+                                <th>Due Date</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>AI Insights</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for invoice in invoices.items %}
+                            <tr class="invoice-row" data-invoice-id="{{ invoice.id }}">
+                                <td>
+                                    <input type="checkbox" class="form-check-input invoice-checkbox"
+                                        value="{{ invoice.id }}">
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <a href="{{ url_for('invoice_detail', id=invoice.id) }}"
+                                            class="text-decoration-none fw-bold">
+                                            {{ invoice.invoice_number }}
+                                        </a>
+                                        <div class="ms-2">
+                                            {% if invoice.ai_generated %}
+                                            <span class="badge bg-success bg-opacity-10 text-success"
+                                                title="AI Generated">
+                                                <i data-feather="cpu" size="12"></i>
+                                            </span>
+                                            {% endif %}
+                                            {% if invoice.voice_command_created %}
+                                            <span class="badge bg-info bg-opacity-10 text-info"
+                                                title="Created via Voice">
+                                                <i data-feather="mic" size="12"></i>
+                                            </span>
+                                            {% endif %}
+                                            {% if invoice.blockchain_hash %}
+                                            <span class="badge bg-dark bg-opacity-10 text-dark"
+                                                title="Blockchain Verified">
+                                                <i data-feather="shield" size="12"></i>
+                                            </span>
+                                            {% endif %}
+                                        </div>
                                     </div>
-                                </div>
-                            </td>
-                            <td>
-                                <div>
-                                    <div class="fw-medium">{{ invoice.client.name }}</div>
-                                    <small class="text-muted">{{ invoice.client.email or invoice.client.phone }}</small>
-                                </div>
-                            </td>
-                            <td>{{ invoice.invoice_date.strftime('%d %b %Y') }}</td>
-                            <td>
-                                {% if invoice.due_date %}
-                                <span
-                                    class="{% if invoice.due_date < today.date() and invoice.payment_status != 'Paid' %}text-danger{% endif %}">
-                                    {{ invoice.due_date.strftime('%d %b %Y') }}
-                                </span>
-                                {% if invoice.due_date < today.date() and invoice.payment_status !='Paid' %} <br><small
-                                        class="text-danger">Overdue</small>
+                                </td>
+                                <td>
+                                    <div>
+                                        <div class="fw-medium">{{ invoice.client.name }}</div>
+                                        <small class="text-muted">{{ invoice.client.email or invoice.client.phone
+                                            }}</small>
+                                    </div>
+                                </td>
+                                <td>{{ invoice.invoice_date.strftime('%d %b %Y') }}</td>
+                                <td>
+                                    {% if invoice.due_date %}
+                                    <span
+                                        class="{% if invoice.due_date < today.date() and invoice.payment_status != 'Paid' %}text-danger{% endif %}">
+                                        {{ invoice.due_date.strftime('%d %b %Y') }}
+                                    </span>
+                                    {% if invoice.due_date < today.date() and invoice.payment_status !='Paid' %} <br>
+                                        <small class="text-danger">Overdue</small>
+                                        {% endif %}
+                                        {% else %}
+                                        <span class="text-muted">Not set</span>
+                                        {% endif %}
+                                </td>
+                                <td>
+                                    <div class="fw-bold">₹{{ "%.2f"|format(invoice.total_amount) }}</div>
+                                    {% if invoice.amount_paid > 0 and invoice.payment_status != 'Paid' %}
+                                    <small class="text-success">Paid: ₹{{ "%.2f"|format(invoice.amount_paid) }}</small>
                                     {% endif %}
-                                    {% else %}
-                                    <span class="text-muted">Not set</span>
-                                    {% endif %}
-                            </td>
-                            <td>
-                                <div class="fw-bold">₹{{ "%.2f"|format(invoice.total_amount) }}</div>
-                                {% if invoice.amount_paid > 0 and invoice.payment_status != 'Paid' %}
-                                <small class="text-success">Paid: ₹{{ "%.2f"|format(invoice.amount_paid) }}</small>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <span class="badge 
+                                </td>
+                                <td>
+                                    <span class="badge 
                                         {% if invoice.payment_status == 'Paid' %}bg-success
                                         {% elif invoice.payment_status == 'Unpaid' %}bg-danger
                                         {% else %}bg-warning text-dark{% endif %}">
-                                    {{ invoice.payment_status }}
-                                </span>
-                            </td>
-                            <td>
-                                {% if ai_enabled and ai_insights and invoice.id in ai_insights %}
-                                <div class="ai-insight-cell">
-                                    <!-- Payment Risk Badge -->
-                                    <span
-                                        class="badge bg-{{ 'danger' if ai_insights[invoice.id].payment_risk == 'High' else 'warning' if ai_insights[invoice.id].payment_risk == 'Medium' else 'success' }} bg-opacity-10 
+                                        {{ invoice.payment_status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if ai_enabled and ai_insights and invoice.id in ai_insights %}
+                                    <div class="ai-insight-cell">
+                                        <!-- Payment Risk Badge -->
+                                        <span
+                                            class="badge bg-{{ 'danger' if ai_insights[invoice.id].payment_risk == 'High' else 'warning' if ai_insights[invoice.id].payment_risk == 'Medium' else 'success' }} bg-opacity-10 
                                                      text-{{ 'danger' if ai_insights[invoice.id].payment_risk == 'High' else 'warning' if ai_insights[invoice.id].payment_risk == 'Medium' else 'success' }}">
-                                        {{ ai_insights[invoice.id].payment_risk }} Risk
-                                    </span>
+                                            {{ ai_insights[invoice.id].payment_risk }} Risk
+                                        </span>
 
-                                    <!-- High Value Badge -->
-                                    {% if ai_insights[invoice.id].high_value %}
-                                    <span class="badge bg-primary bg-opacity-10 text-primary mt-1">
-                                        High Value
-                                    </span>
+                                        <!-- High Value Badge -->
+                                        {% if ai_insights[invoice.id].high_value %}
+                                        <span class="badge bg-primary bg-opacity-10 text-primary mt-1">
+                                            High Value
+                                        </span>
+                                        {% endif %}
+
+                                        {% if ai_insights[invoice.id].predicted_payment_date %}
+                                        <br><small class="text-muted">
+                                            Predicted: {{ ai_insights[invoice.id].predicted_payment_date }}
+                                        </small>
+                                        {% endif %}
+                                    </div>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
                                     {% endif %}
-
-                                    {% if ai_insights[invoice.id].predicted_payment_date %}
-                                    <br><small class="text-muted">
-                                        Predicted: {{ ai_insights[invoice.id].predicted_payment_date }}
-                                    </small>
-                                    {% endif %}
-                                </div>
-                                {% else %}
-                                <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
+                                </td>
 
 
-                            <td>
-                                <div class="d-flex flex-wrap gap-1 align-items-center">
-                                    <!-- View Details -->
-                                    <a href="{{ url_for('invoice_detail', id=invoice.id) }}"
-                                        class="btn btn-outline-primary btn-sm" title="View Details">
-                                        <i data-feather="eye" size="14"></i>
-                                    </a>
+                                <td>
+                                    <div class="d-flex flex-wrap gap-1 align-items-center">
+                                        <!-- View Details -->
+                                        <a href="{{ url_for('invoice_detail', id=invoice.id) }}"
+                                            class="btn btn-outline-primary btn-sm" title="View Details">
+                                            <i data-feather="eye" size="14"></i>
+                                        </a>
 
-                                    <!-- Download PDF -->
-                                    <a href="#" onclick="downloadInvoice('{{ invoice.id }}'); return false;"
-                                        class="btn btn-outline-secondary btn-sm" title="Download PDF">
-                                        <i data-feather="download" size="14"></i>
-                                    </a>
+                                        <!-- Download PDF -->
+                                        <a href="#" onclick="downloadInvoice('{{ invoice.id }}'); return false;"
+                                            class="btn btn-outline-secondary btn-sm" title="Download PDF">
+                                            <i data-feather="download" size="14"></i>
+                                        </a>
 
-                                    <!-- Blockchain Verify -->
+                                        <!-- Blockchain Verify -->
 
 
-                                    <!-- Edit -->
-                                    <button class="btn btn-outline-warning btn-sm"
-                                        onclick="editInvoice('{{ invoice.id }}')" title="Edit">
-                                        <i data-feather="edit" size="14"></i>
-                                    </button>
+                                        <!-- Edit -->
+                                        <button class="btn btn-outline-warning btn-sm"
+                                            onclick="editInvoice('{{ invoice.id }}')" title="Edit">
+                                            <i data-feather="edit" size="14"></i>
+                                        </button>
 
-                                    <!-- Duplicate -->
-                                    <button class="btn btn-outline-success btn-sm"
-                                        onclick="duplicateInvoice('{{ invoice.id }}')" title="Duplicate">
-                                        <i data-feather="copy" size="14"></i>
-                                    </button>
+                                        <!-- Duplicate -->
+                                        <button class="btn btn-outline-success btn-sm"
+                                            onclick="duplicateInvoice('{{ invoice.id }}')" title="Duplicate">
+                                            <i data-feather="copy" size="14"></i>
+                                        </button>
 
-                                    <!-- Send -->
-                                    <button class="btn btn-outline-primary btn-sm"
-                                        onclick="sendInvoice('{{ invoice.id }}')" title="Send">
-                                        <i data-feather="send" size="14"></i>
-                                    </button>
+                                        <!-- Send -->
+                                        <button class="btn btn-outline-primary btn-sm"
+                                            onclick="sendInvoice('{{ invoice.id }}')" title="Send">
+                                            <i data-feather="send" size="14"></i>
+                                        </button>
 
-                                    <!-- Delete -->
-                                    <button class="btn btn-outline-danger btn-sm"
-                                        onclick="deleteInvoice('{{ invoice.id }}')" title="Delete">
-                                        <i data-feather="trash-2" size="14"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Pagination -->
-            {% if invoices.pages > 1 %}
-            <nav aria-label="Invoice pagination" class="mt-4">
-                <ul class="pagination justify-content-center">
-                    <li class="page-item {% if not invoices.has_prev %}disabled{% endif %}">
-                        <a class="page-link glass-btn"
-                            href="{{ url_for('invoice_management', page=invoices.prev_num, search=search, status=status_filter, client_id=client_filter, date_from=date_from, date_to=date_to) }}">
-                            <i data-feather="chevron-left" size="16"></i>
-                        </a>
-                    </li>
-
-                    {% for page_num in invoices.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2)
-                    %}
-                    {% if page_num %}
-                    {% if page_num != invoices.page %}
-                    <li class="page-item">
-                        <a class="page-link glass-btn"
-                            href="{{ url_for('invoice_management', page=page_num, search=search, status=status_filter, client_id=client_filter, date_from=date_from, date_to=date_to) }}">
-                            {{ page_num }}
-                        </a>
-                    </li>
-                    {% else %}
-                    <li class="page-item active">
-                        <span class="page-link bg-primary border-primary">{{ page_num }}</span>
-                    </li>
-                    {% endif %}
-                    {% else %}
-                    <li class="page-item disabled">
-                        <span class="page-link">...</span>
-                    </li>
-                    {% endif %}
-                    {% endfor %}
-
-                    <li class="page-item {% if not invoices.has_next %}disabled{% endif %}">
-                        <a class="page-link glass-btn"
-                            href="{{ url_for('invoice_management', page=invoices.next_num, search=search, status=status_filter, client_id=client_filter, date_from=date_from, date_to=date_to) }}">
-                            <i data-feather="chevron-right" size="16"></i>
-                        </a>
-                    </li>
-                </ul>
-            </nav>
-            {% endif %}
-
-            {% else %}
-            <!-- Empty State -->
-            <div class="text-center py-5">
-                <i data-feather="file-text" size="64" class="text-muted mb-3"></i>
-                <h4 class="text-muted">No invoices found</h4>
-                <p class="text-muted mb-4">
-                    {% if search or status_filter or client_filter or date_from or date_to %}
-                    Try adjusting your filters or create a new invoice.
-                    {% else %}
-                    Start by creating your first invoice.
-                    {% endif %}
-                </p>
-                <div class="d-flex gap-2 justify-content-center">
-                    <a href="{{ url_for('create_invoice') }}" class="btn btn-primary glass-btn-primary">
-                        <i data-feather="plus" class="me-1"></i> Create Invoice
-                    </a>
-                    {% if search or status_filter or client_filter or date_from or date_to %}
-                    <a href="{{ url_for('invoice_management') }}" class="btn btn-outline-secondary glass-btn">
-                        <i data-feather="x" class="me-1"></i> Clear Filters
-                    </a>
-                    {% endif %}
+                                        <!-- Delete -->
+                                        <button class="btn btn-outline-danger btn-sm"
+                                            onclick="deleteInvoice('{{ invoice.id }}')" title="Delete">
+                                            <i data-feather="trash-2" size="14"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
+
+                <!-- Pagination -->
+                {% if invoices.pages > 1 %}
+                <nav aria-label="Invoice pagination" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        <li class="page-item {% if not invoices.has_prev %}disabled{% endif %}">
+                            <a class="page-link glass-btn"
+                                href="{{ url_for('invoice_management', page=invoices.prev_num, search=search, status=status_filter, client_id=client_filter, date_from=date_from, date_to=date_to) }}">
+                                <i data-feather="chevron-left" size="16"></i>
+                            </a>
+                        </li>
+
+                        {% for page_num in invoices.iter_pages(left_edge=1, right_edge=1, left_current=1,
+                        right_current=2)
+                        %}
+                        {% if page_num %}
+                        {% if page_num != invoices.page %}
+                        <li class="page-item">
+                            <a class="page-link glass-btn"
+                                href="{{ url_for('invoice_management', page=page_num, search=search, status=status_filter, client_id=client_filter, date_from=date_from, date_to=date_to) }}">
+                                {{ page_num }}
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="page-item active">
+                            <span class="page-link bg-primary border-primary">{{ page_num }}</span>
+                        </li>
+                        {% endif %}
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                        {% endif %}
+                        {% endfor %}
+
+                        <li class="page-item {% if not invoices.has_next %}disabled{% endif %}">
+                            <a class="page-link glass-btn"
+                                href="{{ url_for('invoice_management', page=invoices.next_num, search=search, status=status_filter, client_id=client_filter, date_from=date_from, date_to=date_to) }}">
+                                <i data-feather="chevron-right" size="16"></i>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+                {% endif %}
+
+                {% else %}
+                <!-- Empty State -->
+                <div class="text-center py-5">
+                    <i data-feather="file-text" size="64" class="text-muted mb-3"></i>
+                    <h4 class="text-muted">No invoices found</h4>
+                    <p class="text-muted mb-4">
+                        {% if search or status_filter or client_filter or date_from or date_to %}
+                        Try adjusting your filters or create a new invoice.
+                        {% else %}
+                        Start by creating your first invoice.
+                        {% endif %}
+                    </p>
+                    <div class="d-flex gap-2 justify-content-center">
+                        <a href="{{ url_for('create_invoice') }}" class="btn btn-primary glass-btn-primary">
+                            <i data-feather="plus" class="me-1"></i> Create Invoice
+                        </a>
+                        {% if search or status_filter or client_filter or date_from or date_to %}
+                        <a href="{{ url_for('invoice_management') }}" class="btn btn-outline-secondary glass-btn">
+                            <i data-feather="x" class="me-1"></i> Clear Filters
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
             </div>
-            {% endif %}
         </div>
     </div>
-</div>
 </div>
 {% endblock %}
 {% block scripts %}

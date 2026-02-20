@@ -217,9 +217,9 @@ Subject to local jurisdiction only.</textarea>
                             <span id="cgstAmount">₹0.00</span>
                         </div>
 
-                        <div class="d-flex justify-content-between mb-2" >
+                        <div class="d-flex justify-content-between mb-2">
                             <span>SGST:</span>
-                            <span id="sgstAmount" >₹0.00</span>
+                            <span id="sgstAmount">₹0.00</span>
                         </div>
 
                         <div class="d-flex justify-content-between mb-2">
@@ -711,6 +711,13 @@ Subject to local jurisdiction only.</textarea>
                 const sgstPercent = parseFloat(row.querySelector('[name="sgst_percentage"]').value) || 0;
                 const igstPercent = parseFloat(row.querySelector('[name="igst_percentage"]').value) || 0;
 
+                const lineAmount = quantity * unitPrice;
+                const cgstAmount = (lineAmount * cgstPercent) / 100;
+                const sgstAmount = (lineAmount * sgstPercent) / 100;
+                const igstAmount = cgstAmount + sgstAmount;
+                const taxAmount = igstAmount; // total tax = cgst + sgst
+                const itemTotal = lineAmount + taxAmount;
+
                 lineItems.push({
                     hsn_code: row.querySelector('[name="hsn_code"]').value,
                     description: description,
@@ -719,7 +726,12 @@ Subject to local jurisdiction only.</textarea>
                     unit_price: unitPrice,
                     cgst_percentage: cgstPercent,
                     sgst_percentage: sgstPercent,
-                    igst_percentage: igstPercent
+                    igst_percentage: igstPercent,
+                    // Fields the billing-API reads when saving to DB:
+                    tax_percentage: cgstPercent + sgstPercent, // total tax %
+                    tax_amount: parseFloat(taxAmount.toFixed(2)),
+                    total_amount: parseFloat(itemTotal.toFixed(2)),
+                    cost_price: 0
                 });
             }
         });
