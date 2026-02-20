@@ -1,12 +1,12 @@
-TIMESTAMP: 2026-02-18 23:08:30.041964
+TIMESTAMP: 2026-02-20 15:39:34.095328
 FILTERS: Search='', Status='All Status', Client='All Clients', From='None', To='None'
 TOTAL INVOICES FETCHED: 4
-INV [0]: Num='inv-2541', Client='aravind', ID='2541'
+INV [0]: Num='inv-2558', Client='aravind', ID='2558'
   -> MATCHED!
-INV [1]: Num='inv-2537', Client='sam', ID='2537'
+INV [1]: Num='inv-2551', Client='sam', ID='2551'
   -> MATCHED!
-INV [2]: Num='inv-2536', Client='sam', ID='2536'
+INV [2]: Num='inv-2550', Client='sam', ID='2550'
   -> MATCHED!
-INV [3]: Num='inv-2535', Client='aravind', ID='2535'
+INV [3]: Num='inv-2549', Client='sam', ID='2549'
   -> MATCHED!
 FINAL RESULT COUNT: 4

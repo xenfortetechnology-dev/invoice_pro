@@ -495,6 +495,7 @@ def create_invoice():
     if request.method == 'POST':
         try:
             client_id = request.form.get('client_id')
+            invoice_format = request.form.get("invoice_format", "default")
             invoice_date_str = request.form.get('invoice_date')
 
             invoice_number = generate_invoice_number()
@@ -518,7 +519,7 @@ def create_invoice():
 
             total_amount = subtotal + total_tax
 
-            # 🔥 SEND TO CLOUD API
+            # 🔥 SEND TO CLOUD API (FIXED INDENTATION)
             response = cloud_request(
                 "POST",
                 "/invoices",
@@ -528,7 +529,8 @@ def create_invoice():
                     "invoice_date": invoice_date_str,
                     "total_amount": total_amount,
                     "payment_status": "Unpaid",
-                    "line_items": line_items_data   
+                    "line_items": line_items_data,
+                    "invoice_format": invoice_format
                 }
             )
 
@@ -539,11 +541,10 @@ def create_invoice():
                 try:
                     from email_service import send_email
 
-                    # 🔹 Fetch Company Details
+                    # Fetch Company
                     company_response = cloud_request("GET", "/company")
 
                     if not company_response or company_response.status_code != 200:
-                        print("Company API failed")
                         flash("Invoice created but company fetch failed", "warning")
                         return redirect(url_for("invoice_management"))
 
@@ -552,24 +553,22 @@ def create_invoice():
                     company_email = company_data.get("email")
                     company_phone = company_data.get("phone")
 
-                    # 🔹 Fetch ALL Clients (since /clients/<id> not supported)
+                    # Fetch Clients
                     client_response = cloud_request("GET", "/clients")
 
                     if not client_response or client_response.status_code != 200:
-                        print("Client API failed")
                         flash("Invoice created but client fetch failed", "warning")
                         return redirect(url_for("invoice_management"))
 
                     clients = client_response.json()
 
-                    # 🔹 Find correct client manually
+                    # Find specific client
                     client_data = next(
                         (c for c in clients if str(c.get("id")) == str(client_id)),
                         None
                     )
 
                     if not client_data:
-                        print("Client not found")
                         flash("Invoice created but client not found", "warning")
                         return redirect(url_for("invoice_management"))
 
@@ -577,16 +576,14 @@ def create_invoice():
                     client_email = client_data.get("email")
 
                     if not client_email:
-                        print("Client email not found")
                         flash("Invoice created but client email not found", "warning")
                         return redirect(url_for("invoice_management"))
 
-                    # 🔹 Prepare Email
+                    # Prepare Email
                     subject = f"Invoice {invoice_number} from {company_name}"
 
                     body = f"""
                     <h2>Invoice Notification</h2>
-
                     <p>Dear {client_name},</p>
 
                     <p>Your invoice has been generated. Below are the details:</p>
@@ -651,8 +648,6 @@ def create_invoice():
         today=datetime.now()
     )
 
-
-
 @app.route('/invoice/preview', methods=['POST'])
 @login_required
 def preview_invoice():
@@ -665,6 +660,7 @@ def preview_invoice():
         notes = request.form.get('notes', '')
         terms_conditions = request.form.get('terms_conditions', '')
         invoice_format = request.form.get("invoice_format", "default")
+        print("Saving Invoice Format:", invoice_format)
 
         # Fetch client from cloud database
         client_data = fetch_cloud_client_by_id(client_id)
@@ -781,6 +777,12 @@ def invoice_detail(id):
 
     invoice_data = fetch_cloud_invoice_by_id(id)
 
+    # 🔍 DEBUG FORMAT
+    print("===== FORMAT DEBUG =====")
+    print("Invoice ID:", id)
+    print("invoice_format from cloud:", invoice_data.get("invoice_format") if invoice_data else None)
+    print("========================")
+
     if not invoice_data:
         flash('Invoice not found', 'error')
         return redirect(url_for('invoice_management'))
@@ -791,9 +793,9 @@ def invoice_detail(id):
         flash('Client not found', 'error')
         return redirect(url_for('invoice_management'))
 
-    # 🔥 FIX HERE — FETCH LINE ITEMS
+    # 🔥 FETCH LINE ITEMS
     line_items_data = invoice_data.get("line_items", [])
-        
+
     line_items = []
     subtotal = 0
     total_cgst = 0
@@ -806,17 +808,15 @@ def invoice_detail(id):
         unit_price = float(item.get("unit_price", 0))
         tax_amount = float(item.get("tax_amount", 0))
         total_amount = float(item.get("total_amount", 0))
-        tax_percentage = float(item.get("tax_percentage", 0))
 
         line_total = quantity * unit_price
 
-        # 🔥 If IGST is used (interstate)
+        # If IGST exists
         if item.get("igst_percentage"):
             igst_amount = tax_amount
             cgst_amount = 0
             sgst_amount = 0
         else:
-            # Split CGST + SGST equally
             cgst_amount = tax_amount / 2
             sgst_amount = tax_amount / 2
             igst_amount = 0
@@ -825,23 +825,22 @@ def invoice_detail(id):
         total_cgst += cgst_amount
         total_sgst += sgst_amount
         total_igst += igst_amount
-        igst_amount = cgst_amount + sgst_amount
-
 
         line_items.append(SimpleNamespace(
             sr_no=i,
-            hsn_code=item.get("hsn_code", ""),  # ✅ FIX
+            hsn_code=item.get("hsn_code", ""),
             description=item.get("description"),
             quantity=quantity,
-            unit=item.get("unit", "Nos"),       # ✅ FIX
+            unit=item.get("unit", "Nos"),
             unit_price=unit_price,
             cgst_amount=cgst_amount,
             sgst_amount=sgst_amount,
-            igst_amount=igst_amount,            # ✅ FIX
-            total_amount=item.get("total_amount", 0)
+            igst_amount=igst_amount,
+            total_amount=total_amount
         ))
 
-
+    # 🔥 Get stored format
+    invoice_format = invoice_data.get("invoice_format", "default")
 
     invoice = SimpleNamespace(
         id=invoice_data.get('id'),
@@ -854,9 +853,8 @@ def invoice_detail(id):
         cgst=total_cgst,
         sgst=total_sgst,
         igst=total_igst,
-        invoice_format='default'
+        invoice_format=invoice_format
     )
-
 
     invoice.client = SimpleNamespace(
         name=client_data.get('name'),
@@ -868,15 +866,24 @@ def invoice_detail(id):
     company = Company.query.first()
     bank = BankDetails.query.first()
 
+    # 🔥 SELECT TEMPLATE BASED ON SAVED FORMAT
+    template_map = {
+        "default": "invoice_detail.html",
+        "excel_customer_A": "invoice_excel_customer_A.html"
+    }
+
+    template_name = template_map.get(invoice_format, "invoice_detail.html")
+
+    print("Rendering Template:", template_name)
+
     return render_template(
-        "invoice_detail.html",
+        template_name,
         invoice=invoice,
         company=company,
         bank=bank,
         blockchain_verification={},
         ai_insights={}
     )
-
 
 @app.route('/invoice/<int:id>/download-pdf')
 @login_required
