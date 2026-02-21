@@ -2810,6 +2810,45 @@ def api_get_invoices_data():
         logging.error(f"Error fetching invoices data: {e}")
         return jsonify({'error': str(e)}), 500
 
+
+@app.route('/api/invoices/by-client/<int:client_id>', methods=['GET'])
+@login_required
+def api_invoices_by_client(client_id):
+    """Return invoices for a specific client — used by the challan import modal."""
+    try:
+        all_invoices = fetch_cloud_invoices()
+        client_invoices = [
+            {
+                'id': inv.get('id'),
+                'invoice_number': inv.get('invoice_number'),
+                'invoice_date': inv.get('invoice_date'),
+                'total_amount': float(inv.get('total_amount', 0)),
+                'payment_status': inv.get('payment_status'),
+            }
+            for inv in all_invoices
+            if str(inv.get('client_id')) == str(client_id)
+        ]
+        return jsonify({'invoices': client_invoices})
+    except Exception as e:
+        logging.error(f"Error fetching invoices for client {client_id}: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/invoices/<int:invoice_id>/items', methods=['GET'])
+@login_required
+def api_invoice_items(invoice_id):
+    """Return line items for a specific invoice — used by the challan import modal."""
+    try:
+        inv = fetch_cloud_invoice_by_id(invoice_id)
+        if not inv:
+            return jsonify({'items': []})
+        items = inv.get('line_items') or inv.get('items') or inv.get('invoice_items') or []
+        return jsonify({'items': items})
+    except Exception as e:
+        logging.error(f"Error fetching items for invoice {invoice_id}: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/proxy/clients', methods=['GET'])
 @login_required
 def api_proxy_clients():
