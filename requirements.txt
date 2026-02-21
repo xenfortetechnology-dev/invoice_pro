@@ -24,3 +24,4 @@ requests>=2.32.0
 pywebview>=4.4
 selenium
 webdriver-manager
+apscheduler

@@ -20,7 +20,7 @@ from models import Company
 from analytics_engine import AnalyticsEngine
 import config
 
-def generate_invoice_pdf(invoice):
+def generate_invoice_pdf(invoice, company=None):
     #Generate a professional invoice PDF with modern styling"""
     try:
         buffer = io.BytesIO()
@@ -61,7 +61,7 @@ def generate_invoice_pdf(invoice):
         )
 
         # Invoice title
-        if invoice.invoice_type == 'Proforma':
+        if getattr(invoice, 'invoice_type', 'Invoice') == 'Proforma':
             title_text = "PROFORMA INVOICE"
         else:
             title_text = "TAX INVOICE"
@@ -70,7 +70,9 @@ def generate_invoice_pdf(invoice):
         content.append(Spacer(1, 20))
 
         # Company and invoice details header
-        company = Company.query.first()
+        if not company:
+            company = Company.query.first()
+        
         if not company:
             company = type('Company', (), {
                 'name': config.COMPANY_NAME,
@@ -81,7 +83,8 @@ def generate_invoice_pdf(invoice):
                 'phone': config.COMPANY_PHONE,
                 'email': config.COMPANY_EMAIL,
                 'gstin': config.GSTIN,
-                'pan': config.PAN
+                'pan': config.PAN,
+                'tin': getattr(config, 'TIN', '')
             })()
 
         header_data = [
@@ -305,7 +308,7 @@ def generate_invoice_pdf(invoice):
         logging.error(f"PDF generation failed: {e}")
         raise
 
-def generate_challan_pdf(challan):
+def generate_challan_pdf(challan, company=None):
     #Generate delivery challan PDF
     try:
         buffer = io.BytesIO()
@@ -349,7 +352,9 @@ def generate_challan_pdf(challan):
         content.append(Spacer(1, 10))
 
         # Company Header (similar to invoice)
-        company = Company.query.first()
+        if not company:
+            company = Company.query.first()
+            
         if not company:
             company = type('Company', (), {
                 'name': config.COMPANY_NAME,

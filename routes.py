@@ -733,7 +733,14 @@ def preview_invoice():
             payment_status='Unpaid'
         )
         
-        company = Company.query.first()
+        # Fetch company from cloud API
+        company_res = cloud_request("GET", "/company")
+        if company_res and company_res.status_code == 200:
+            company = SimpleNamespace(**company_res.json())
+        else:
+            # Fallback to local if cloud fails
+            company = Company.query.first()
+            
         bank = BankDetails.query.first()
 
         # Select Template
@@ -850,7 +857,14 @@ def invoice_detail(id):
         address=''
     )
 
-    company = Company.query.first()
+    # Fetch company from cloud API
+    company_res = cloud_request("GET", "/company")
+    if company_res and company_res.status_code == 200:
+        company = SimpleNamespace(**company_res.json())
+    else:
+        # Fallback to local if cloud fails
+        company = Company.query.first()
+        
     bank = BankDetails.query.first()
 
     # 🔥 SELECT TEMPLATE BASED ON SAVED FORMAT
@@ -955,7 +969,11 @@ def download_invoice_pdf(id):
 
         logging.info(f"Generating PDF for invoice {id}: {invoice_data.get('invoice_number')} with {len(line_items)} items")
 
-        pdf_buffer = generate_invoice_pdf(invoice)
+        # Fetch company from cloud API
+        company_res = cloud_request("GET", "/company")
+        company = SimpleNamespace(**company_res.json()) if company_res and company_res.status_code == 200 else None
+
+        pdf_buffer = generate_invoice_pdf(invoice, company=company)
         pdf_buffer.seek(0)
 
         from pathlib import Path
@@ -984,7 +1002,11 @@ def invoice_pdf(id):
         invoice = Invoice.query.get_or_404(id)
         logging.info(f"Generating PDF for invoice {id}: {invoice.invoice_number}")
         
-        pdf_buffer = generate_invoice_pdf(invoice)
+        # Fetch company from cloud API
+        company_res = cloud_request("GET", "/company")
+        company = SimpleNamespace(**company_res.json()) if company_res and company_res.status_code == 200 else None
+
+        pdf_buffer = generate_invoice_pdf(invoice, company=company)
         pdf_buffer.seek(0)
         
         buffer_size = len(pdf_buffer.getvalue())
@@ -2172,9 +2194,13 @@ def preview_challan():
         
         challan.line_items = line_items
 
+        # Fetch company from cloud API
+        company_res = cloud_request("GET", "/company")
+        company = SimpleNamespace(**company_res.json()) if company_res and company_res.status_code == 200 else None
+
         # 6. Generate PDF
         # We use the existing function. 
-        pdf_buffer = generate_challan_pdf(challan)
+        pdf_buffer = generate_challan_pdf(challan, company=company)
         pdf_buffer.seek(0)
         
         # 7. Return PDF Inline
@@ -4346,8 +4372,12 @@ def challan_pdf(id):
         
         challan.line_items = line_items
         
+        # Fetch company from cloud API
+        company_res = cloud_request("GET", "/company")
+        company = SimpleNamespace(**company_res.json()) if company_res and company_res.status_code == 200 else None
+
         # Generate PDF
-        pdf_buffer = generate_challan_pdf(challan)
+        pdf_buffer = generate_challan_pdf(challan, company=company)
         pdf_buffer.seek(0)
         
         filename = f'Challan_{challan.challan_number}.pdf'
