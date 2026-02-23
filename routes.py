@@ -447,7 +447,11 @@ def invoice_management():
             invoice_date=datetime.strptime(
                 inv["invoice_date"], "%Y-%m-%d"
             ) if inv["invoice_date"] else None,
-            due_date=None,
+
+            due_date=datetime.strptime(
+                inv["due_date"], "%Y-%m-%d"
+            ) if inv.get("due_date") else None,
+            
             total_amount=inv["total_amount"],
             amount_paid=0,
             payment_status=inv["payment_status"],
@@ -479,8 +483,10 @@ def invoice_management():
         client_filter=client_filter,
         clients=cloud_clients, # Pass cloud clients for the dropdown
         date_from=date_from,
-        date_to=date_to
+        date_to=date_to,
+        today=datetime.now()
     )
+
 @app.route('/create_invoice', methods=['GET', 'POST'])
 @login_required
 def create_invoice():
@@ -490,7 +496,7 @@ def create_invoice():
             client_id = request.form.get('client_id')
             invoice_format = request.form.get("invoice_format", "default")
             invoice_date_str = request.form.get('invoice_date')
-
+            due_date_str = request.form.get('due_date')
             invoice_number = generate_invoice_number()
 
             # Process line items — use pre-computed amounts from JS
@@ -508,6 +514,7 @@ def create_invoice():
                     "invoice_number": invoice_number,
                     "client_id": client_id,
                     "invoice_date": invoice_date_str,
+                    "due_date": due_date_str, 
                     "total_amount": total_amount,
                     "payment_status": "Unpaid",
                     "line_items": line_items_data,

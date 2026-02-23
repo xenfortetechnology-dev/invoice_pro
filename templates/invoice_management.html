@@ -203,10 +203,10 @@
                                 <td>
                                     {% if invoice.due_date %}
                                     <span
-                                        class="{% if invoice.due_date < today.date() and invoice.payment_status != 'Paid' %}text-danger{% endif %}">
+                                        class="{% if invoice.due_date.date() < today.date() and invoice.payment_status != 'Paid' %}text-danger{% endif %}">
                                         {{ invoice.due_date.strftime('%d %b %Y') }}
                                     </span>
-                                    {% if invoice.due_date < today.date() and invoice.payment_status !='Paid' %} <br>
+                                    {% if invoice.due_date.date() < today.date() and invoice.payment_status !='Paid' %} <br>
                                         <small class="text-danger">Overdue</small>
                                         {% endif %}
                                         {% else %}
