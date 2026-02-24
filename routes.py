@@ -1383,6 +1383,10 @@ def client_management():
             c_gstin = loc.gstin or 'N/A'
             c_pan = loc.pan or 'N/A'
             c_contact = loc.contact_person or c.get('name')
+        c_lead_stage = c.get('lead_stage')
+
+        if loc and loc.lead_stage:
+            c_lead_stage = loc.lead_stage
 
         # Use simple ID (integer) as we are only using cloud now
         client_obj = SimpleNamespace(
@@ -1394,7 +1398,7 @@ def client_management():
             phone=c.get('phone'),
             contact_person=c_contact, # Enhanced
             client_type=c_type, # Enhanced
-            lead_stage='New', # Default for cloud
+            lead_stage=c_lead_stage or 'New',
             total_business=total_business,
             gstin=c_gstin, # Enhanced
             pan=c_pan, # Enhanced
@@ -1485,6 +1489,8 @@ def create_client():
                 "name": request.form.get('name'),
                 "email": request.form.get('email'),
                 "phone": request.form.get('phone'),
+                "client_type": request.form.get('client_type'),
+                "lead_stage": request.form.get('lead_stage'),
                 # Add other fields if Cloud API supports them, otherwise they are lost or need local storage map
                 # For now assuming basic fields supported by the provided API
             }
