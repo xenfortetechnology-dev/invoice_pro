@@ -264,11 +264,16 @@
     <div class="signature-box">
         <div>
             <strong>OUR BANK DETAILS</strong><br>
-            Bank Name : UNION BANK OF INDIA<br>
-            A/C No. : 54780514000101<br>
-            A/C Name : OMPS Engineering Industries<br>
-            IFSC Code : UBIN081042<br>
-            Branch : AVADI
+
+            {% if bank %}
+                Bank Name : {{ bank.bank_name }}<br>
+                A/C No. : {{ bank.account_number }}<br>
+                A/C Name : {{ bank.account_name }}<br>
+                IFSC Code : {{ bank.ifsc_code }}<br>
+                Branch : {{ bank.branch }}<br>
+            {% else %}
+                Bank details not available
+            {% endif %}
         </div>
         <div style="text-align: center;">
             <img src="{{ url_for('static', filename='images/stamp.png') }}" style="height: 80px;"><br>

@@ -989,8 +989,11 @@ def download_invoice_pdf(id):
         # Fetch company from cloud API
         company_res = cloud_request("GET", "/company")
         company = SimpleNamespace(**company_res.json()) if company_res and company_res.status_code == 200 else None
+        # Fetch bank details from cloud API
+        bank_res = cloud_request("GET", "/bank-details")
+        bank = SimpleNamespace(**bank_res.json()) if bank_res and bank_res.status_code == 200 else None
 
-        pdf_buffer = generate_invoice_pdf(invoice, company=company)
+        pdf_buffer = generate_invoice_pdf(invoice, company=company, bank=bank)
         pdf_buffer.seek(0)
 
         # The JS passes ?t=<timestamp> so each download gets a unique filename –
