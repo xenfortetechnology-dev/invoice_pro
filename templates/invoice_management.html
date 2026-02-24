@@ -503,7 +503,6 @@
 
     function sendInvoice(invoiceId) {
         console.log('Sending invoice:', invoiceId);
-        showPdfToast('Sending invoice to client…');
 
         fetch(`/invoice/${invoiceId}/send`, {
             method: 'POST',
@@ -514,16 +513,16 @@
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
-                    showPdfToast('✅ ' + data.message);
+                    showPdfToast('✅ ' + data.message, 'Email Sent');
                     console.log('Invoice sent:', data.message);
                 } else {
-                    showPdfToast('❌ ' + data.message);
+                    showPdfToast('❌ ' + data.message, 'Email Failed');
                     console.error('Send failed:', data.message);
                 }
             })
             .catch(err => {
                 console.error('Send error:', err);
-                showPdfToast('❌ Failed to send invoice: ' + err.message);
+                showPdfToast('❌ Failed to send invoice: ' + err.message, 'Email Failed');
             });
     }
 
@@ -628,14 +627,16 @@
 
 
     let _pdfToastTimer = null;
-    function showPdfToast(msg) {
+    function showPdfToast(msg, title) {
         const toast = document.getElementById('pdfToast');
         const msgEl = document.getElementById('pdfToastMsg');
+        const titleEl = toast ? toast.querySelector('.toast-title') : null;
+        if (titleEl) titleEl.textContent = title || 'PDF Downloaded Successfully';
         if (msgEl) msgEl.textContent = msg || 'Your invoice PDF is ready.';
         if (toast) {
             toast.classList.add('show');
             clearTimeout(_pdfToastTimer);
-            _pdfToastTimer = setTimeout(hidePdfToast, 3000);
+            _pdfToastTimer = setTimeout(hidePdfToast, 3500);
         }
     }
     function hidePdfToast() {

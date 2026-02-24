@@ -1,0 +1,18 @@
+TIMESTAMP: 2026-02-24 22:55:15.247341
+FILTERS: Search='', Status='All Status', Client='All Clients', From='None', To='None'
+TOTAL INVOICES FETCHED: 27
+INV [0]: Num='ai-inv-2601', Client='farook test 2', ID='2601'
+  -> MATCHED!
+INV [1]: Num='inv-2597', Client='abc', ID='2597'
+  -> MATCHED!
+INV [2]: Num='inv-2596', Client='abc', ID='2596'
+  -> MATCHED!
+INV [3]: Num='inv-2593', Client='aravind', ID='2593'
+  -> MATCHED!
+INV [4]: Num='inv-2592', Client='abc', ID='2592'
+  -> MATCHED!
+INV [5]: Num='inv-2591', Client='seenu', ID='2591'
+  -> MATCHED!
+INV [11]: Num='inv-2580', Client='seenu', ID='2580'
+  -> MATCHED!
+FINAL RESULT COUNT: 27
