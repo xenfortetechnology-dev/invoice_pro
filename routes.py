@@ -490,6 +490,7 @@ def create_invoice():
             client_id = request.form.get('client_id')
             invoice_format = request.form.get("invoice_format", "default")
             invoice_date_str = request.form.get('invoice_date')
+            template_id = request.form.get("format_choice")
 
             invoice_number = generate_invoice_number()
 
@@ -511,7 +512,7 @@ def create_invoice():
                     "total_amount": total_amount,
                     "payment_status": "Unpaid",
                     "line_items": line_items_data,
-                    "invoice_format": invoice_format
+                    "template_id": int(template_id) if template_id else None
                 }
             )
 
@@ -640,7 +641,7 @@ def preview_invoice():
         due_date_str = request.form.get('due_date')
         notes = request.form.get('notes', '')
         terms_conditions = request.form.get('terms_conditions', '')
-        invoice_format = request.form.get("invoice_format", "default")
+        template_id = request.form.get("format_choice")
         print("Saving Invoice Format:", invoice_format)
 
         # Fetch client from cloud database
@@ -736,12 +737,16 @@ def preview_invoice():
         company = Company.query.first()
         bank = BankDetails.query.first()
 
-        # Select Template
+        template_id = invoice.get("template_id")
+        print("TEMPLATE DEBUG:", invoice.get("template_id"))
+
         template_map = {
-            "default": "invoice_detail.html",
-            "excel_customer_A": "invoice_excel_customer_A.html"
+            5: "invoice_detail.html",              
+            6: "invoice_excel_customer_A.html"     
         }
-        template_name = template_map.get(invoice_format, "invoice_detail.html")
+
+        template_name = template_map.get(template_id, "invoice_detail.html")
+
 
         return render_template(
             template_name,
@@ -826,9 +831,11 @@ def invoice_detail(id):
             total_amount=total_amount
         ))
 
-    # 🔥 Get stored format
-    invoice_format = invoice_data.get("invoice_format", "default")
-
+  
+    company = Company.query.first()
+    bank = BankDetails.query.first()
+    template_id = invoice_data.get("template_id")
+    print("TEMPLATE FROM CLOUD:", template_id)
     invoice = SimpleNamespace(
         id=invoice_data.get('id'),
         invoice_number=invoice_data.get('invoice_number'),
@@ -840,7 +847,8 @@ def invoice_detail(id):
         cgst=total_cgst,
         sgst=total_sgst,
         igst=total_igst,
-        invoice_format=invoice_format
+        template_id=template_id 
+       
     )
 
     invoice.client = SimpleNamespace(
@@ -850,16 +858,16 @@ def invoice_detail(id):
         address=''
     )
 
-    company = Company.query.first()
-    bank = BankDetails.query.first()
-
+  
     # 🔥 SELECT TEMPLATE BASED ON SAVED FORMAT
     template_map = {
-        "default": "invoice_detail.html",
-        "excel_customer_A": "invoice_excel_customer_A.html"
+        5: "invoice_detail.html",
+        6: "invoice_excel_customer_A.html"
     }
 
-    template_name = template_map.get(invoice_format, "invoice_detail.html")
+    template_name = template_map.get(template_id, "invoice_detail.html")
+
+    print("TEMPLATE FROM CLOUD:", invoice_data.get("template_id"))
 
     print("Rendering Template:", template_name)
 
