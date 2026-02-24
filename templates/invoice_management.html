@@ -3,9 +3,21 @@
 {% block title %}Invoice Management - Revolutionary Invoice System{% endblock %}
 
 {% block content %}
-<style>
 
-</style>
+<!-- PDF Download Success Toast -->
+<div id="pdfToast">
+    <div class="toast-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#198754"
+            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+    </div>
+    <div class="toast-body">
+        <div class="toast-title">PDF Downloaded Successfully</div>
+        <div class="toast-msg" id="pdfToastMsg">Your invoice PDF is ready.</div>
+    </div>
+    <button class="toast-close" onclick="hidePdfToast()" title="Close">&times;</button>
+</div>
 <div class="container-fluid">
     <!-- Header -->
     <div class="row mb-4">
@@ -206,7 +218,8 @@
                                         class="{% if invoice.due_date.date() < today.date() and invoice.payment_status != 'Paid' %}text-danger{% endif %}">
                                         {{ invoice.due_date.strftime('%d %b %Y') }}
                                     </span>
-                                    {% if invoice.due_date.date() < today.date() and invoice.payment_status !='Paid' %} <br>
+                                    {% if invoice.due_date.date() < today.date() and invoice.payment_status !='Paid' %}
+                                        <br>
                                         <small class="text-danger">Overdue</small>
                                         {% endif %}
                                         {% else %}
@@ -260,7 +273,8 @@
                                     <div class="d-flex flex-wrap gap-1 align-items-center">
                                         <!-- View Details -->
                                         <a href="{{ url_for('invoice_detail', id=invoice.id) }}"
-                                            class="btn btn-outline-primary btn-sm" title="View Details" target="_blank" rel="noopener noreferrer">
+                                            class="btn btn-outline-primary btn-sm" title="View Details" target="_blank"
+                                            rel="noopener noreferrer">
                                             <i data-feather="eye" size="14"></i>
                                         </a>
 
@@ -489,6 +503,7 @@
 
     function sendInvoice(invoiceId) {
         console.log('Sending invoice:', invoiceId);
+        showPdfToast('Sending invoice to client…');
 
         fetch(`/invoice/${invoiceId}/send`, {
             method: 'POST',
@@ -499,16 +514,16 @@
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
-                    alert(data.message);
+                    showPdfToast('✅ ' + data.message);
                     console.log('Invoice sent:', data.message);
                 } else {
-                    alert('❌ Error: ' + data.message);
+                    showPdfToast('❌ ' + data.message);
                     console.error('Send failed:', data.message);
                 }
             })
             .catch(err => {
                 console.error('Send error:', err);
-                alert('❌ Failed to send invoice: ' + err.message);
+                showPdfToast('❌ Failed to send invoice: ' + err.message);
             });
     }
 
@@ -566,24 +581,66 @@
             });
     }
 
-    // Download invoice PDF - direct save to Downloads folder for desktop app
+    // Download invoice PDF
+    // • PyWebView desktop app  → POST /invoice/id/save-pdf via fetch()
+    //   (session cookie is sent automatically — no browser, no login redirect)
+    //   PDF is saved directly to the OS Downloads folder by Python.
+    // • Regular browser (Chrome etc.) → standard <a download> approach.
     function downloadInvoice(invoiceId) {
         console.log('Downloading invoice:', invoiceId);
 
-        fetch(`/invoice/${invoiceId}/download-pdf`, { method: 'GET' })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    alert('✅ PDF downloaded successfully!\n\nSaved to Downloads folder');
-                    console.log('PDF saved to:', data.filepath);
-                } else {
-                    alert('❌ Error: ' + data.error);
-                }
+        if (window.pywebview) {
+            // ── PyWebView desktop app ──────────────────────────────────────
+            // Use fetch() so the Flask session cookie is included.
+            // The server saves the PDF straight to ~/Downloads on Python side.
+            showPdfToast('Saving PDF to Downloads folder…');
+
+            fetch(`/invoice/${invoiceId}/save-pdf`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
             })
-            .catch(err => {
-                console.error('Download failed:', err);
-                alert('❌ Failed to download PDF: ' + err.message);
-            });
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        showPdfToast(`✅ ${data.filename} saved to Downloads!`);
+                    } else {
+                        showPdfToast(`❌ Failed: ${data.error}`);
+                    }
+                })
+                .catch(err => {
+                    console.error('save-pdf error:', err);
+                    showPdfToast('❌ Could not save PDF. Check console.');
+                });
+
+        } else {
+            // ── Regular browser (Chrome, Edge, etc.) ──────────────────────
+            const timestamp = Date.now();
+            const a = document.createElement('a');
+            a.href = `/invoice/${invoiceId}/download-pdf?t=${timestamp}`;
+            a.download = '';   // let server set filename via Content-Disposition
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => showPdfToast(`Invoice #${invoiceId} PDF downloaded.`), 800);
+        }
+    }
+
+
+
+    let _pdfToastTimer = null;
+    function showPdfToast(msg) {
+        const toast = document.getElementById('pdfToast');
+        const msgEl = document.getElementById('pdfToastMsg');
+        if (msgEl) msgEl.textContent = msg || 'Your invoice PDF is ready.';
+        if (toast) {
+            toast.classList.add('show');
+            clearTimeout(_pdfToastTimer);
+            _pdfToastTimer = setTimeout(hidePdfToast, 3000);
+        }
+    }
+    function hidePdfToast() {
+        const toast = document.getElementById('pdfToast');
+        if (toast) toast.classList.remove('show');
     }
 
 
