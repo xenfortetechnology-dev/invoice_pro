@@ -748,7 +748,8 @@ def preview_invoice():
             # Fallback to local if cloud fails
             company = Company.query.first()
             
-        bank = BankDetails.query.first()
+        bank_res = cloud_request("GET", "/bank-details")
+        bank = SimpleNamespace(**bank_res.json()) if bank_res and bank_res.status_code == 200 else None
 
         # Select Template
         template_map = {
@@ -872,7 +873,8 @@ def invoice_detail(id):
         # Fallback to local if cloud fails
         company = Company.query.first()
         
-    bank = BankDetails.query.first()
+    bank_res = cloud_request("GET", "/bank-details")
+    bank = SimpleNamespace(**bank_res.json()) if bank_res and bank_res.status_code == 200 else None     
 
     # 🔥 SELECT TEMPLATE BASED ON SAVED FORMAT
     template_map = {
@@ -1963,6 +1965,9 @@ def settings():
         company_res = cloud_request("GET", "/company")
         company_data = company_res.json() if company_res and company_res.status_code == 200 else {}
 
+        bank_res = cloud_request("GET", "/bank-details")
+        bank_data = bank_res.json() if bank_res and bank_res.status_code == 200 else {}
+
         # Fetch invoice defaults
         defaults_res = cloud_request("GET", "/settings/default-prefix")
         defaults_data = defaults_res.json() if defaults_res and defaults_res.status_code == 200 else {}
@@ -1972,11 +1977,13 @@ def settings():
 
     except Exception:
         company_data = {}
+        bank_data = {}
         defaults_data = {}
         tax_data = {}
 
     settings_data = {
         "company": company_data,
+        "bank": bank_data,
         "invoice_defaults": defaults_data,
         "tax_settings": tax_data,
         "user": {
@@ -1995,7 +2002,7 @@ def update_settings():
     try:
         data = request.get_json()
 
-        # 1️⃣ Update Company (Cloud)
+        # 1️⃣ Update Company
         if "company" in data:
             company_payload = {
                 "name": data["company"].get("companyName"),
@@ -2016,7 +2023,32 @@ def update_settings():
                 return jsonify({"success": False, "message": "Company update failed"}), 400
 
 
-        # 2️⃣ Update User Profile (Cloud)
+        # 2️⃣ Update Bank (🔥 MOVE HERE — OUTSIDE company block)
+        if "bank" in data:
+            bank_payload = {
+                "bank_name": data["bank"].get("bankName"),
+                "account_number": data["bank"].get("accountNumber"),
+                "account_name": data["bank"].get("accountName"),
+                "ifsc_code": data["bank"].get("ifscCode"),
+                "branch": data["bank"].get("branchName")
+            }
+
+            response = cloud_request("POST", "/bank-details", json=bank_payload)
+
+            print("Bank API STATUS:", response.status_code)
+            print("Bank API RESPONSE:", response.text)
+
+            if not response:
+                print("Bank API: No response from cloud")
+                return jsonify({"success": False, "message": "Bank update failed"}), 400
+
+            if response.status_code not in (200, 201):
+                print("Bank API Status:", response.status_code)
+                print("Bank API Response:", response.text)
+                return jsonify({"success": False, "message": "Bank update failed"}), 400
+
+
+        # 3️⃣ Update User
         if "user" in data:
             user_payload = {
                 "preferred_language": data["user"].get("preferredLanguage"),
@@ -2036,7 +2068,7 @@ def update_settings():
                 return jsonify({"success": False, "message": "User update failed"}), 400
 
 
-        # 3️⃣ Invoice Settings
+        # 4️⃣ Invoice Settings
         if "invoice" in data:
             inv = data["invoice"]
 
@@ -2066,6 +2098,8 @@ def update_settings():
             "success": False,
             "message": str(e)
         }), 500
+
+
 
 @app.route("/create-challan", methods=['GET', 'POST'])
 @login_required

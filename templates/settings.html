@@ -49,6 +49,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="#bank" data-bs-toggle="pill">
+                            <i data-feather="credit-card" class="me-1"></i> Bank Details
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="#user" data-bs-toggle="pill">
                             <i data-feather="user" class="me-1"></i> User Profile
                         </a>
@@ -186,6 +191,63 @@
                                 <input type="file" class="form-control glass-input" id="companyLogo" accept="image/*">
                                 <small class="text-muted">Upload a logo for your invoices (Max: 2MB,
                                     PNG/JPG/SVG)</small>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                                <!-- Bank Details Settings -->
+                <div class="tab-pane fade" id="bank">
+                    <div class="glass-card p-4">
+                        <h5 class="fw-bold mb-4">
+                            <i data-feather="credit-card" class="me-2 text-primary"></i>
+                            Bank Details
+                        </h5>
+
+                        <form id="bankForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="bankName" class="form-label">Bank Name</label>
+                                        <input type="text" class="form-control glass-input" id="bankName"
+                                            value="{{ settings_data.bank.bank_name if settings_data.bank else '' }}">
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="accountNumber" class="form-label">Account Number</label>
+                                        <input type="text" class="form-control glass-input" id="accountNumber"
+                                            value="{{ settings_data.bank.account_number if settings_data.bank else '' }}">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="accountName" class="form-label">Account Name</label>
+                                        <input type="text" class="form-control glass-input" id="accountName"
+                                            value="{{ settings_data.bank.account_name if settings_data.bank else '' }}">
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="ifscCode" class="form-label">IFSC Code</label>
+                                        <input type="text"
+                                                class="form-control glass-input"
+                                                id="ifscCode"
+                                                value="{{ settings_data.bank.ifsc_code if settings_data.bank else '' }}">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="branchName" class="form-label">Branch</label>
+                                <input type="text"
+                                        class="form-control glass-input"
+                                        id="branchName"
+                                        value="{{ settings_data.bank.branch if settings_data.bank else '' }}">
                             </div>
                         </form>
                     </div>
@@ -1004,23 +1066,7 @@ document.addEventListener("DOMContentLoaded", function () {
     document.addEventListener('DOMContentLoaded', function () {
         initializeSettings();
         setupEventListeners();
-        // Load user profile from cloud
-fetch("http://44.208.164.236:5000/api/user/profile")
-    .then(res => res.json())
-    .then(data => {
-        document.getElementById("username").value = data.username || "";
-        document.getElementById("userEmail").value = data.email || "";
-        document.getElementById("preferredLanguage").value = data.preferred_language || "en";
-        document.getElementById("themePreference").value = data.theme_preference || "light";
-
-        document.getElementById("aiFeatures").checked = data.ai_features_enabled || false;
-        document.getElementById("voiceCommands").checked = data.voice_commands_enabled || false;
-        document.getElementById("collaborationAccess").checked = data.collaboration_access || false;
-        document.getElementById("biometricEnabled").checked = data.biometric_enabled || false;
-    })
-    .catch(error => {
-        console.error("Error loading user profile:", error);
-    });
+        
 
     });
 
@@ -1078,173 +1124,61 @@ fetch("http://44.208.164.236:5000/api/user/profile")
         });
     }
 
+
     function saveAllSettings() {
-        const saveBtn = document.getElementById('saveAllSettings');
-        const originalText = saveBtn.innerHTML;
+    const saveBtn = document.getElementById('saveAllSettings');
+    const originalText = saveBtn.innerHTML;
 
-        // Show loading state
-        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
-        saveBtn.disabled = true;
-         // Collect all form data
-        const settings = {
-            company: collectFormData('companyForm'),
-            user: collectFormData('userForm'),
-            ai: collectFormData('aiForm'),
-            blockchain: collectFormData('blockchainForm'),
-            invoice: collectFormData('invoiceForm'),
-            notifications: collectFormData('notificationForm'),
-            security: collectFormData('securityForm')
-        };
-        fetch("http://44.208.164.236:5000/api/settings/default-tax", {
-    method: "POST",
-    headers: {
-        "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-        default_tax_rate: settings.invoice.defaultTaxRate
+    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+    saveBtn.disabled = true;
+
+    const settings = {
+        company: collectFormData('companyForm'),
+        bank: collectFormData('bankForm'),
+        user: collectFormData('userForm'),
+        invoice: collectFormData('invoiceForm')
+    };
+
+    fetch('/settings/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
     })
-});
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            showNotification("Settings saved successfully", "success");
+        } else {
+            showNotification(data.message || "Save failed", "danger");
+        }
+    })
+    .catch(error => {
+        showNotification("Failed to save settings", "danger");
+    })
+    .finally(() => {
+        saveBtn.innerHTML = originalText;
+        saveBtn.disabled = false;
+    });
+}
 
-        // Save user profile to cloud
-        fetch("http://44.208.164.236:5000/api/user/profile", {
-        method: "PUT",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            email: settings.user.userEmail,
-            preferred_language: settings.user.preferredLanguage,
-            theme_preference: settings.user.themePreference,
-            ai_features_enabled: settings.user.aiFeatures,
-            voice_commands_enabled: settings.user.voiceCommands,
-            collaboration_access: settings.user.collaborationAccess,
-            biometric_enabled: settings.user.biometricEnabled
-        })
-        })
-        .then(res => res.json())
-        .then(data => {
-        console.log("User profile updated:", data);
-        })
-        .catch(error => {
-        console.error("User update failed:", error);
-        });
 
-       
 
-        // DEBUG: Alert the user what we are sending
-        // alert("DEBUG: Sending data to server:\n" + JSON.stringify(settings.company, null, 2));
-        // console.log('SaveAllSettings: Sending payload', settings);
-
-        // In real application, send to backend
-        fetch('http://44.208.164.236:5000/api/company', {
-        method: 'PUT',
-
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({name: settings.company.companyName,
-            email: settings.company.companyEmail,
-            phone: settings.company.companyPhone,
-            website: settings.company.companyWebsite,
-            address: settings.company.companyAddress,
-            city: settings.company.companyCity,
-            state: settings.company.companyState,
-            pincode: settings.company.companyPincode,
-            gstin: settings.company.companyGstin,
-            pan: settings.company.companyPan,
-            logo_path: ""})
-                })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    saveBtn.innerHTML = '<i data-feather="check" class="me-1"></i> Saved Successfully';
-                    saveBtn.classList.remove('btn-success');
-                    saveBtn.classList.add('btn-outline-success');
-                    feather.replace();
-
-                    // Reset button after 2 seconds
-                    setTimeout(() => {
-                        saveBtn.innerHTML = originalText;
-                        saveBtn.classList.remove('btn-outline-success');
-                        saveBtn.classList.add('btn-success');
-                        saveBtn.disabled = false;
-                        feather.replace();
-                    }, 2000);
-
-                    showNotification(data.message || 'Settings saved successfully!', 'success');
-                } else {
-                    throw new Error(data.message || 'Save failed');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                saveBtn.innerHTML = originalText;
-                saveBtn.disabled = false;
-                showNotification('Failed to save settings: ' + error.message, 'danger');
-            });
-            // Save invoice settings to cloud
-            fetch("http://44.208.164.236:5000/api/settings", {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    defaultTaxRate: settings.invoice.defaultTaxRate,
-                    paymentTerms: settings.invoice.paymentTerms,
-                    invoicePrefix: settings.invoice.invoicePrefix,
-                    defaultCurrency: settings.invoice.defaultCurrency,
-                    qrCodePayments: settings.invoice.qrCodePayments,
-                    digitalWatermark: settings.invoice.digitalWatermark,
-                    autoNumbering: settings.invoice.autoNumbering,
-                    defaultTerms: settings.invoice.defaultTerms
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                console.log("Invoice settings updated:", data);
-            })
-            .catch(error => {
-                console.error("Invoice update failed:", error);
-            });
-
-    }
-
-   function resetSettings() {
+function resetSettings() {
     if (!confirm('Are you sure you want to reset all settings to defaults?')) {
         return;
     }
 
-    // Define cloud defaults
-    const defaultSettings = {
-        defaultTaxRate: 18,
-        paymentTerms: 30,
-        invoicePrefix: "AI-INV",
-        defaultCurrency: "INR"
-    };
-
-    // Update UI
+    // Reset UI fields only
     document.getElementById('defaultTaxRate').value = 18;
     document.getElementById('paymentTerms').value = 30;
-    document.getElementById('themePreference').value = 'light';
+    document.getElementById('invoicePrefix').value = "AI-INV";
+    document.getElementById('defaultCurrency').value = "INR";
+    document.getElementById('defaultTerms').value = "";
 
+    document.getElementById('themePreference').value = 'light';
     applyTheme('light');
 
-    // 🔥 Send defaults to cloud
-    fetch("http://44.208.164.236:5000/api/settings", {
-        method: "PUT",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify(defaultSettings)
-    })
-    .then(res => res.json())
-    .then(data => {
-        showNotification('Settings reset and synced to cloud', 'success');
-    })
-    .catch(error => {
-        console.error("Reset failed:", error);
-        showNotification('Cloud reset failed', 'danger');
-    });
+    showNotification('Settings reset locally. Click Save to apply.', 'info');
 }
 
     function collectFormData(formId) {
