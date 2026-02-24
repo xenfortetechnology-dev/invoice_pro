@@ -496,12 +496,7 @@ def create_invoice():
             client_id = request.form.get('client_id')
             invoice_format = request.form.get("invoice_format", "default")
             invoice_date_str = request.form.get('invoice_date')
-<<<<<<< HEAD
-            template_id = request.form.get("format_choice")
-
-=======
             due_date_str = request.form.get('due_date')
->>>>>>> bb0cfc96927154aeb2a4844d0cc2ce1a286818e0
             invoice_number = generate_invoice_number()
 
             # Process line items — use pre-computed amounts from JS
@@ -523,7 +518,7 @@ def create_invoice():
                     "total_amount": total_amount,
                     "payment_status": "Unpaid",
                     "line_items": line_items_data,
-                    "template_id": int(template_id) if template_id else None
+                    "invoice_format": invoice_format
                 }
             )
 
@@ -876,9 +871,6 @@ def invoice_detail(id):
         address=''
     )
 
-<<<<<<< HEAD
-  
-=======
     # Fetch company from cloud API
     company_res = cloud_request("GET", "/company")
     if company_res and company_res.status_code == 200:
@@ -889,16 +881,14 @@ def invoice_detail(id):
         
     bank = BankDetails.query.first()
 
->>>>>>> bb0cfc96927154aeb2a4844d0cc2ce1a286818e0
-    # 🔥 SELECT TEMPLATE BASED ON SAVED FORMAT
+    # SELECT TEMPLATE BASED ON SAVED FORMAT
+    invoice_format = invoice_data.get("invoice_format", "default")
     template_map = {
-        5: "invoice_detail.html",
-        6: "invoice_excel_customer_A.html"
+        "default": "invoice_detail.html",
+        "excel_customer_A": "invoice_excel_customer_A.html"
     }
 
-    template_name = template_map.get(template_id, "invoice_detail.html")
-
-    print("TEMPLATE FROM CLOUD:", invoice_data.get("template_id"))
+    template_name = template_map.get(invoice_format, "invoice_detail.html")
 
     print("Rendering Template:", template_name)
 
