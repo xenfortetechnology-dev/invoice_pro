@@ -2,9 +2,9 @@ def _get_analytics_data_dict(time_range='12m'):
     """Helper to gather all analytics data as a dictionary"""
     analytics_data = {
         'revenue_trends': analytics_engine.get_revenue_trends(time_range),
-        'client_performance': analytics_engine.get_client_performance_metrics(),
-        'payment_analytics': analytics_engine.get_payment_analytics(),
-        'profitability_analysis': analytics_engine.get_profitability_analysis(),
+        'client_performance': analytics_engine.get_client_performance_metrics(time_range),
+        'payment_analytics': analytics_engine.get_payment_analytics(time_range),
+        'profitability_analysis': analytics_engine.get_profitability_analysis(time_range),
         'ai_predictions': {},
         'blockchain_insights': {}
     }

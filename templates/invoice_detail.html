@@ -107,9 +107,13 @@
                 </td>
                 <td
                     style="width: 50%; font-size: 12px; font-weight: bold; text-transform: uppercase; text-align: right; padding: 4px;">
-                    OMPS ENGINEERING INDUSTRIES<br>
-                    <span style="font-weight: normal; font-size: 10px;">No. 39, 9th Street, Kamaraj Nagar, Avadi,
-                        Chennai - 600071</span>
+                    {{ company.name if company and company.name else '' }}<br>
+                    <span style="font-weight: normal; font-size: 10px;">
+                        {{ company.address if company and company.address else '' }}
+                        {% if company and company.city %}, {{ company.city }}{% endif %}
+                        {% if company and company.state %}, {{ company.state }}{% endif %}
+                        {% if company and company.pincode %} - {{ company.pincode }}{% endif %}
+                    </span>
                 </td>
             </tr>
         </table>
@@ -127,9 +131,9 @@
             </td>
             <td style="width: 50%;">
                 <div class="section-title">Our Details</div>
-                <strong>GSTIN:</strong> {{ invoice.company.gstin if invoice.company else '33AAFF01969B1Z1' }}<br>
-                <strong>PAN:</strong> {{ invoice.company.pan if invoice.company else 'AAFF01969B1' }}<br>
-                <strong>TIN:</strong> {{ invoice.company.tin if invoice.company else '33436486057' }}
+                <strong>GSTIN:</strong> {{ company.gstin if company and company.gstin else '' }}<br>
+                <strong>PAN:</strong> {{ company.pan if company and company.pan else '' }}<br>
+                <strong>TIN:</strong> {{ company.tin if company and company.tin else '' }}
             </td>
         </tr>
     </table>
@@ -275,7 +279,8 @@
     </div>
 
     <div class="footer-contact">
-        Ph. 044 - 4853 397, 9884544409, 9884533309 | Email: ompsindustries@gmail.com
+        Ph. {{ company.phone if company and company.phone else '' }} | Email: {{ company.email if company and
+        company.email else '' }}
     </div>
     {% if request.args.get('auto_close') %}
     <script>
