@@ -1,18 +1,16 @@
-<<<<<<< Updated upstream
-TIMESTAMP: 2026-02-24 11:32:53.253790
-=======
-TIMESTAMP: 2026-02-22 02:12:52.363650
->>>>>>> Stashed changes
+TIMESTAMP: 2026-02-24 16:10:28.746953
 FILTERS: Search='', Status='All Status', Client='All Clients', From='None', To='None'
-TOTAL INVOICES FETCHED: 16
-INV [0]: Num='inv-2580', Client='seenu', ID='2580'
+TOTAL INVOICES FETCHED: 24
+INV [0]: Num='inv-2593', Client='aravind', ID='2593'
   -> MATCHED!
-INV [1]: Num='inv-2578', Client='abc', ID='2578'
+INV [1]: Num='inv-2592', Client='abc', ID='2592'
   -> MATCHED!
-INV [2]: Num='inv-2577', Client='abc', ID='2577'
+INV [2]: Num='inv-2591', Client='seenu', ID='2591'
   -> MATCHED!
-INV [3]: Num='inv-2576', Client='aravind', ID='2576'
+INV [3]: Num='inv-2590', Client='abc', ID='2590'
   -> MATCHED!
-INV [4]: Num='inv-2573', Client='sam', ID='2573'
+INV [4]: Num='inv-2589', Client='closed1', ID='2589'
   -> MATCHED!
-FINAL RESULT COUNT: 16
+INV [8]: Num='inv-2580', Client='seenu', ID='2580'
+  -> MATCHED!
+FINAL RESULT COUNT: 24
