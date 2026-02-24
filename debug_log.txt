@@ -1,20 +1,4 @@
-<<<<<<< HEAD
-TIMESTAMP: 2026-02-20 20:14:11.592664
-FILTERS: Search='', Status='All Status', Client='All Clients', From='None', To='None'
-TOTAL INVOICES FETCHED: 13
-INV [0]: Num='inv-2574', Client='aravind', ID='2574'
-  -> MATCHED!
-INV [1]: Num='inv-2573', Client='sam', ID='2573'
-  -> MATCHED!
-INV [2]: Num='inv-2572', Client='sam', ID='2572'
-  -> MATCHED!
-INV [3]: Num='inv-2571', Client='aravind', ID='2571'
-  -> MATCHED!
-INV [4]: Num='inv-2565', Client='sam', ID='2565'
-  -> MATCHED!
-FINAL RESULT COUNT: 13
-=======
-TIMESTAMP: 2026-02-24 20:50:49.372319
+TIMESTAMP: 2026-02-24 22:04:41.831654
 FILTERS: Search='', Status='All Status', Client='All Clients', From='None', To='None'
 TOTAL INVOICES FETCHED: 2528
 INV [0]: Num='inv-2600', Client='aravind', ID='2600'
@@ -262,4 +246,3 @@ INV [2519]: Num='ai-inv-20260211-001-757', Client='seenu', ID='10'
 INV [2520]: Num='ai-inv-20260211-001-949', Client='seenu', ID='9'
   -> MATCHED!
 FINAL RESULT COUNT: 2528
->>>>>>> bb0cfc96927154aeb2a4844d0cc2ce1a286818e0
