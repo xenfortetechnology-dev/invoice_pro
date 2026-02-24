@@ -896,7 +896,7 @@ def invoice_detail(id):
 @app.route('/invoice/<int:id>/download-pdf')
 @login_required
 def download_invoice_pdf(id):
-    """Download PDF directly to user's Downloads folder (fetch from cloud)"""
+    """Stream the invoice PDF directly to the browser as a file download."""
     try:
         # Fetch full invoice detail (with line_items) from cloud API
         invoice_data = fetch_cloud_invoice_by_id(id)
@@ -983,22 +983,122 @@ def download_invoice_pdf(id):
         pdf_buffer = generate_invoice_pdf(invoice, company=company)
         pdf_buffer.seek(0)
 
-        from pathlib import Path
-        downloads_folder = Path.home() / 'Downloads'
-        downloads_folder.mkdir(exist_ok=True)
+        # The JS passes ?t=<timestamp> so each download gets a unique filename –
+        # Chrome will never overwrite a previous download of the same invoice.
+        ts = request.args.get('t', datetime.now().strftime('%Y%m%d%H%M%S'))
+        invoice_number = invoice_data.get('invoice_number', str(id))
+        filename = f'Invoice_{invoice_number}_{ts}.pdf'
 
-        filename = f'Invoice_{invoice_data.get("invoice_number")}.pdf'
-        filepath = downloads_folder / filename
-
-        with open(filepath, 'wb') as f:
-            f.write(pdf_buffer.getvalue())
-
-        logging.info(f"PDF saved to: {filepath}")
-        return jsonify({'success': True, 'message': f'PDF saved to Downloads: {filename}', 'filepath': str(filepath)})
+        logging.info(f"Streaming PDF to browser as: {filename}")
+        return Response(
+            pdf_buffer.getvalue(),
+            mimetype='application/pdf',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Type': 'application/pdf',
+            }
+        )
 
     except Exception as e:
         logging.error(f"PDF download failed: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': f'Failed to save PDF: {str(e)}'}), 500
+        return jsonify({'success': False, 'error': f'Failed to generate PDF: {str(e)}'}), 500
+
+
+@app.route('/invoice/<int:id>/save-pdf', methods=['POST'])
+@login_required
+def save_invoice_pdf_to_disk(id):
+    """Save invoice PDF directly to the OS Downloads folder.
+
+    Called by the PyWebView desktop app via fetch() — no browser navigation
+    needed so the session cookie is valid and there is no login redirect.
+    Returns JSON {success, filename, path}.
+    """
+    try:
+        invoice_data = fetch_cloud_invoice_by_id(id)
+        if not invoice_data:
+            return jsonify({'success': False, 'error': 'Invoice not found'}), 404
+
+        client_data = fetch_cloud_client_by_id(invoice_data.get('client_id'))
+        if not client_data:
+            return jsonify({'success': False, 'error': 'Client not found'}), 404
+
+        raw_items = invoice_data.get('line_items', [])
+        line_items = []
+        subtotal = total_cgst = total_sgst = total_igst = 0
+        for i, item in enumerate(raw_items):
+            qty   = item.get('quantity', 0)
+            price = item.get('unit_price', 0)
+            line_total = qty * price
+            tax_amt  = item.get('tax_amount', 0)
+            cgst_amt = round(tax_amt / 2, 2)
+            sgst_amt = round(tax_amt / 2, 2)
+            igst_amt = cgst_amt + sgst_amt
+            subtotal    += line_total
+            total_cgst  += cgst_amt
+            total_sgst  += sgst_amt
+            total_igst  += igst_amt
+            line_items.append(SimpleNamespace(
+                sr_no=item.get('sr_no', i + 1),
+                hsn_code=item.get('hsn_code', ''),
+                description=item.get('description', ''),
+                quantity=qty,
+                unit=item.get('unit', 'Nos'),
+                unit_price=price,
+                tax_percentage=item.get('tax_percentage', 18),
+                cgst_amount=cgst_amt,
+                sgst_amount=sgst_amt,
+                igst_amount=igst_amt,
+                total_amount=line_total + cgst_amt + sgst_amt,
+                cost_price=item.get('cost_price', 0)
+            ))
+
+        invoice = SimpleNamespace(
+            id=invoice_data.get('id'),
+            invoice_number=invoice_data.get('invoice_number', 'N/A'),
+            invoice_date=datetime.strptime(invoice_data.get('invoice_date'), '%Y-%m-%d').date()
+                         if invoice_data.get('invoice_date') else datetime.now().date(),
+            due_date=None,
+            total_amount=subtotal + total_cgst + total_sgst,
+            payment_status=invoice_data.get('payment_status', 'Unpaid'),
+            notes=invoice_data.get('notes', ''),
+            terms_conditions=invoice_data.get('terms_conditions', ''),
+            line_items=line_items,
+            subtotal=subtotal,
+            cgst=total_cgst,
+            sgst=total_sgst,
+            igst=total_igst,
+            invoice_type='Invoice',
+            blockchain_hash=None
+        )
+        invoice.client = SimpleNamespace(
+            name=client_data.get('name', 'N/A'),
+            email=client_data.get('email', ''),
+            phone=client_data.get('phone', ''),
+            address=client_data.get('address', ''),
+            city=client_data.get('city', ''),
+            state='', pincode='', gstin='', pan='', contact_person=''
+        )
+
+        company_res = cloud_request("GET", "/company")
+        company = SimpleNamespace(**company_res.json()) if company_res and company_res.status_code == 200 else None
+
+        pdf_buffer = generate_invoice_pdf(invoice, company=company)
+        pdf_buffer.seek(0)
+
+        ts = datetime.now().strftime('%Y%m%d%H%M%S')
+        filename = f'Invoice_{invoice_data.get("invoice_number", id)}_{ts}.pdf'
+        saved_path = save_pdf_to_downloads(pdf_buffer, filename)
+
+        if saved_path:
+            logging.info(f"PDF saved to Downloads: {saved_path}")
+            return jsonify({'success': True, 'filename': filename, 'path': saved_path})
+        else:
+            return jsonify({'success': False, 'error': 'Could not save PDF to Downloads folder'}), 500
+
+    except Exception as e:
+        logging.error(f"save-pdf failed: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 
 @app.route('/invoice/<int:id>/pdf')
