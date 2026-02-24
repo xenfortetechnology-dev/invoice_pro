@@ -1383,6 +1383,10 @@ def client_management():
             c_gstin = loc.gstin or 'N/A'
             c_pan = loc.pan or 'N/A'
             c_contact = loc.contact_person or c.get('name')
+        c_lead_stage = c.get('lead_stage')
+
+        if loc and loc.lead_stage:
+            c_lead_stage = loc.lead_stage
 
         # Use simple ID (integer) as we are only using cloud now
         client_obj = SimpleNamespace(
@@ -1394,7 +1398,7 @@ def client_management():
             phone=c.get('phone'),
             contact_person=c_contact, # Enhanced
             client_type=c_type, # Enhanced
-            lead_stage='New', # Default for cloud
+            lead_stage=c_lead_stage or 'New',
             total_business=total_business,
             gstin=c_gstin, # Enhanced
             pan=c_pan, # Enhanced
@@ -1485,6 +1489,8 @@ def create_client():
                 "name": request.form.get('name'),
                 "email": request.form.get('email'),
                 "phone": request.form.get('phone'),
+                "client_type": request.form.get('client_type'),
+                "lead_stage": request.form.get('lead_stage'),
                 # Add other fields if Cloud API supports them, otherwise they are lost or need local storage map
                 # For now assuming basic fields supported by the provided API
             }
@@ -2807,6 +2813,45 @@ def api_get_invoices_data():
     except Exception as e:
         logging.error(f"Error fetching invoices data: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/invoices/by-client/<int:client_id>', methods=['GET'])
+@login_required
+def api_invoices_by_client(client_id):
+    """Return invoices for a specific client — used by the challan import modal."""
+    try:
+        all_invoices = fetch_cloud_invoices()
+        client_invoices = [
+            {
+                'id': inv.get('id'),
+                'invoice_number': inv.get('invoice_number'),
+                'invoice_date': inv.get('invoice_date'),
+                'total_amount': float(inv.get('total_amount', 0)),
+                'payment_status': inv.get('payment_status'),
+            }
+            for inv in all_invoices
+            if str(inv.get('client_id')) == str(client_id)
+        ]
+        return jsonify({'invoices': client_invoices})
+    except Exception as e:
+        logging.error(f"Error fetching invoices for client {client_id}: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/invoices/<int:invoice_id>/items', methods=['GET'])
+@login_required
+def api_invoice_items(invoice_id):
+    """Return line items for a specific invoice — used by the challan import modal."""
+    try:
+        inv = fetch_cloud_invoice_by_id(invoice_id)
+        if not inv:
+            return jsonify({'items': []})
+        items = inv.get('line_items') or inv.get('items') or inv.get('invoice_items') or []
+        return jsonify({'items': items})
+    except Exception as e:
+        logging.error(f"Error fetching items for invoice {invoice_id}: {e}")
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/proxy/clients', methods=['GET'])
 @login_required
