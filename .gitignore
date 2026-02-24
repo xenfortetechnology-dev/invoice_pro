@@ -20,6 +20,7 @@ scripts/
 .env
 .env.*
 .env.local
+invoice_pro_structure.md
 
 # --------------------
 # Database files (local only)

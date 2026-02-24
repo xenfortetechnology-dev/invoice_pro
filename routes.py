@@ -1373,13 +1373,13 @@ def client_management():
         elif c_name and c_name in local_clients_name_map:
              loc = local_clients_name_map[c_name]
         
-        c_type = 'Regular' 
+        c_type = c.get('client_type') or 'Regular'
         c_gstin = 'N/A'
         c_pan = 'N/A'
         c_contact = c.get('name')
-
+        
         if loc:
-            c_type = loc.client_type or 'Regular'
+            c_type = loc.client_type or c_type
             c_gstin = loc.gstin or 'N/A'
             c_pan = loc.pan or 'N/A'
             c_contact = loc.contact_person or c.get('name')
@@ -1636,8 +1636,8 @@ def export_clients_excel():
             'Name': c.get('name') or 'N/A',
             'Email': c.get('email') or 'N/A',
             'Phone': c.get('phone') or 'N/A',
-            'Type': 'Regular',
-            'Lead Stage': 'New',
+            'Type': c.get('client_type') or 'Regular',
+            'Lead Stage': c.get('lead_stage') or 'New',
             'Total Business': total_business,
             'Risk Score': 0, # Placeholder
             'GST No': c.get('gstin') or 'N/A',
@@ -1690,7 +1690,7 @@ def export_clients_pdf():
                 'name': c.get('name', ''),
                 'email': c.get('email', ''),
                 'phone': c.get('phone', ''),
-                'type': 'Regular', # Cloud default
+                'type': c.get('client_type') or 'Regular',
                 'gstin': 'N/A', # Cloud default
                 'business_value': total_biz
             }
@@ -1803,9 +1803,9 @@ def _get_analytics_data_dict(time_range='12m'):
     
     analytics_data = {
         'revenue_trends': analytics_engine.compute_revenue_trends(invoices_data, time_range),
-        'client_performance': analytics_engine.compute_client_performance_metrics(invoices_data, clients_data),
-        'payment_analytics': analytics_engine.compute_payment_analytics(invoices_data),
-        'profitability_analysis': analytics_engine.compute_profitability_analysis(invoices_data),
+        'client_performance': analytics_engine.compute_client_performance_metrics(invoices_data, clients_data, time_range),
+        'payment_analytics': analytics_engine.compute_payment_analytics(invoices_data, time_range),
+        'profitability_analysis': analytics_engine.compute_profitability_analysis(invoices_data, time_range),
         'ai_predictions': {},
         'blockchain_insights': {}
     }
@@ -1894,10 +1894,12 @@ def export_analytics_excel():
     """Export analytics data to Excel and save to system"""
     try:
         time_range = request.args.get('range', '12m')
+        report_type = request.args.get('type', 'all')
         analytics_data = _get_analytics_data_dict(time_range)
-        output = report_generator.generate_excel_report(analytics_data)
+        output = report_generator.generate_excel_report(analytics_data, report_type)
         
-        filename = f"Analytics_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        prefix = report_type.title() if report_type != 'all' else 'Analytics'
+        filename = f"{prefix}_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         file_path = _save_buffer_to_downloads(output, filename)
         
         if file_path:
@@ -1919,10 +1921,12 @@ def export_analytics_pdf():
     """Export analytics data to PDF and save to system"""
     try:
         time_range = request.args.get('range', '12m')
+        report_type = request.args.get('type', 'all')
         analytics_data = _get_analytics_data_dict(time_range)
-        output = report_generator.generate_pdf_report(analytics_data)
+        output = report_generator.generate_pdf_report(analytics_data, report_type)
         
-        filename = f"Analytics_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        prefix = report_type.title() if report_type != 'all' else 'Analytics'
+        filename = f"{prefix}_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         file_path = _save_buffer_to_downloads(output, filename)
         
         if file_path:
