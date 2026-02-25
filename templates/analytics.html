@@ -377,73 +377,52 @@ System{% endblock %} {% block content %}
 
   <!-- Detailed Reports -->
   <div class="row">
-    <div class="col-12">
-      <div class="glass-card p-4">
-        <h5 class="fw-bold mb-3">Generate Detailed Reports</h5>
-        <div class="row">
-          <div class="col-md-3">
-            <div class="report-card glass-card-sm p-3 text-center">
-              <i
-                data-feather="file-text"
-                size="32"
-                class="text-primary mb-2"
-              ></i>
-              <h6>Monthly Report</h6>
-              <p class="small text-muted">
-                Comprehensive monthly business summary
-              </p>
-              <button
-                class="btn btn-outline-primary btn-sm"
-                onclick="generateReport('monthly')"
-              >
-                Generate
-              </button>
-            </div>
+  <div class="col-12">
+    <div class="glass-card p-4">
+      <h5 class="fw-bold mb-3">Generate Detailed Reports</h5>
+      <div class="row justify-content-center"> <!-- added justify-content-center -->
+        <div class="col-md-3 d-flex justify-content-center mb-3"> <!-- center each card -->
+          <div class="report-card glass-card-sm p-3 text-center">
+            <i data-feather="file-text" size="32" class="text-primary mb-2"></i>
+            <h6>Monthly Report</h6>
+            <p class="small text-muted">Comprehensive monthly business summary</p>
+            <button class="btn btn-outline-primary btn-sm" onclick="generateReport('monthly')">Generate</button>
           </div>
-          <div class="col-md-3">
-            <div class="report-card glass-card-sm p-3 text-center">
-              <i data-feather="users" size="32" class="text-success mb-2"></i>
-              <h6>Client Analysis</h6>
-              <p class="small text-muted">
-                Detailed client performance metrics
-              </p>
-              <button
-                class="btn btn-outline-success btn-sm"
-                onclick="generateReport('clients')"
-              >
-                Generate
-              </button>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="report-card glass-card-sm p-3 text-center">
-              <i
-                data-feather="dollar-sign"
-                size="32"
-                class="text-warning mb-2"
-              ></i>
-              <h6>Financial Report</h6>
-              <p class="small text-muted">Revenue, profit, and tax analysis</p>
-              <button
-                class="btn btn-outline-warning btn-sm"
-                onclick="generateReport('financial')"
-              >
-                Generate
-              </button>
-            </div>
-          </div>
-          <!-- <div class="col-md-3">
-                        <div class="report-card glass-card-sm p-3 text-center">
-                            <i data-feather="cpu" size="32" class="text-info mb-2"></i>
-                            <h6>AI Insights</h6>
-                            <p class="small text-muted">Machine learning predictions</p>
-                            <button class="btn btn-outline-info btn-sm" onclick="generateReport('ai')">Generate</button>
-                        </div>
-                    </div> -->
         </div>
+        <div class="col-md-3 d-flex justify-content-center mb-3">
+          <div class="report-card glass-card-sm p-3 text-center">
+            <i data-feather="users" size="32" class="text-success mb-2"></i>
+            <h6>Client Analysis</h6>
+            <p class="small text-muted">Detailed client performance metrics</p>
+            <button class="btn btn-outline-success btn-sm" onclick="generateReport('clients')">Generate</button>
+          </div>
+        </div>
+        <div class="col-md-3 d-flex justify-content-center mb-3">
+          <div class="report-card glass-card-sm p-3 text-center">
+              <!-- Big Rupee symbol -->
+          <div class="mb-2">
+            <span class="text-warning" style="font-size:32px; line-height:1;">₹</span>
+          </div>
+
+          <!-- Text on second line -->
+          <h6 class="mt-0">Financial Report</h6>
+            <p class="small text-muted">Revenue, profit, and tax analysis</p>
+            <button class="btn btn-outline-warning btn-sm" onclick="generateReport('financial')">Generate</button>
+          </div>
+        </div>
+        <!-- optional 4th card commented out preserved -->
+        <!-- <div class="col-md-3 d-flex justify-content-center mb-3">
+          <div class="report-card glass-card-sm p-3 text-center">
+            <i data-feather="cpu" size="32" class="text-info mb-2"></i>
+            <h6>AI Insights</h6>
+            <p class="small text-muted">Machine learning predictions</p>
+            <button class="btn btn-outline-info btn-sm" onclick="generateReport('ai')">Generate</button>
+          </div>
+        </div> -->
       </div>
     </div>
   </div>
+</div>
 </div>
 {% endblock %} {% block scripts %}
 <script>
