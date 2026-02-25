@@ -1363,19 +1363,22 @@ def delete_invoice1(id):
 @app.route('/invoice/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_invoice(id):
-    """Edit invoice from cloud database"""
 
     if request.method == 'POST':
         action = request.form.get('action', 'update')
 
         update_data = {}
+        send_payment_email = False
 
         if action == 'mark_paid':
             update_data['payment_status'] = 'Paid'
             flash_msg = 'Invoice marked as Paid!'
+            send_payment_email = True
+
         elif action == 'mark_unpaid':
             update_data['payment_status'] = 'Unpaid'
             flash_msg = 'Invoice marked as Unpaid!'
+
         else:
             if request.form.get('notes'):
                 update_data['notes'] = request.form.get('notes')
@@ -1385,29 +1388,97 @@ def edit_invoice(id):
                 update_data['client_id'] = int(request.form.get('client_id'))
             flash_msg = 'Invoice updated successfully!'
 
-        # Use cloud_request (with JWT token) instead of raw requests.put
         try:
             response = cloud_request("PUT", f"/invoices/{id}", json=update_data)
+
             if response and response.status_code in (200, 204):
+
+                # 🔥 SEND PAYMENT EMAIL IF MARKED AS PAID
+                if send_payment_email:
+                    try:
+                        from email_service import send_email
+
+                        # Fetch updated invoice
+                        invoice_data = fetch_cloud_invoice_by_id(id)
+                        client_data = fetch_cloud_client_by_id(invoice_data.get('client_id'))
+                        company_response = cloud_request("GET", "/company")
+
+                        if company_response and company_response.status_code == 200:
+                            company_data = company_response.json()
+
+                            company_name = company_data.get("name")
+                            company_email = company_data.get("email")
+                            company_phone = company_data.get("phone")
+
+                            client_name = client_data.get("name")
+                            client_email = client_data.get("email")
+
+                            subject = f"Payment Received - Invoice {invoice_data.get('invoice_number')}"
+
+                            body = f"""
+                            <html>
+                            <body style="font-family: Arial, sans-serif;">
+
+                            <h2 style="color:#2c3e50;">Payment Confirmation</h2>
+
+                            <p>Dear {client_name},</p>
+
+                            <p>We have successfully received your payment.</p>
+
+                            <table border="1" cellpadding="8" cellspacing="0" 
+                                   style="border-collapse: collapse; width: 100%;">
+                                <tr>
+                                    <td><b>Invoice Number</b></td>
+                                    <td>{invoice_data.get('invoice_number')}</td>
+                                </tr>
+                                <tr>
+                                    <td><b>Total Amount Paid</b></td>
+                                    <td>₹ {invoice_data.get('total_amount')}</td>
+                                </tr>
+                            </table>
+
+                            <br>
+
+                            <p>Thank you for your business.</p>
+
+                            <p>
+                            Regards,<br>
+                            <b>{company_name}</b><br>
+                            Email: {company_email}<br>
+                            Phone: {company_phone}
+                            </p>
+
+                            </body>
+                            </html>
+                            """
+
+                            email_status = send_email(client_email, subject, body)
+
+                            if email_status:
+                                print("Payment email sent successfully")
+                            else:
+                                print("Payment email failed")
+
+                    except Exception as e:
+                        print("Payment email error:", e)
+
                 flash(flash_msg, 'success')
+
             else:
                 flash(f'Failed to update invoice: {response.text if response else "No response"}', 'error')
+
         except Exception as e:
-            logging.error(f"Cloud API update error: {e}")
             flash(f'API connection error: {str(e)}', 'error')
 
         return redirect(url_for('invoice_management'))
 
-    # GET request — fetch invoice from cloud and show edit form
+    # GET Request
     invoice_data = fetch_cloud_invoice_by_id(id)
     if not invoice_data:
         flash('Invoice not found', 'error')
         return redirect(url_for('invoice_management'))
 
     client_data = fetch_cloud_client_by_id(invoice_data.get('client_id'))
-    if not client_data:
-        flash('Client not found', 'error')
-        return redirect(url_for('invoice_management'))
 
     client = SimpleNamespace(
         id=client_data.get('id'),
