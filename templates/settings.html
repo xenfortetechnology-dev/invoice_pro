@@ -1125,24 +1125,35 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
 
-    function saveAllSettings() {
+function saveAllSettings() {
     const saveBtn = document.getElementById('saveAllSettings');
     const originalText = saveBtn.innerHTML;
 
     saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
     saveBtn.disabled = true;
 
-    const settings = {
-        company: collectFormData('companyForm'),
-        bank: collectFormData('bankForm'),
-        user: collectFormData('userForm'),
-        invoice: collectFormData('invoiceForm')
-    };
+    const formData = new FormData();
+
+    // Collect normal fields
+    const companyData = collectFormData('companyForm');
+    const bankData = collectFormData('bankForm');
+    const userData = collectFormData('userForm');
+    const invoiceData = collectFormData('invoiceForm');
+
+    formData.append("company", JSON.stringify(companyData));
+    formData.append("bank", JSON.stringify(bankData));
+    formData.append("user", JSON.stringify(userData));
+    formData.append("invoice", JSON.stringify(invoiceData));
+
+    // 🔥 IMPORTANT: Append logo file
+    const logoInput = document.getElementById("companyLogo");
+    if (logoInput.files.length > 0) {
+        formData.append("logo", logoInput.files[0]);
+    }
 
     fetch('/settings/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings)
+        body: formData   // ❌ NO Content-Type header
     })
     .then(res => res.json())
     .then(data => {
@@ -1160,8 +1171,6 @@ document.addEventListener("DOMContentLoaded", function () {
         saveBtn.disabled = false;
     });
 }
-
-
 
 function resetSettings() {
     if (!confirm('Are you sure you want to reset all settings to defaults?')) {

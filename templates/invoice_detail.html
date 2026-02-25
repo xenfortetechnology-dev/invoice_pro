@@ -105,15 +105,27 @@
                     <strong>Date:</strong> {{ invoice.invoice_date.strftime('%d-%m-%Y') }}<br>
                     <span style="font-size: 8px;">(TRIPLICATE FOR RECIPIENT)</span>
                 </td>
-                <td
-                    style="width: 50%; font-size: 12px; font-weight: bold; text-transform: uppercase; text-align: right; padding: 4px;">
-                    {{ company.name if company and company.name else '' }}<br>
-                    <span style="font-weight: normal; font-size: 10px;">
+                <td style="width: 50%; text-align: right; padding: 4px;">
+
+                    <!-- COMPANY LOGO -->
+                    <div style="text-align: right; margin-bottom: 5px;">
+                        <img src="{{ url_for('company_logo') }}"
+                            style="max-height: 70px; max-width: 180px;"
+                            onerror="this.style.display='none'">
+                    </div>
+
+                    <!-- COMPANY NAME -->
+                    <div style="font-size: 12px; font-weight: bold; text-transform: uppercase;">
+                        {{ company.name if company and company.name else '' }}
+                    </div>
+
+                    <div style="font-size: 10px;">
                         {{ company.address if company and company.address else '' }}
                         {% if company and company.city %}, {{ company.city }}{% endif %}
                         {% if company and company.state %}, {{ company.state }}{% endif %}
                         {% if company and company.pincode %} - {{ company.pincode }}{% endif %}
-                    </span>
+                    </div>
+
                 </td>
             </tr>
         </table>

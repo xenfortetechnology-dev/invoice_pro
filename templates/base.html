@@ -140,9 +140,16 @@
     <nav class="glass-nav sidebar d-flex flex-column p-3">
 
         <!-- Brand -->
-        <a class="navbar-brand fw-bold text-white mb-4" href="{{ url_for('dashboard_page') }}">
-            <!-- <img src="{{ url_for('static', filename='Xen_logo.png') }}" alt="Xen Logo" class="mb xen-logo logo-glow" /> -->
-            Xenforte Invoice
+        <a class="navbar-brand fw-bold text-white mb-4 d-flex align-items-center"
+            href="{{ url_for('dashboard_page') }}">
+
+                <img src="{{ url_for('company_logo') }}"
+                    alt="Company Logo"
+                    class="logo-glow me-2"
+                    onerror="this.style.display='none'">
+
+                <span>Xenforte Invoice</span>
+
         </a>
 
         <!-- Nav Items -->
@@ -286,7 +293,7 @@
     <footer class="footer bg-light border-top text-center py-3">
 
         <h5 class="fw-bold text-primary mb-1">
-            ⚡ Xenforte Invoice System
+                 Xenforte Invoice System
         </h5>
 
         <p class="mb-0 text-muted">

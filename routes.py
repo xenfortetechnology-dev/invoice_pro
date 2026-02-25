@@ -2362,31 +2362,80 @@ def settings():
 @login_required
 def update_settings():
     try:
-        data = request.get_json()
+        # ---------------------------------------
+        # HANDLE FORM DATA (supports file upload)
+        # ---------------------------------------
+        import json
 
-        # 1️⃣ Update Company
-        if "company" in data:
+        if request.content_type and "multipart/form-data" in request.content_type:
+            logo_file = request.files.get("logo")
+
+            # 🔥 Parse JSON strings properly
+            data = {
+                "company": json.loads(request.form.get("company", "{}")),
+                "bank": json.loads(request.form.get("bank", "{}")),
+                "user": json.loads(request.form.get("user", "{}")),
+                "invoice": json.loads(request.form.get("invoice", "{}")),
+            }
+        else:
+            data = request.get_json()
+            logo_file = None
+
+        # ---------------------------------------
+        # 1️⃣ UPDATE COMPANY (WITH LOGO SUPPORT)
+        # ---------------------------------------
+        if data and (
+            "companyName" in data or
+            (isinstance(data, dict) and "company" in data)
+        ):
+
+            if isinstance(data, dict) and "company" in data:
+                company_data = data["company"]
+            else:
+                company_data = data
+
             company_payload = {
-                "name": data["company"].get("companyName"),
-                "email": data["company"].get("companyEmail"),
-                "phone": data["company"].get("companyPhone"),
-                "website": data["company"].get("companyWebsite"),
-                "address": data["company"].get("companyAddress"),
-                "city": data["company"].get("companyCity"),
-                "state": data["company"].get("companyState"),
-                "pincode": data["company"].get("companyPincode"),
-                "gstin": data["company"].get("companyGstin"),
-                "pan": data["company"].get("companyPan")
+                "name": company_data.get("companyName"),
+                "email": company_data.get("companyEmail"),
+                "phone": company_data.get("companyPhone"),
+                "website": company_data.get("companyWebsite"),
+                "address": company_data.get("companyAddress"),
+                "city": company_data.get("companyCity"),
+                "state": company_data.get("companyState"),
+                "pincode": company_data.get("companyPincode"),
+                "gstin": company_data.get("companyGstin"),
+                "pan": company_data.get("companyPan")
             }
 
-            response = cloud_request("POST", "/company", json=company_payload)
+            files = {}
+
+            # ✅ CORRECT FILE HANDLING
+            if logo_file and logo_file.filename != "":
+                files = {
+                    "logo": (
+                        logo_file.filename,
+                        logo_file.stream,   # 🔥 NOT .read()
+                        logo_file.mimetype
+                    )
+                }
+
+            response = cloud_request(
+                "POST",
+                "/company",
+                data=company_payload,
+                files=files
+            )
 
             if not response or response.status_code != 200:
-                return jsonify({"success": False, "message": "Company update failed"}), 400
+                return jsonify({
+                    "success": False,
+                    "message": "Company update failed"
+                }), 400
 
-
-        # 2️⃣ Update Bank (🔥 MOVE HERE — OUTSIDE company block)
-        if "bank" in data:
+        # ---------------------------------------
+        # 2️⃣ UPDATE BANK
+        # ---------------------------------------
+        if isinstance(data, dict) and "bank" in data:
             bank_payload = {
                 "bank_name": data["bank"].get("bankName"),
                 "account_number": data["bank"].get("accountNumber"),
@@ -2395,23 +2444,22 @@ def update_settings():
                 "branch": data["bank"].get("branchName")
             }
 
-            response = cloud_request("POST", "/bank-details", json=bank_payload)
+            response = cloud_request(
+                "POST",
+                "/bank-details",
+                json=bank_payload
+            )
 
-            print("Bank API STATUS:", response.status_code)
-            print("Bank API RESPONSE:", response.text)
+            if not response or response.status_code not in (200, 201):
+                return jsonify({
+                    "success": False,
+                    "message": "Bank update failed"
+                }), 400
 
-            if not response:
-                print("Bank API: No response from cloud")
-                return jsonify({"success": False, "message": "Bank update failed"}), 400
-
-            if response.status_code not in (200, 201):
-                print("Bank API Status:", response.status_code)
-                print("Bank API Response:", response.text)
-                return jsonify({"success": False, "message": "Bank update failed"}), 400
-
-
-        # 3️⃣ Update User
-        if "user" in data:
+        # ---------------------------------------
+        # 3️⃣ UPDATE USER
+        # ---------------------------------------
+        if isinstance(data, dict) and "user" in data:
             user_payload = {
                 "preferred_language": data["user"].get("preferredLanguage"),
                 "theme_preference": data["user"].get("themePreference"),
@@ -2424,14 +2472,22 @@ def update_settings():
             if data["user"].get("newPassword"):
                 user_payload["new_password"] = data["user"]["newPassword"]
 
-            response = cloud_request("PUT", "/user/profile", json=user_payload)
+            response = cloud_request(
+                "PUT",
+                "/user/profile",
+                json=user_payload
+            )
 
             if not response or response.status_code != 200:
-                return jsonify({"success": False, "message": "User update failed"}), 400
+                return jsonify({
+                    "success": False,
+                    "message": "User update failed"
+                }), 400
 
-
-        # 4️⃣ Invoice Settings
-        if "invoice" in data:
+        # ---------------------------------------
+        # 4️⃣ UPDATE INVOICE SETTINGS
+        # ---------------------------------------
+        if isinstance(data, dict) and "invoice" in data:
             inv = data["invoice"]
 
             cloud_request(
@@ -2461,6 +2517,23 @@ def update_settings():
             "message": str(e)
         }), 500
 
+
+
+
+from flask import Response
+
+@app.route("/company/logo")
+@login_required
+def company_logo():
+    response = cloud_request("GET", "/company/logo")
+
+    if response and response.status_code == 200:
+        return Response(
+            response.content,
+            content_type=response.headers.get("Content-Type")
+        )
+
+    return "", 404
 
 
 @app.route("/create-challan", methods=['GET', 'POST'])
