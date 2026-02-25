@@ -282,6 +282,30 @@ def index():
     """Redirect root to dashboard"""
     return redirect(url_for('dashboard_page'))
 
+class CustomPagination:
+    def __init__(self, items, page, per_page, total):
+        self.items = items
+        self.page = page
+        self.per_page = per_page
+        self.total = total
+        self.pages = (total + per_page - 1) // per_page if per_page > 0 else 0
+        self.has_prev = page > 1
+        self.has_next = page < self.pages
+        self.prev_num = page - 1
+        self.next_num = page + 1
+
+    def iter_pages(self, left_edge=2, left_current=2, right_current=5, right_edge=2):
+        last = 0
+        for num in range(1, self.pages + 1):
+            if num <= left_edge or \
+               (num > self.page - left_current - 1 and \
+                num < self.page + right_current) or \
+               num > self.pages - right_edge:
+                if last + 1 != num:
+                    yield None
+                yield num
+                last = num
+
 @app.route('/invoices')
 @login_required
 def invoice_management():
@@ -403,10 +427,18 @@ def invoice_management():
     app.logger.info(f"SEARCH DEBUG: Result count {len(filtered_data)}")
 
     ai_insights = {}
-
     invoice_list = []
 
-    for inv in filtered_data:
+    # --- PAGINATION ---
+    page = request.args.get('page', 1, type=int)
+    per_page = 30
+    total_invoices = len(filtered_data)
+    
+    start = (page - 1) * per_page
+    end = start + per_page
+    paginated_data = filtered_data[start:end]
+
+    for inv in paginated_data:
         # Determine risk level based on local data
         risk_score = client_risk_map.get(int(inv.get("client_id", 0)), 0.0)
         risk_level = "High" if risk_score > 0.7 else "Medium" if risk_score > 0.3 else "Low"
@@ -460,14 +492,7 @@ def invoice_management():
         )
         invoice_list.append(invoice_obj)
 
-    invoices_obj = SimpleNamespace(
-        items=invoice_list,
-        total=len(invoice_list),
-        pages=1,
-        has_prev=False,
-        has_next=False,
-        page=1
-    )
+    invoices_obj = CustomPagination(invoice_list, page, per_page, total_invoices)
 
     return render_template(
         "invoice_management.html",
