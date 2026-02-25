@@ -20,6 +20,7 @@ scripts/
 .env
 .env.*
 .env.local
+invoice_pro_structure.md
 
 # --------------------
 # Database files (local only)
@@ -40,3 +41,9 @@ instance/
 # --------------------
 seed_revolutionary_invoice.py
 seed_revolutionary_db.py
+
+
+#-------------------
+# debug_log file
+#-------------------
+debug_log.txt

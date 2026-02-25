@@ -31,7 +31,7 @@ class AnalyticsEngine:
             
             # Get historical revenue data
             end_date = datetime.now()
-            start_date = end_date - timedelta(days=30 * months)
+            start_date = self._get_start_date(time_range)
             
             monthly_revenue = db.session.query(
                 func.strftime('%Y-%m', Invoice.invoice_date).label('month'),
@@ -87,9 +87,12 @@ class AnalyticsEngine:
             logging.error(f"Revenue trends analysis failed: {e}")
             return {'error': str(e)}
     
-    def get_client_performance_metrics(self) -> Dict[str, Any]:
+    def get_client_performance_metrics(self, time_range: str = '12m') -> Dict[str, Any]:
         """Comprehensive client performance analysis"""
         try:
+            months = self._parse_time_range(time_range)
+            start_date = self._get_start_date(time_range).date()
+            
             # Top performing clients
             top_clients = db.session.query(
                 Client.id,
@@ -102,7 +105,8 @@ class AnalyticsEngine:
                 func.avg(Invoice.total_amount).label('avg_invoice_value'),
                 func.max(Invoice.invoice_date).label('last_invoice_date')
             ).join(Invoice).filter(
-                Invoice.payment_status == 'Paid'
+                Invoice.payment_status == 'Paid',
+                Invoice.invoice_date >= start_date
             ).group_by(Client.id).order_by(
                 func.sum(Invoice.total_amount).desc()
             ).limit(20).all()
@@ -158,15 +162,18 @@ class AnalyticsEngine:
             logging.error(f"Client type analysis failed: {e}")
             return []
     
-    def get_payment_analytics(self) -> Dict[str, Any]:
+    def get_payment_analytics(self, time_range: str = '12m') -> Dict[str, Any]:
         """Advanced payment behavior analytics"""
         try:
+            months = self._parse_time_range(time_range)
+            start_date = self._get_start_date(time_range).date()
+            
             # Payment status distribution
             payment_status_dist = db.session.query(
                 Invoice.payment_status,
                 func.count(Invoice.id).label('count'),
                 func.sum(Invoice.total_amount).label('amount')
-            ).group_by(Invoice.payment_status).all()
+            ).filter(Invoice.invoice_date >= start_date).group_by(Invoice.payment_status).all()
             
             # Payment timing analysis
             payment_timing = db.session.query(
@@ -182,7 +189,8 @@ class AnalyticsEngine:
             ).filter(
                 Invoice.payment_status == 'Paid',
                 Invoice.payment_date.isnot(None),
-                Invoice.due_date.isnot(None)
+                Invoice.due_date.isnot(None),
+                Invoice.invoice_date >= start_date
             ).first()
             
             # Payment mode analysis
@@ -192,7 +200,8 @@ class AnalyticsEngine:
                 func.sum(Invoice.total_amount).label('amount')
             ).filter(
                 Invoice.payment_status == 'Paid',
-                Invoice.payment_mode.isnot(None)
+                Invoice.payment_mode.isnot(None),
+                Invoice.invoice_date >= start_date
             ).group_by(Invoice.payment_mode).all()
             
             # Monthly collection trends
@@ -202,7 +211,7 @@ class AnalyticsEngine:
                 func.count(Invoice.id).label('invoices_paid')
             ).filter(
                 Invoice.payment_status == 'Paid',
-                Invoice.payment_date >= (datetime.now() - timedelta(days=365)).date()
+                Invoice.payment_date >= start_date
             ).group_by('month').order_by('month').all()
             
             # Outstanding analysis
@@ -245,9 +254,12 @@ class AnalyticsEngine:
             logging.error(f"Payment analytics failed: {e}")
             return {'error': str(e)}
     
-    def get_profitability_analysis(self):
+    def get_profitability_analysis(self, time_range: str = '12m'):
         """Detailed profitability analysis with explicit joins"""
         try:
+            months = self._parse_time_range(time_range)
+            start_date = self._get_start_date(time_range).date()
+            
             # ---------- Overall Profit ----------
             overall_profit = (
                 self.db_session.query(
@@ -256,7 +268,10 @@ class AnalyticsEngine:
                 )
                 .select_from(InvoiceLineItem)
                 .join(Invoice, InvoiceLineItem.invoice_id == Invoice.id)
-                .filter(Invoice.payment_status == "Paid")
+                .filter(
+                    Invoice.payment_status == "Paid",
+                    Invoice.invoice_date >= start_date
+                )
                 .first()
             )
 
@@ -276,7 +291,7 @@ class AnalyticsEngine:
                 .join(Invoice, InvoiceLineItem.invoice_id == Invoice.id)
                 .filter(
                     Invoice.payment_status == "Paid",
-                    Invoice.invoice_date >= (datetime.now() - timedelta(days=365)).date()
+                    Invoice.invoice_date >= start_date
                 )
                 .group_by('month')
                 .order_by('month')
@@ -309,7 +324,10 @@ class AnalyticsEngine:
                 .select_from(InvoiceLineItem)
                 .join(Invoice, InvoiceLineItem.invoice_id == Invoice.id)
                 .join(Client, Invoice.client_id == Client.id)
-                .filter(Invoice.payment_status == "Paid")
+                .filter(
+                    Invoice.payment_status == "Paid",
+                    Invoice.invoice_date >= start_date
+                )
                 .group_by(Client.id)
                 .order_by(func.sum(InvoiceLineItem.unit_price * InvoiceLineItem.quantity).desc())
                 .limit(10)
@@ -524,13 +542,32 @@ class AnalyticsEngine:
     # Helper methods
     
     def _parse_time_range(self, time_range: str) -> int:
-        """Parse time range string to months"""
-        if time_range.endswith('m'):
+        """Parse time range string to months for summary purposes"""
+        if time_range == 'all':
+            return 120
+        elif time_range.endswith('d'):
+            days = int(time_range[:-1])
+            return max(1, days // 30)
+        elif time_range.endswith('m'):
             return int(time_range[:-1])
         elif time_range.endswith('y'):
             return int(time_range[:-1]) * 12
         else:
             return 12  # Default to 12 months
+
+    def _get_start_date(self, time_range: str):
+        """Get the start date based on the time range parameter"""
+        current_date = datetime.now()
+        if time_range == 'all':
+            return current_date - timedelta(days=365*10)
+        elif time_range.endswith('d'):
+            return current_date - timedelta(days=int(time_range[:-1]))
+        elif time_range.endswith('m'):
+            return current_date - timedelta(days=30*int(time_range[:-1]))
+        elif time_range.endswith('y'):
+            return current_date - timedelta(days=365*int(time_range[:-1]))
+        else:
+            return current_date - timedelta(days=365)
     
     def _calculate_trend_direction(self, recent_data: List[Dict]) -> str:
         """Calculate trend direction from recent data"""
@@ -810,7 +847,7 @@ class AnalyticsEngine:
         try:
             months = self._parse_time_range(time_range)
             end_date = datetime.now()
-            start_date = end_date - timedelta(days=30 * months)
+            start_date = self._get_start_date(time_range)
             
             # Filter and process data
             monthly_data = defaultdict(lambda: {'revenue': 0.0, 'count': 0, 'total': 0.0})
@@ -825,7 +862,7 @@ class AnalyticsEngine:
                     
                 try:
                     inv_date = datetime.strptime(inv_date_str, '%Y-%m-%d')
-                    if inv_date < start_date:
+                    if inv_date < start_date or inv_date > end_date:
                         continue
                         
                     month_key = inv_date.strftime('%Y-%m')
@@ -876,9 +913,12 @@ class AnalyticsEngine:
             logging.error(f"Compute revenue trends error: {e}")
             return {'error': str(e)}
 
-    def compute_client_performance_metrics(self, invoices_data: List[Dict], clients_data: List[Dict]) -> Dict[str, Any]:
+    def compute_client_performance_metrics(self, invoices_data: List[Dict], clients_data: List[Dict], time_range: str = '12m') -> Dict[str, Any]:
         """Compute client performance from data lists"""
         try:
+            start_date = self._get_start_date(time_range)
+            end_date = datetime.now()
+            
             client_metrics = defaultdict(lambda: {
                 'revenue': 0.0, 'count': 0, 'last_date': None
             })
@@ -894,6 +934,13 @@ class AnalyticsEngine:
                     
                 amount = float(inv.get('total_amount', 0))
                 inv_date = inv.get('invoice_date')
+                if inv_date:
+                    try:
+                        inv_date_obj = datetime.strptime(inv_date, '%Y-%m-%d')
+                        if inv_date_obj < start_date or inv_date_obj > end_date:
+                            continue
+                    except:
+                        pass
                 
                 metrics = client_metrics[int(client_id)]
                 metrics['revenue'] += amount
@@ -937,8 +984,8 @@ class AnalyticsEngine:
             
             # Client Types
             type_counts = defaultdict(int)
-            for c in clients_data:
-                type_counts[c.get('client_type', 'Regular')] += 1
+            for c in top_clients:
+                type_counts[c['type']] += 1
                 
             client_types = [{'type': k, 'count': v} for k, v in type_counts.items()]
 
@@ -953,17 +1000,34 @@ class AnalyticsEngine:
             logging.error(f"Compute client metrics error: {e}")
             return {'error': str(e)}
 
-    def compute_payment_analytics(self, invoices_data: List[Dict]) -> Dict[str, Any]:
+    def compute_payment_analytics(self, invoices_data: List[Dict], time_range: str = '12m') -> Dict[str, Any]:
         """Compute payment analytics from invoice data"""
         try:
+            start_date = self._get_start_date(time_range)
+            end_date = datetime.now()
+            
             status_dist = defaultdict(lambda: {'count': 0, 'amount': 0.0})
             monthly_collections = defaultdict(lambda: {'collected': 0.0, 'count': 0})
             
-            current_date = datetime.now().date()
+            current_date = end_date.date()
             overdue_counts = {'30': 0, '60': 0, '90': 0}
             overdue_amounts = {'30': 0.0, '60': 0.0, '90': 0.0}
+            
+            total_delay_days = 0
+            paid_with_dates_count = 0
+            min_delay, max_delay = None, None
 
             for inv in invoices_data:
+                inv_date_str = inv.get('invoice_date')
+                if inv_date_str:
+                    try:
+                        inv_date_obj = datetime.strptime(inv_date_str, '%Y-%m-%d')
+                        if inv_date_obj < start_date or inv_date_obj > end_date:
+                            continue
+                    except:
+                        pass
+                else:
+                    continue
                 status = inv.get('payment_status', 'Unknown')
                 amount = float(inv.get('total_amount', 0))
                 
@@ -971,11 +1035,27 @@ class AnalyticsEngine:
                 status_dist[status]['amount'] += amount
                 
                 if status == 'Paid':
+                    p_date_str = inv.get('payment_date')
+                    d_date_str = inv.get('due_date')
+                    if p_date_str and d_date_str:
+                        try:
+                            p_date_obj = datetime.strptime(p_date_str, '%Y-%m-%d').date()
+                            d_date_obj = datetime.strptime(d_date_str, '%Y-%m-%d').date()
+                            delay = (p_date_obj - d_date_obj).days
+                            total_delay_days += delay
+                            paid_with_dates_count += 1
+                            if min_delay is None or delay < min_delay:
+                                min_delay = delay
+                            if max_delay is None or delay > max_delay:
+                                max_delay = delay
+                        except Exception:
+                            pass
+
                     p_date_str = inv.get('payment_date') or inv.get('invoice_date')
                     if p_date_str:
                         try:
                             p_date = datetime.strptime(p_date_str, '%Y-%m-%d')
-                            if p_date.date() >= (current_date - timedelta(days=365)):
+                            if p_date >= start_date:
                                 m_key = p_date.strftime('%Y-%m')
                                 monthly_collections[m_key]['collected'] += amount
                                 monthly_collections[m_key]['count'] += 1
@@ -1018,9 +1098,15 @@ class AnalyticsEngine:
                 for k, v in sorted(monthly_collections.items())
             ]
             
+            avg_delay = (total_delay_days / paid_with_dates_count) if paid_with_dates_count > 0 else 0
+            
             return {
                 'payment_status_distribution': payment_status_distribution,
-                'payment_timing': {'avg_delay_days': 0},
+                'payment_timing': {
+                    'avg_delay_days': avg_delay,
+                    'min_delay_days': min_delay or 0,
+                    'max_delay_days': max_delay or 0
+                },
                 'payment_modes': [],
                 'monthly_collections': monthly_coll_list,
                 'outstanding': {
@@ -1035,15 +1121,26 @@ class AnalyticsEngine:
             logging.error(f"Compute payment analytics error: {e}")
             return {'error': str(e)}
 
-    def compute_profitability_analysis(self, invoices_data: List[Dict]) -> Dict[str, Any]:
+    def compute_profitability_analysis(self, invoices_data: List[Dict], time_range: str = '12m') -> Dict[str, Any]:
         """Compute profitability (approximate as we might lack cost data)"""
         try:
+            start_date = self._get_start_date(time_range)
+            end_date = datetime.now()
+            
             total_revenue = 0.0
             total_cost = 0.0
             
             monthly_data = defaultdict(lambda: {'revenue': 0, 'cost': 0})
             
             for inv in invoices_data:
+                inv_date_str = inv.get('invoice_date')
+                if inv_date_str:
+                    try:
+                        inv_date_obj = datetime.strptime(inv_date_str, '%Y-%m-%d')
+                        if inv_date_obj < start_date or inv_date_obj > end_date:
+                            continue
+                    except:
+                        pass
                 if inv.get('payment_status') == 'Paid':
                     amount = float(inv.get('total_amount', 0))
                     total_revenue += amount

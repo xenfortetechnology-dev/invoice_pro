@@ -20,8 +20,8 @@ from models import Company
 from analytics_engine import AnalyticsEngine
 import config
 
-def generate_invoice_pdf(invoice, company=None):
-    #Generate a professional invoice PDF with modern styling"""
+def generate_invoice_pdf(invoice, company=None, bank=None):
+    #Generate a professional invoice PDF with modern styling""" 
     try:
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(
@@ -239,6 +239,9 @@ def generate_invoice_pdf(invoice, company=None):
         content.append(words_table)
         content.append(Spacer(1, 20))
 
+        from flask import g
+
+        # bank = BankDetails.query.filter_by(company_id=invoice.company_id).first()
         # Terms and bank details
         terms_data = [
             [
@@ -248,13 +251,15 @@ def generate_invoice_pdf(invoice, company=None):
                           "2. Interest @ 2% per month will be charged on overdue amounts.<br/>"
                           "3. Subject to local jurisdiction only."), 
                          normal_style),
-                Paragraph(f"<b>Bank Details:</b><br/>"
-                         f"Bank: {config.BANK_NAME}<br/>"
-                         f"A/c No: {config.ACCOUNT_NO}<br/>"
-                         f"A/c Name: {config.ACCOUNT_NAME}<br/>"
-                         f"IFSC: {config.IFSC_CODE}<br/>"
-                         f"Branch: {config.BRANCH}", 
-                         normal_style)
+                Paragraph(
+                    f"<b>Bank Details:</b><br/>"
+                    f"Bank: {bank.bank_name if bank else ''}<br/>"
+                    f"A/c No: {bank.account_number if bank else ''}<br/>"
+                    f"A/c Name: {bank.account_name if bank else ''}<br/>"
+                    f"IFSC: {bank.ifsc_code if bank else ''}<br/>"
+                    f"Branch: {bank.branch if bank else ''}",
+                    normal_style
+                )
             ]
         ]
         

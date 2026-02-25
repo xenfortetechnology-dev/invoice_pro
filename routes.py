@@ -645,6 +645,8 @@ def preview_invoice():
         due_date_str = request.form.get('due_date')
         notes = request.form.get('notes', '')
         terms_conditions = request.form.get('terms_conditions', '')
+        template_id = request.form.get("format_choice")
+        print("Saving Invoice Format:", invoice_format)
 
         # ✅ Get template_id instead of invoice_format
         template_id = request.form.get("template_id")
@@ -744,18 +746,20 @@ def preview_invoice():
             company = SimpleNamespace(**company_res.json())
         else:
             company = Company.query.first()
+            
+        bank_res = cloud_request("GET", "/bank-details")
+        bank = SimpleNamespace(**bank_res.json()) if bank_res and bank_res.status_code == 200 else None
 
-        bank = BankDetails.query.first()
+        template_id = invoice.get("template_id")
+        print("TEMPLATE DEBUG:", invoice.get("template_id"))
 
-        # ✅ Map template_id → HTML template
         template_map = {
-            1: "invoice_detail.html",
-            2: "invoice_excel_customer_A.html"
+            5: "invoice_detail.html",              
+            6: "invoice_excel_customer_A.html"     
         }
 
         template_name = template_map.get(template_id, "invoice_detail.html")
 
-        print("Preview Rendering Template:", template_name)
 
         return render_template(
             template_name,
@@ -840,12 +844,11 @@ def invoice_detail(id):
             total_amount=total_amount
         ))
 
-    # ✅ Get stored template_id
+  
+    company = Company.query.first()
+    bank = BankDetails.query.first()
     template_id = invoice_data.get("template_id")
-
-    if template_id:
-        template_id = int(template_id)
-
+    print("TEMPLATE FROM CLOUD:", template_id)
     invoice = SimpleNamespace(
         id=invoice_data.get('id'),
         invoice_number=invoice_data.get('invoice_number'),
@@ -856,7 +859,9 @@ def invoice_detail(id):
         subtotal=subtotal,
         cgst=total_cgst,
         sgst=total_sgst,
-        igst=total_igst
+        igst=total_igst,
+        template_id=template_id 
+       
     )
 
     invoice.client = SimpleNamespace(
@@ -872,10 +877,12 @@ def invoice_detail(id):
         company = SimpleNamespace(**company_res.json())
     else:
         company = Company.query.first()
+        
+    bank_res = cloud_request("GET", "/bank-details")
+    bank = SimpleNamespace(**bank_res.json()) if bank_res and bank_res.status_code == 200 else None     
 
-    bank = BankDetails.query.first()
-
-    # ✅ TEMPLATE SELECTION USING template_id
+    # SELECT TEMPLATE BASED ON SAVED FORMAT
+    invoice_format = invoice_data.get("invoice_format", "default")
     template_map = {
         1: "invoice_detail.html",
         2: "invoice_excel_customer_A.html"
@@ -897,7 +904,7 @@ def invoice_detail(id):
 @app.route('/invoice/<int:id>/download-pdf')
 @login_required
 def download_invoice_pdf(id):
-    """Download PDF directly to user's Downloads folder (fetch from cloud)"""
+    """Stream the invoice PDF directly to the browser as a file download."""
     try:
         # Fetch full invoice detail (with line_items) from cloud API
         invoice_data = fetch_cloud_invoice_by_id(id)
@@ -980,26 +987,286 @@ def download_invoice_pdf(id):
         # Fetch company from cloud API
         company_res = cloud_request("GET", "/company")
         company = SimpleNamespace(**company_res.json()) if company_res and company_res.status_code == 200 else None
+        # Fetch bank details from cloud API
+        bank_res = cloud_request("GET", "/bank-details")
+        bank = SimpleNamespace(**bank_res.json()) if bank_res and bank_res.status_code == 200 else None
+
+        pdf_buffer = generate_invoice_pdf(invoice, company=company, bank=bank)
+        pdf_buffer.seek(0)
+
+        # The JS passes ?t=<timestamp> so each download gets a unique filename –
+        # Chrome will never overwrite a previous download of the same invoice.
+        ts = request.args.get('t', datetime.now().strftime('%Y%m%d%H%M%S'))
+        invoice_number = invoice_data.get('invoice_number', str(id))
+        filename = f'Invoice_{invoice_number}_{ts}.pdf'
+
+        logging.info(f"Streaming PDF to browser as: {filename}")
+        return Response(
+            pdf_buffer.getvalue(),
+            mimetype='application/pdf',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Type': 'application/pdf',
+            }
+        )
+
+    except Exception as e:
+        logging.error(f"PDF download failed: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': f'Failed to generate PDF: {str(e)}'}), 500
+
+
+@app.route('/invoice/<int:id>/save-pdf', methods=['POST'])
+@login_required
+def save_invoice_pdf_to_disk(id):
+    """Save invoice PDF directly to the OS Downloads folder.
+
+    Called by the PyWebView desktop app via fetch() — no browser navigation
+    needed so the session cookie is valid and there is no login redirect.
+    Returns JSON {success, filename, path}.
+    """
+    try:
+        invoice_data = fetch_cloud_invoice_by_id(id)
+        if not invoice_data:
+            return jsonify({'success': False, 'error': 'Invoice not found'}), 404
+
+        client_data = fetch_cloud_client_by_id(invoice_data.get('client_id'))
+        if not client_data:
+            return jsonify({'success': False, 'error': 'Client not found'}), 404
+
+        raw_items = invoice_data.get('line_items', [])
+        line_items = []
+        subtotal = total_cgst = total_sgst = total_igst = 0
+        for i, item in enumerate(raw_items):
+            qty   = item.get('quantity', 0)
+            price = item.get('unit_price', 0)
+            line_total = qty * price
+            tax_amt  = item.get('tax_amount', 0)
+            cgst_amt = round(tax_amt / 2, 2)
+            sgst_amt = round(tax_amt / 2, 2)
+            igst_amt = cgst_amt + sgst_amt
+            subtotal    += line_total
+            total_cgst  += cgst_amt
+            total_sgst  += sgst_amt
+            total_igst  += igst_amt
+            line_items.append(SimpleNamespace(
+                sr_no=item.get('sr_no', i + 1),
+                hsn_code=item.get('hsn_code', ''),
+                description=item.get('description', ''),
+                quantity=qty,
+                unit=item.get('unit', 'Nos'),
+                unit_price=price,
+                tax_percentage=item.get('tax_percentage', 18),
+                cgst_amount=cgst_amt,
+                sgst_amount=sgst_amt,
+                igst_amount=igst_amt,
+                total_amount=line_total + cgst_amt + sgst_amt,
+                cost_price=item.get('cost_price', 0)
+            ))
+
+        invoice = SimpleNamespace(
+            id=invoice_data.get('id'),
+            invoice_number=invoice_data.get('invoice_number', 'N/A'),
+            invoice_date=datetime.strptime(invoice_data.get('invoice_date'), '%Y-%m-%d').date()
+                         if invoice_data.get('invoice_date') else datetime.now().date(),
+            due_date=None,
+            total_amount=subtotal + total_cgst + total_sgst,
+            payment_status=invoice_data.get('payment_status', 'Unpaid'),
+            notes=invoice_data.get('notes', ''),
+            terms_conditions=invoice_data.get('terms_conditions', ''),
+            line_items=line_items,
+            subtotal=subtotal,
+            cgst=total_cgst,
+            sgst=total_sgst,
+            igst=total_igst,
+            invoice_type='Invoice',
+            blockchain_hash=None
+        )
+        invoice.client = SimpleNamespace(
+            name=client_data.get('name', 'N/A'),
+            email=client_data.get('email', ''),
+            phone=client_data.get('phone', ''),
+            address=client_data.get('address', ''),
+            city=client_data.get('city', ''),
+            state='', pincode='', gstin='', pan='', contact_person=''
+        )
+
+        company_res = cloud_request("GET", "/company")
+        company = SimpleNamespace(**company_res.json()) if company_res and company_res.status_code == 200 else None
 
         pdf_buffer = generate_invoice_pdf(invoice, company=company)
         pdf_buffer.seek(0)
 
-        from pathlib import Path
-        downloads_folder = Path.home() / 'Downloads'
-        downloads_folder.mkdir(exist_ok=True)
+        ts = datetime.now().strftime('%Y%m%d%H%M%S')
+        filename = f'Invoice_{invoice_data.get("invoice_number", id)}_{ts}.pdf'
+        saved_path = save_pdf_to_downloads(pdf_buffer, filename)
 
-        filename = f'Invoice_{invoice_data.get("invoice_number")}.pdf'
-        filepath = downloads_folder / filename
-
-        with open(filepath, 'wb') as f:
-            f.write(pdf_buffer.getvalue())
-
-        logging.info(f"PDF saved to: {filepath}")
-        return jsonify({'success': True, 'message': f'PDF saved to Downloads: {filename}', 'filepath': str(filepath)})
+        if saved_path:
+            logging.info(f"PDF saved to Downloads: {saved_path}")
+            return jsonify({'success': True, 'filename': filename, 'path': saved_path})
+        else:
+            return jsonify({'success': False, 'error': 'Could not save PDF to Downloads folder'}), 500
 
     except Exception as e:
-        logging.error(f"PDF download failed: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': f'Failed to save PDF: {str(e)}'}), 500
+        logging.error(f"save-pdf failed: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+
+@app.route('/invoice/<int:id>/send', methods=['POST'])
+@login_required
+def send_invoice_to_client(id):
+    """Generate invoice PDF and email it to the client as an attachment."""
+    try:
+        from email_service import send_email
+
+        # ── 1. Fetch invoice data ──────────────────────────────────────────
+        invoice_data = fetch_cloud_invoice_by_id(id)
+        if not invoice_data:
+            return jsonify({'success': False, 'message': 'Invoice not found'}), 404
+
+        # ── 2. Fetch client data ───────────────────────────────────────────
+        client_data = fetch_cloud_client_by_id(invoice_data.get('client_id'))
+        if not client_data:
+            return jsonify({'success': False, 'message': 'Client not found'}), 404
+
+        client_email = client_data.get('email')
+        if not client_email:
+            return jsonify({'success': False, 'message': 'Client email not found'}), 400
+
+        client_name  = client_data.get('name', 'Client')
+
+        # ── 3. Build line items for PDF generator ─────────────────────────
+        raw_items  = invoice_data.get('line_items', [])
+        line_items = []
+        subtotal   = total_cgst = total_sgst = total_igst = 0
+
+        for i, item in enumerate(raw_items):
+            qty        = item.get('quantity', 0)
+            price      = item.get('unit_price', 0)
+            line_total = qty * price
+            tax_amt    = item.get('tax_amount', 0)
+            cgst_amt   = round(tax_amt / 2, 2)
+            sgst_amt   = round(tax_amt / 2, 2)
+            igst_amt   = cgst_amt + sgst_amt
+            subtotal   += line_total
+            total_cgst += cgst_amt
+            total_sgst += sgst_amt
+            total_igst += igst_amt
+            line_items.append(SimpleNamespace(
+                sr_no        = item.get('sr_no', i + 1),
+                hsn_code     = item.get('hsn_code', ''),
+                description  = item.get('description', ''),
+                quantity     = qty,
+                unit         = item.get('unit', 'Nos'),
+                unit_price   = price,
+                tax_percentage = item.get('tax_percentage', 18),
+                cgst_amount  = cgst_amt,
+                sgst_amount  = sgst_amt,
+                igst_amount  = igst_amt,
+                total_amount = line_total + cgst_amt + sgst_amt,
+                cost_price   = item.get('cost_price', 0)
+            ))
+
+        invoice_number = invoice_data.get('invoice_number', str(id))
+
+        invoice = SimpleNamespace(
+            id                = invoice_data.get('id'),
+            invoice_number    = invoice_number,
+            invoice_date      = datetime.strptime(invoice_data.get('invoice_date'), '%Y-%m-%d').date()
+                                if invoice_data.get('invoice_date') else datetime.now().date(),
+            due_date          = None,
+            total_amount      = subtotal + total_cgst + total_sgst,
+            payment_status    = invoice_data.get('payment_status', 'Unpaid'),
+            notes             = invoice_data.get('notes', ''),
+            terms_conditions  = invoice_data.get('terms_conditions', ''),
+            line_items        = line_items,
+            subtotal          = subtotal,
+            cgst              = total_cgst,
+            sgst              = total_sgst,
+            igst              = total_igst,
+            invoice_type      = 'Invoice',
+            blockchain_hash   = None
+        )
+        invoice.client = SimpleNamespace(
+            name           = client_name,
+            email          = client_email,
+            phone          = client_data.get('phone', ''),
+            address        = client_data.get('address', ''),
+            city           = client_data.get('city', ''),
+            state          = '', pincode='', gstin='', pan='', contact_person=''
+        )
+
+        # ── 4. Fetch company info ──────────────────────────────────────────
+        company_res  = cloud_request("GET", "/company")
+        company      = SimpleNamespace(**company_res.json()) if company_res and company_res.status_code == 200 else None
+        company_name = getattr(company, 'name', 'Our Company')
+        company_email= getattr(company, 'email', '')
+        company_phone= getattr(company, 'phone', '')
+
+        # ── 5. Generate PDF ────────────────────────────────────────────────
+        pdf_buffer = generate_invoice_pdf(invoice, company=company)
+        pdf_buffer.seek(0)
+        pdf_bytes  = pdf_buffer.read()
+        pdf_filename = f'Invoice_{invoice_number}.pdf'
+
+        # ── 6. Build email body ─────────────────────────────────────────────
+        subject = f"Invoice {invoice_number} from {company_name}"
+        body = f"""
+        <h2>Invoice from {company_name}</h2>
+        <p>Dear {client_name},</p>
+
+        <p>Please find your invoice attached to this email. Below is a summary:</p>
+
+        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse;">
+            <tr>
+                <td><b>Invoice Number</b></td>
+                <td>{invoice_number}</td>
+            </tr>
+            <tr>
+                <td><b>Invoice Date</b></td>
+                <td>{invoice.invoice_date}</td>
+            </tr>
+            <tr>
+                <td><b>Total Amount</b></td>
+                <td>&#8377; {invoice.total_amount:.2f}</td>
+            </tr>
+            <tr>
+                <td><b>Payment Status</b></td>
+                <td>{invoice.payment_status}</td>
+            </tr>
+        </table>
+
+        <br>
+        <h3>Company Details</h3>
+        <p>
+            <b>{company_name}</b><br>
+            Email: {company_email}<br>
+            Phone: {company_phone}
+        </p>
+
+        <p>Regards,<br>{company_name}</p>
+        """
+
+        # ── 7. Send email with PDF attachment ──────────────────────────────
+        print(f"Sending invoice PDF to: {client_email}")
+        success = send_email(
+            to_email            = client_email,
+            subject             = subject,
+            body                = body,
+            attachment_bytes    = pdf_bytes,
+            attachment_filename = pdf_filename
+        )
+
+        if success:
+            logging.info(f"Invoice {invoice_number} PDF sent to {client_email}")
+            return jsonify({'success': True, 'message': f'Invoice sent to {client_email} ✅'})
+        else:
+            logging.error(f"Failed to send invoice email to {client_email}")
+            return jsonify({'success': False, 'message': 'Email sending failed. Please try again.'}), 500
+
+    except Exception as e:
+        logging.error(f"send_invoice_to_client error: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
 
 @app.route('/invoice/<int:id>/pdf')
@@ -1374,13 +1641,13 @@ def client_management():
         elif c_name and c_name in local_clients_name_map:
              loc = local_clients_name_map[c_name]
         
-        c_type = 'Regular' 
+        c_type = c.get('client_type') or 'Regular'
         c_gstin = 'N/A'
         c_pan = 'N/A'
         c_contact = c.get('name')
-
+        
         if loc:
-            c_type = loc.client_type or 'Regular'
+            c_type = loc.client_type or c_type
             c_gstin = loc.gstin or 'N/A'
             c_pan = loc.pan or 'N/A'
             c_contact = loc.contact_person or c.get('name')
@@ -1643,8 +1910,8 @@ def export_clients_excel():
             'Name': c.get('name') or 'N/A',
             'Email': c.get('email') or 'N/A',
             'Phone': c.get('phone') or 'N/A',
-            'Type': 'Regular',
-            'Lead Stage': 'New',
+            'Type': c.get('client_type') or 'Regular',
+            'Lead Stage': c.get('lead_stage') or 'New',
             'Total Business': total_business,
             'Risk Score': 0, # Placeholder
             'GST No': c.get('gstin') or 'N/A',
@@ -1697,7 +1964,7 @@ def export_clients_pdf():
                 'name': c.get('name', ''),
                 'email': c.get('email', ''),
                 'phone': c.get('phone', ''),
-                'type': 'Regular', # Cloud default
+                'type': c.get('client_type') or 'Regular',
                 'gstin': 'N/A', # Cloud default
                 'business_value': total_biz
             }
@@ -1810,9 +2077,9 @@ def _get_analytics_data_dict(time_range='12m'):
     
     analytics_data = {
         'revenue_trends': analytics_engine.compute_revenue_trends(invoices_data, time_range),
-        'client_performance': analytics_engine.compute_client_performance_metrics(invoices_data, clients_data),
-        'payment_analytics': analytics_engine.compute_payment_analytics(invoices_data),
-        'profitability_analysis': analytics_engine.compute_profitability_analysis(invoices_data),
+        'client_performance': analytics_engine.compute_client_performance_metrics(invoices_data, clients_data, time_range),
+        'payment_analytics': analytics_engine.compute_payment_analytics(invoices_data, time_range),
+        'profitability_analysis': analytics_engine.compute_profitability_analysis(invoices_data, time_range),
         'ai_predictions': {},
         'blockchain_insights': {}
     }
@@ -1901,10 +2168,12 @@ def export_analytics_excel():
     """Export analytics data to Excel and save to system"""
     try:
         time_range = request.args.get('range', '12m')
+        report_type = request.args.get('type', 'all')
         analytics_data = _get_analytics_data_dict(time_range)
-        output = report_generator.generate_excel_report(analytics_data)
+        output = report_generator.generate_excel_report(analytics_data, report_type)
         
-        filename = f"Analytics_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        prefix = report_type.title() if report_type != 'all' else 'Analytics'
+        filename = f"{prefix}_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         file_path = _save_buffer_to_downloads(output, filename)
         
         if file_path:
@@ -1926,10 +2195,12 @@ def export_analytics_pdf():
     """Export analytics data to PDF and save to system"""
     try:
         time_range = request.args.get('range', '12m')
+        report_type = request.args.get('type', 'all')
         analytics_data = _get_analytics_data_dict(time_range)
-        output = report_generator.generate_pdf_report(analytics_data)
+        output = report_generator.generate_pdf_report(analytics_data, report_type)
         
-        filename = f"Analytics_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        prefix = report_type.title() if report_type != 'all' else 'Analytics'
+        filename = f"{prefix}_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         file_path = _save_buffer_to_downloads(output, filename)
         
         if file_path:
@@ -1960,6 +2231,9 @@ def settings():
         company_res = cloud_request("GET", "/company")
         company_data = company_res.json() if company_res and company_res.status_code == 200 else {}
 
+        bank_res = cloud_request("GET", "/bank-details")
+        bank_data = bank_res.json() if bank_res and bank_res.status_code == 200 else {}
+
         # Fetch invoice defaults
         defaults_res = cloud_request("GET", "/settings/default-prefix")
         defaults_data = defaults_res.json() if defaults_res and defaults_res.status_code == 200 else {}
@@ -1969,11 +2243,13 @@ def settings():
 
     except Exception:
         company_data = {}
+        bank_data = {}
         defaults_data = {}
         tax_data = {}
 
     settings_data = {
         "company": company_data,
+        "bank": bank_data,
         "invoice_defaults": defaults_data,
         "tax_settings": tax_data,
         "user": {
@@ -1992,7 +2268,7 @@ def update_settings():
     try:
         data = request.get_json()
 
-        # 1️⃣ Update Company (Cloud)
+        # 1️⃣ Update Company
         if "company" in data:
             company_payload = {
                 "name": data["company"].get("companyName"),
@@ -2013,7 +2289,32 @@ def update_settings():
                 return jsonify({"success": False, "message": "Company update failed"}), 400
 
 
-        # 2️⃣ Update User Profile (Cloud)
+        # 2️⃣ Update Bank (🔥 MOVE HERE — OUTSIDE company block)
+        if "bank" in data:
+            bank_payload = {
+                "bank_name": data["bank"].get("bankName"),
+                "account_number": data["bank"].get("accountNumber"),
+                "account_name": data["bank"].get("accountName"),
+                "ifsc_code": data["bank"].get("ifscCode"),
+                "branch": data["bank"].get("branchName")
+            }
+
+            response = cloud_request("POST", "/bank-details", json=bank_payload)
+
+            print("Bank API STATUS:", response.status_code)
+            print("Bank API RESPONSE:", response.text)
+
+            if not response:
+                print("Bank API: No response from cloud")
+                return jsonify({"success": False, "message": "Bank update failed"}), 400
+
+            if response.status_code not in (200, 201):
+                print("Bank API Status:", response.status_code)
+                print("Bank API Response:", response.text)
+                return jsonify({"success": False, "message": "Bank update failed"}), 400
+
+
+        # 3️⃣ Update User
         if "user" in data:
             user_payload = {
                 "preferred_language": data["user"].get("preferredLanguage"),
@@ -2033,7 +2334,7 @@ def update_settings():
                 return jsonify({"success": False, "message": "User update failed"}), 400
 
 
-        # 3️⃣ Invoice Settings
+        # 4️⃣ Invoice Settings
         if "invoice" in data:
             inv = data["invoice"]
 
@@ -2063,6 +2364,8 @@ def update_settings():
             "success": False,
             "message": str(e)
         }), 500
+
+
 
 @app.route("/create-challan", methods=['GET', 'POST'])
 @login_required

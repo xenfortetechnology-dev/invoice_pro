@@ -20,9 +20,9 @@ class AnalyticsReportGenerator:
     def __init__(self):
         pass
         
-    def generate_excel_report(self, analytics_data):
+    def generate_excel_report(self, analytics_data, report_type='all'):
         """
-        Generate Excel report from analytics data dictionary.
+        Generate Excel report from analytics data dictionary based on report_type.
         Matches PDF structure: Header -> Revenue -> Profit -> Payments -> Summary
         """
         output = io.BytesIO()
@@ -63,132 +63,146 @@ class AnalyticsReportGenerator:
             row += 1
             worksheet.write(row, 0, f"Generated On: {datetime.now().strftime('%d-%m-%Y %H:%M')}")
             row += 1
-            worksheet.write(row, 0, "Reporting Period: Last 12 Months")
-            row += 2
             
-            # 2. Revenue Trends
-            worksheet.write(row, 0, "1. Revenue Trends", sub_header_format)
-            row += 2
+            # Map type to string
+            type_label_map = {
+                'all': 'Comprehensive Business Summary',
+                'monthly': 'Monthly Business Report',
+                'financial': 'Financial/Tax Analysis',
+                'clients': 'Client Performance Report'
+            }
+            report_title = type_label_map.get(report_type, 'Analytics Report')
             
-            revenue_data = revenue.get("monthly_data", [])
-            df_revenue = pd.DataFrame(revenue_data)
-            if not df_revenue.empty:
-                # Rename cols for display
-                df_revenue = df_revenue.rename(columns={
-                    "month": "Month", 
-                    "revenue": "Revenue (₹)", 
-                    "invoice_count": "Number of Invoices"
-                })
-                # Select specific columns to match PDF
-                cols_to_show = ["Month", "Revenue (₹)", "Number of Invoices"]
-                # Ensure cols exist
-                valid_cols = [c for c in cols_to_show if c in df_revenue.columns]
-                df_revenue = df_revenue[valid_cols] if valid_cols else df_revenue
-                
-                df_revenue.to_excel(writer, sheet_name="Analytics Report", startrow=row, index=False)
-                
-                # Apply format to Revenue column (approximate check)
-                # Pandas writes header at 'row', data starts 'row+1'
-                # Revenue is col 1 (B) if strictly following the list
-                for i in range(len(df_revenue)):
-                    worksheet.write_number(row + 1 + i, 1, df_revenue.iloc[i]["Revenue (₹)"], currency_format)
-                
-                row += len(df_revenue) + 3
-            else:
-                worksheet.write(row, 0, "-")
-                row += 3
-
-            # 3. Profitability Analysis
-            worksheet.write(row, 0, "2. Profitability Analysis", sub_header_format)
-            row += 2
-            
-            profit_data = profit.get("monthly_trends", [])
-            df_profit = pd.DataFrame(profit_data)
-            if not df_profit.empty:
-                df_profit = df_profit.rename(columns={
-                    "month": "Month",
-                    "revenue": "Revenue (₹)", 
-                    "cost": "Cost (₹)", 
-                    "profit": "Profit (₹)",
-                    "margin_percentage": "Margin (%)"
-                })
-                cols_to_show = ["Month", "Revenue (₹)", "Cost (₹)", "Profit (₹)", "Margin (%)"]
-                valid_cols = [c for c in cols_to_show if c in df_profit.columns]
-                df_profit = df_profit[valid_cols] if valid_cols else df_profit
-                
-                df_profit.to_excel(writer, sheet_name="Analytics Report", startrow=row, index=False)
-                
-                # Apply currency formats
-                # Revenue (B), Cost (C), Profit (D)
-                for i in range(len(df_profit)):
-                    if "Revenue (₹)" in df_profit.columns:
-                        worksheet.write_number(row + 1 + i, 1, df_profit.iloc[i].get("Revenue (₹)", 0), currency_format)
-                    if "Cost (₹)" in df_profit.columns:
-                        worksheet.write_number(row + 1 + i, 2, df_profit.iloc[i].get("Cost (₹)", 0), currency_format)
-                    if "Profit (₹)" in df_profit.columns:
-                        worksheet.write_number(row + 1 + i, 3, df_profit.iloc[i].get("Profit (₹)", 0), currency_format)
-
-                row += len(df_profit) + 3
-            else:
-                worksheet.write(row, 0, "-")
-                row += 3
-
-            # 4. Payment Status Distribution
-            worksheet.write(row, 0, "3. Payment Status Distribution", sub_header_format)
-            row += 2
-            
-            payment_data = payments.get("payment_status_distribution", [])
-            df_payments = pd.DataFrame(payment_data)
-            if not df_payments.empty:
-                df_payments = df_payments.rename(columns={
-                    "status": "Payment Status",
-                    "count": "Invoice Count", 
-                    "amount": "Amount (₹)"
-                })
-                cols_to_show = ["Payment Status", "Invoice Count", "Amount (₹)"]
-                valid_cols = [c for c in cols_to_show if c in df_payments.columns]
-                df_payments = df_payments[valid_cols] if valid_cols else df_payments
-                
-                df_payments.to_excel(writer, sheet_name="Analytics Report", startrow=row, index=False)
-                
-                # Apply currency format to Amount (C)
-                for i in range(len(df_payments)):
-                     worksheet.write_number(row + 1 + i, 2, df_payments.iloc[i]["Amount (₹)"], currency_format)
-
-                row += len(df_payments) + 4
-            else:
-                worksheet.write(row, 0, "-")
-                row += 4
-
-            # 5. Summary Section
-            worksheet.write(row, 0, "Summary", sub_header_format)
-            row += 2
-            
-            overall_profit = profit.get("overall", {})
-            total_revenue = overall_profit.get("total_revenue", 0)
-            total_profit = overall_profit.get("total_profit", 0)
-            total_cost = overall_profit.get("total_cost", 0)
-            
-            outstanding_amount = sum(
-                p.get('amount', 0) for p in payment_data 
-                if p.get('status') in ['Unpaid', 'Partially Paid']
-            )
-            
-            worksheet.write(row, 0, "Total Revenue:", bold_format)
-            worksheet.write_number(row, 1, total_revenue, currency_format)
+            worksheet.write(row, 0, f"Report Type: {report_title}")
             row += 1
+            worksheet.write(row, 0, "Reporting Period: Selected Range")
+            row += 2
             
-            worksheet.write(row, 0, "Total Profit:", bold_format)
-            worksheet.write_number(row, 1, total_profit, currency_format)
-            row += 1
-            
-            worksheet.write(row, 0, "Total Cost:", bold_format)
-            worksheet.write_number(row, 1, total_cost, currency_format)
-            row += 1
-            
-            worksheet.write(row, 0, "Outstanding Amount:", bold_format)
-            worksheet.write_number(row, 1, outstanding_amount, currency_format)
-            row += 1
+            # 2. Revenue Trends (All except clients)
+            if report_type in ['all', 'monthly', 'financial']:
+                worksheet.write(row, 0, "1. Revenue Trends", sub_header_format)
+                row += 2
+                
+                revenue_data = revenue.get("monthly_data", [])
+                df_revenue = pd.DataFrame(revenue_data)
+                if not df_revenue.empty:
+                    # Rename cols for display
+                    df_revenue = df_revenue.rename(columns={
+                        "month": "Month", 
+                        "revenue": "Revenue (₹)", 
+                        "invoice_count": "Number of Invoices"
+                    })
+                    # Select specific columns to match PDF
+                    cols_to_show = ["Month", "Revenue (₹)", "Number of Invoices"]
+                    # Ensure cols exist
+                    valid_cols = [c for c in cols_to_show if c in df_revenue.columns]
+                    df_revenue = df_revenue[valid_cols] if valid_cols else df_revenue
+                    
+                    df_revenue.to_excel(writer, sheet_name="Analytics Report", startrow=row, index=False)
+                    
+                    # Apply format to Revenue column (approximate check)
+                    for i in range(len(df_revenue)):
+                        worksheet.write_number(row + 1 + i, 1, df_revenue.iloc[i]["Revenue (₹)"], currency_format)
+                    
+                    row += len(df_revenue) + 3
+                else:
+                    worksheet.write(row, 0, "-")
+                    row += 3
+
+            # 3. Profitability Analysis (Only financial or all)
+            if report_type in ['all', 'financial']:
+                worksheet.write(row, 0, "2. Profitability Analysis", sub_header_format)
+                row += 2
+                
+                profit_data = profit.get("monthly_trends", [])
+                df_profit = pd.DataFrame(profit_data)
+                if not df_profit.empty:
+                    df_profit = df_profit.rename(columns={
+                        "month": "Month",
+                        "revenue": "Revenue (₹)", 
+                        "cost": "Cost (₹)", 
+                        "profit": "Profit (₹)",
+                        "margin_percentage": "Margin (%)"
+                    })
+                    cols_to_show = ["Month", "Revenue (₹)", "Cost (₹)", "Profit (₹)", "Margin (%)"]
+                    valid_cols = [c for c in cols_to_show if c in df_profit.columns]
+                    df_profit = df_profit[valid_cols] if valid_cols else df_profit
+                    
+                    df_profit.to_excel(writer, sheet_name="Analytics Report", startrow=row, index=False)
+                    
+                    # Apply currency formats
+                    # Revenue (B), Cost (C), Profit (D)
+                    for i in range(len(df_profit)):
+                        if "Revenue (₹)" in df_profit.columns:
+                            worksheet.write_number(row + 1 + i, 1, df_profit.iloc[i].get("Revenue (₹)", 0), currency_format)
+                        if "Cost (₹)" in df_profit.columns:
+                            worksheet.write_number(row + 1 + i, 2, df_profit.iloc[i].get("Cost (₹)", 0), currency_format)
+                        if "Profit (₹)" in df_profit.columns:
+                            worksheet.write_number(row + 1 + i, 3, df_profit.iloc[i].get("Profit (₹)", 0), currency_format)
+
+                    row += len(df_profit) + 3
+                else:
+                    worksheet.write(row, 0, "-")
+                    row += 3
+
+            # 4. Payment Status Distribution (Not relevant for client report)
+            if report_type in ['all', 'monthly', 'financial']:
+                worksheet.write(row, 0, "3. Payment Status Distribution", sub_header_format)
+                row += 2
+                
+                payment_data = payments.get("payment_status_distribution", [])
+                df_payments = pd.DataFrame(payment_data)
+                if not df_payments.empty:
+                    df_payments = df_payments.rename(columns={
+                        "status": "Payment Status",
+                        "count": "Invoice Count", 
+                        "amount": "Amount (₹)"
+                    })
+                    cols_to_show = ["Payment Status", "Invoice Count", "Amount (₹)"]
+                    valid_cols = [c for c in cols_to_show if c in df_payments.columns]
+                    df_payments = df_payments[valid_cols] if valid_cols else df_payments
+                    
+                    df_payments.to_excel(writer, sheet_name="Analytics Report", startrow=row, index=False)
+                    
+                    # Apply currency format to Amount (C)
+                    for i in range(len(df_payments)):
+                        worksheet.write_number(row + 1 + i, 2, df_payments.iloc[i]["Amount (₹)"], currency_format)
+
+                    row += len(df_payments) + 4
+                else:
+                    worksheet.write(row, 0, "-")
+                    row += 4
+
+            # 5. Summary Section (Only on all or financial)
+            if report_type in ['all', 'financial']:
+                worksheet.write(row, 0, "Summary", sub_header_format)
+                row += 2
+                
+                overall_profit = profit.get("overall", {})
+                total_revenue = overall_profit.get("total_revenue", 0)
+                total_profit = overall_profit.get("total_profit", 0)
+                total_cost = overall_profit.get("total_cost", 0)
+                
+                outstanding_amount = sum(
+                    p.get('amount', 0) for p in payments.get("payment_status_distribution", [])
+                    if p.get('status') in ['Unpaid', 'Partially Paid']
+                )
+                
+                worksheet.write(row, 0, "Total Revenue:", bold_format)
+                worksheet.write_number(row, 1, total_revenue, currency_format)
+                row += 1
+                
+                worksheet.write(row, 0, "Total Profit:", bold_format)
+                worksheet.write_number(row, 1, total_profit, currency_format)
+                row += 1
+                
+                worksheet.write(row, 0, "Total Cost:", bold_format)
+                worksheet.write_number(row, 1, total_cost, currency_format)
+                row += 1
+                
+                worksheet.write(row, 0, "Outstanding Amount:", bold_format)
+                worksheet.write_number(row, 1, outstanding_amount, currency_format)
+                row += 1
 
             # Adjust column widths
             worksheet.set_column(0, 0, 25) # Month/Label
@@ -197,8 +211,8 @@ class AnalyticsReportGenerator:
         output.seek(0)
         return output
 
-    def generate_pdf_report(self, analytics_data):
-        """Generate PDF report from analytics data dictionary"""
+    def generate_pdf_report(self, analytics_data, report_type='all'):
+        """Generate PDF report from analytics data dictionary based on report_type"""
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
         
@@ -259,8 +273,16 @@ class AnalyticsReportGenerator:
             
         elements.append(Paragraph(f"Organization: {org_name}", org_style))
         elements.append(Paragraph(f"Generated On: {datetime.now().strftime('%d-%m-%Y %H:%M')}", org_style))
-        time_range = "Last 12 Months" # Placeholder or passed arg? inferred for now
-        elements.append(Paragraph(f"Reporting Period: {time_range}", org_style))
+        
+        type_label_map = {
+            'all': 'Comprehensive Business Summary',
+            'monthly': 'Monthly Business Report',
+            'financial': 'Financial/Tax Analysis',
+            'clients': 'Client Performance Report'
+        }
+        report_title = type_label_map.get(report_type, 'Analytics Report')
+        elements.append(Paragraph(f"Report Type: {report_title}", org_style))
+        elements.append(Paragraph(f"Reporting Period: Selected Range", org_style))
         elements.append(Spacer(1, 20))
         
         # Define Table Style
@@ -282,113 +304,145 @@ class AnalyticsReportGenerator:
         ])
 
         # --- Section 1: Revenue Trends ---
-        elements.append(Paragraph("1. Revenue Trends", styles["Heading2"]))
-        revenue = safe_dict(analytics_data.get("revenue_trends", {}))
-        revenue_data = revenue.get("monthly_data", [])
-        
-        # Columns: Month, Revenue, No. of Invoices
-        # Widths: 40%, 40%, 20%
-        col_widths = [available_width * 0.4, available_width * 0.4, available_width * 0.2]
-        
-        table_data = [["Month", "Revenue (₹)", "Number of Invoices"]]
-        if revenue_data:
-            for r in revenue_data:
-                table_data.append([
-                    str(r.get("month", "")), 
-                    f"₹{r.get('revenue', 0):,.2f}", 
-                    str(r.get("invoice_count", 0))
-                ])
-        else:
-            # Empty row to maintain structure if needed, or just headers
-            # User asked for "empty table with structures", so headers are sufficient, 
-            # but let's add one empty row for better visual if chart is empty
-            table_data.append(["-", "-", "-"])
+        if report_type in ['all', 'monthly', 'financial']:
+            elements.append(Paragraph("1. Revenue Trends", styles["Heading2"]))
+            revenue = safe_dict(analytics_data.get("revenue_trends", {}))
+            revenue_data = revenue.get("monthly_data", [])
+            
+            # Columns: Month, Revenue, No. of Invoices
+            # Widths: 40%, 40%, 20%
+            col_widths = [available_width * 0.4, available_width * 0.4, available_width * 0.2]
+            
+            table_data = [["Month", "Revenue (₹)", "Number of Invoices"]]
+            if revenue_data:
+                for r in revenue_data:
+                    table_data.append([
+                        str(r.get("month", "")), 
+                        f"₹{r.get('revenue', 0):,.2f}", 
+                        str(r.get("invoice_count", 0))
+                    ])
+            else:
+                table_data.append(["-", "-", "-"])
 
-        t = Table(table_data, colWidths=col_widths)
-        t.setStyle(common_table_style)
-        elements.append(t)
-        elements.append(Spacer(1, 20))
+            t = Table(table_data, colWidths=col_widths)
+            t.setStyle(common_table_style)
+            elements.append(t)
+            elements.append(Spacer(1, 20))
 
         # --- Section 2: Profitability Analysis ---
-        elements.append(Paragraph("2. Profitability Analysis", styles["Heading2"]))
-        profit = safe_dict(analytics_data.get("profitability_analysis", {}))
-        profit_data = profit.get("monthly_trends", [])
-        
-        # Columns: Month, Revenue, Cost, Profit, Margin %
-        # Widths: 20% each
-        col_w = available_width / 5
-        col_widths = [col_w] * 5
-        
-        table_data = [["Month", "Revenue (₹)", "Cost (₹)", "Profit (₹)", "Margin (%)"]]
-        if profit_data:
-            for p in profit_data:
-                table_data.append([
-                    str(p.get("month", "")),
-                    f"₹{p.get('revenue', 0):,.2f}",
-                    f"₹{p.get('cost', 0):,.2f}",
-                    f"₹{p.get('profit', 0):,.2f}",
-                    f"{p.get('margin_percentage', 0)}%"
-                ])
-        else:
-             table_data.append(["-", "-", "-", "-", "-"])
-                
-        t = Table(table_data, colWidths=col_widths)
-        t.setStyle(common_table_style)
-        elements.append(t)
-        elements.append(Spacer(1, 20))
+        if report_type in ['all', 'financial']:
+            elements.append(Paragraph("2. Profitability Analysis", styles["Heading2"]))
+            profit = safe_dict(analytics_data.get("profitability_analysis", {}))
+            profit_data = profit.get("monthly_trends", [])
+            
+            # Columns: Month, Revenue, Cost, Profit, Margin %
+            # Widths: 20% each
+            col_w = available_width / 5
+            col_widths = [col_w] * 5
+            
+            table_data = [["Month", "Revenue (₹)", "Cost (₹)", "Profit (₹)", "Margin (%)"]]
+            if profit_data:
+                for p in profit_data:
+                    table_data.append([
+                        str(p.get("month", "")),
+                        f"₹{p.get('revenue', 0):,.2f}",
+                        f"₹{p.get('cost', 0):,.2f}",
+                        f"₹{p.get('profit', 0):,.2f}",
+                        f"{p.get('margin_percentage', 0)}%"
+                    ])
+            else:
+                 table_data.append(["-", "-", "-", "-", "-"])
+                    
+            t = Table(table_data, colWidths=col_widths)
+            t.setStyle(common_table_style)
+            elements.append(t)
+            elements.append(Spacer(1, 20))
 
         # --- Section 3: Payment Status Distribution ---
-        elements.append(Paragraph("3. Payment Status Distribution", styles["Heading2"]))
-        payments = safe_dict(analytics_data.get("payment_analytics", {}))
-        payment_data = payments.get("payment_status_distribution", [])
-        
-        # Columns: Payment Status, Invoice Count, Amount
-        # Widths: 40%, 30%, 30%
-        col_widths = [available_width * 0.4, available_width * 0.3, available_width * 0.3]
-        
-        table_data = [["Payment Status", "Invoice Count", "Amount (₹)"]]
-        if payment_data:
-            for pay in payment_data:
-                table_data.append([
-                    str(pay.get("status", "")),
-                    str(pay.get("count", 0)),
-                    f"₹{pay.get('amount', 0):,.2f}"
-                ])
-        else:
-             table_data.append(["-", "-", "-"])
-                
-        t = Table(table_data, colWidths=col_widths)
-        t.setStyle(common_table_style)
-        elements.append(t)
-        elements.append(Spacer(1, 30))
+        if report_type in ['all', 'monthly', 'financial']:
+            elements.append(Paragraph("3. Payment Status Distribution", styles["Heading2"]))
+            payments = safe_dict(analytics_data.get("payment_analytics", {}))
+            payment_data = payments.get("payment_status_distribution", [])
+            
+            # Columns: Payment Status, Invoice Count, Amount
+            # Widths: 40%, 30%, 30%
+            col_widths = [available_width * 0.4, available_width * 0.3, available_width * 0.3]
+            
+            table_data = [["Payment Status", "Invoice Count", "Amount (₹)"]]
+            if payment_data:
+                for pay in payment_data:
+                    table_data.append([
+                        str(pay.get("status", "")),
+                        str(pay.get("count", 0)),
+                        f"₹{pay.get('amount', 0):,.2f}"
+                    ])
+            else:
+                 table_data.append(["-", "-", "-"])
+                    
+            t = Table(table_data, colWidths=col_widths)
+            t.setStyle(common_table_style)
+            elements.append(t)
+            elements.append(Spacer(1, 30))
+
+        # --- Section 4: Client Performance ---
+        if report_type in ['all', 'clients']:
+            elements.append(Paragraph("Client Performance Analysis", styles["Heading2"]))
+            clients = safe_dict(analytics_data.get("client_performance", {}))
+            top_clients = clients.get("top_clients", [])
+            
+            col_w = available_width / 5
+            col_widths = [col_w] * 5
+            
+            table_data = [["Client Name", "Type", "Revenue (₹)", "Invoices", "Avg Invoice (₹)"]]
+            if top_clients:
+                for cl in top_clients:
+                    table_data.append([
+                        str(cl.get("name", "")),
+                        str(cl.get("type", "")),
+                        f"₹{cl.get('total_revenue', 0):,.2f}",
+                        str(cl.get("invoice_count", 0)),
+                        f"₹{cl.get('avg_invoice_value', 0):,.2f}"
+                    ])
+            else:
+                 table_data.append(["-", "-", "-", "-", "-"])
+                    
+            t = Table(table_data, colWidths=col_widths)
+            t.setStyle(common_table_style)
+            elements.append(t)
+            elements.append(Spacer(1, 30))
 
         # --- Summary Section ---
-        elements.append(Paragraph("Summary", styles["Heading2"]))
-        
-        # Calculate totals
-        overall_profit = profit.get("overall", {})
-        total_revenue = overall_profit.get("total_revenue", 0)
-        total_profit = overall_profit.get("total_profit", 0)
-        total_cost = overall_profit.get("total_cost", 0)
-        
-        # Calculate outstanding from payment data
-        outstanding_amount = sum(
-            p.get('amount', 0) for p in payment_data 
-            if p.get('status') in ['Unpaid', 'Partially Paid']
-        )
+        if report_type in ['all', 'financial']:
+            elements.append(Paragraph("Summary", styles["Heading2"]))
+            
+            # Calculate totals
+            profit = safe_dict(analytics_data.get("profitability_analysis", {}))
+            overall_profit = profit.get("overall", {})
+            total_revenue = overall_profit.get("total_revenue", 0)
+            total_profit = overall_profit.get("total_profit", 0)
+            total_cost = overall_profit.get("total_cost", 0)
+            
+            payments = safe_dict(analytics_data.get("payment_analytics", {}))
+            payment_data = payments.get("payment_status_distribution", [])
+            
+            # Calculate outstanding from payment data
+            outstanding_amount = sum(
+                p.get('amount', 0) for p in payment_data 
+                if p.get('status') in ['Unpaid', 'Partially Paid']
+            )
 
-        summary_style = ParagraphStyle(
-            'SummaryText',
-            parent=styles['Normal'],
-            fontSize=11,
-            leading=14,
-            fontName=font_normal
-        )
-        
-        elements.append(Paragraph(f"<b>Total Revenue:</b> ₹{total_revenue:,.2f}", summary_style))
-        elements.append(Paragraph(f"<b>Total Profit:</b> ₹{total_profit:,.2f}", summary_style))
-        elements.append(Paragraph(f"<b>Total Cost:</b> ₹{total_cost:,.2f}", summary_style))
-        elements.append(Paragraph(f"<b>Outstanding Amount:</b> ₹{outstanding_amount:,.2f}", summary_style))
+            summary_style = ParagraphStyle(
+                'SummaryText',
+                parent=styles['Normal'],
+                fontSize=11,
+                leading=14,
+                fontName=font_normal
+            )
+            
+            elements.append(Paragraph(f"<b>Total Revenue:</b> ₹{total_revenue:,.2f}", summary_style))
+            elements.append(Paragraph(f"<b>Total Profit:</b> ₹{total_profit:,.2f}", summary_style))
+            elements.append(Paragraph(f"<b>Total Cost:</b> ₹{total_cost:,.2f}", summary_style))
+            elements.append(Paragraph(f"<b>Outstanding Amount:</b> ₹{outstanding_amount:,.2f}", summary_style))
         
         # --- Footer ---
         # (Auto-handled by SimpleDocTemplate roughly, but we can add an end line)

@@ -884,3 +884,100 @@ select.form-select {
   background-color: rgba(255, 255, 255, 0.1) !important;
   color: var(--text-primary-light) !important;
 }
+
+/* ========================================
+   Invoice Management — PDF Download Toast
+   ======================================== */
+#pdfToast {
+  position: fixed;
+  top: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  z-index: 9999;
+  min-width: 300px;
+  max-width: 90vw;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background: #ffffff;
+  border-left: 5px solid #198754;
+  opacity: 0;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  pointer-events: none;
+}
+
+#pdfToast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+
+#pdfToast .toast-icon {
+  width: 36px;
+  height: 36px;
+  background: #d1e7dd;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+#pdfToast .toast-body {
+  flex: 1;
+}
+
+#pdfToast .toast-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #198754;
+  margin-bottom: 2px;
+}
+
+#pdfToast .toast-msg {
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+#pdfToast .toast-close {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  color: #adb5bd;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+
+#pdfToast .toast-close:hover {
+  color: #495057;
+}
+
+[data-theme="dark"] #pdfToast {
+  background: #1e293b;
+  border-left-color: #34d399;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] #pdfToast .toast-icon {
+  background: rgba(52, 211, 153, 0.15);
+}
+
+[data-theme="dark"] #pdfToast .toast-title {
+  color: #34d399;
+}
+
+[data-theme="dark"] #pdfToast .toast-msg {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] #pdfToast .toast-close {
+  color: #64748b;
+}
+
+[data-theme="dark"] #pdfToast .toast-close:hover {
+  color: #cbd5e1;
+}
