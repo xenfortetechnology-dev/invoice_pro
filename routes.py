@@ -447,11 +447,7 @@ def invoice_management():
             invoice_date=datetime.strptime(
                 inv["invoice_date"], "%Y-%m-%d"
             ) if inv["invoice_date"] else None,
-
-            due_date=datetime.strptime(
-                inv["due_date"], "%Y-%m-%d"
-            ) if inv.get("due_date") else None,
-            
+            due_date=None,
             total_amount=inv["total_amount"],
             amount_paid=0,
             payment_status=inv["payment_status"],
@@ -483,10 +479,8 @@ def invoice_management():
         client_filter=client_filter,
         clients=cloud_clients, # Pass cloud clients for the dropdown
         date_from=date_from,
-        date_to=date_to,
-        today=datetime.now()
+        date_to=date_to
     )
-
 @app.route('/create_invoice', methods=['GET', 'POST'])
 @login_required
 def create_invoice():
@@ -494,9 +488,14 @@ def create_invoice():
     if request.method == 'POST':
         try:
             client_id = request.form.get('client_id')
-            invoice_format = request.form.get("invoice_format", "default")
+            template_id = None
+
+            # ✅ Convert to integer safely
+            if template_id:
+                template_id = int(template_id)
+
             invoice_date_str = request.form.get('invoice_date')
-            due_date_str = request.form.get('due_date')
+
             invoice_number = generate_invoice_number()
 
             # Process line items — use pre-computed amounts from JS
@@ -506,7 +505,7 @@ def create_invoice():
                 float(item.get("total_amount", 0)) for item in line_items_data
             )
 
-            # 🔥 SEND TO CLOUD API (FIXED INDENTATION)
+            # 🔥 SEND TO CLOUD API
             response = cloud_request(
                 "POST",
                 "/invoices",
@@ -514,11 +513,10 @@ def create_invoice():
                     "invoice_number": invoice_number,
                     "client_id": client_id,
                     "invoice_date": invoice_date_str,
-                    "due_date": due_date_str, 
                     "total_amount": total_amount,
                     "payment_status": "Unpaid",
                     "line_items": line_items_data,
-                    "invoice_format": invoice_format
+                    "template_id": template_id   # ✅ Using template_id
                 }
             )
 
@@ -641,21 +639,26 @@ def create_invoice():
 def preview_invoice():
     """Preview invoice without saving"""
     try:
-        # Extract form data (duplicates logic from create_invoice but doesn't save)
+        # Extract form data
         client_id = request.form.get('client_id')
         invoice_date_str = request.form.get('invoice_date')
         due_date_str = request.form.get('due_date')
         notes = request.form.get('notes', '')
         terms_conditions = request.form.get('terms_conditions', '')
-        invoice_format = request.form.get("invoice_format", "default")
-        print("Saving Invoice Format:", invoice_format)
 
-        # Fetch client from cloud database
+        # ✅ Get template_id instead of invoice_format
+        template_id = request.form.get("template_id")
+
+        if template_id:
+            template_id = int(template_id)
+
+        print("Preview Template ID:", template_id)
+
+        # Fetch client from cloud
         client_data = fetch_cloud_client_by_id(client_id)
         if not client_data:
-             return "Client not found", 404
-        
-        # Create client object with all required fields
+            return "Client not found", 404
+
         client = SimpleNamespace(
             id=client_data.get('id'),
             name=client_data.get('name', 'N/A'),
@@ -666,11 +669,13 @@ def preview_invoice():
             pan=''
         )
 
-        invoice_date = datetime.strptime(invoice_date_str, '%Y-%m-%d').date() if invoice_date_str else datetime.now().date()
-        
-        # Parse Line Items
+        invoice_date = datetime.strptime(
+            invoice_date_str, '%Y-%m-%d'
+        ).date() if invoice_date_str else datetime.now().date()
+
+        # Parse line items
         line_items_data = json.loads(request.form.get('line_items', '[]'))
-        
+
         line_items = []
         subtotal = 0
         total_cgst = 0
@@ -680,22 +685,18 @@ def preview_invoice():
         for i, item_data in enumerate(line_items_data, 1):
             quantity = float(item_data.get('quantity', 0))
             unit_price = float(item_data.get('unit_price', 0))
-            
+
             cgst_percentage = float(item_data.get('cgst_percentage', 0.0))
             sgst_percentage = float(item_data.get('sgst_percentage', 0.0))
-            # IGST = CGST + SGST — it's their combined representation, not a 3rd tax
-            igst_percentage = cgst_percentage + sgst_percentage
 
             line_total = quantity * unit_price
 
             cgst_amount = (line_total * cgst_percentage) / 100
             sgst_amount = (line_total * sgst_percentage) / 100
-            igst_amount = cgst_amount + sgst_amount   # IGST = CGST + SGST
+            igst_amount = cgst_amount + sgst_amount
 
-            # Row total = amount + CGST + SGST (equivalently: amount + IGST)
             item_total = line_total + cgst_amount + sgst_amount
 
-            # Create SimpleNamespace object instead of InvoiceLineItem model
             li = SimpleNamespace(
                 sr_no=i,
                 hsn_code=item_data.get('hsn_code', ''),
@@ -705,7 +706,7 @@ def preview_invoice():
                 unit_price=unit_price,
                 cgst_percentage=cgst_percentage,
                 sgst_percentage=sgst_percentage,
-                igst_percentage=igst_percentage,
+                igst_percentage=cgst_percentage + sgst_percentage,
                 cgst_amount=cgst_amount,
                 sgst_amount=sgst_amount,
                 igst_amount=igst_amount,
@@ -719,10 +720,8 @@ def preview_invoice():
             total_sgst += sgst_amount
             total_igst += igst_amount
 
-        # Grand total = subtotal + CGST + SGST (IGST is CGST+SGST combined, not extra)
         grand_total = subtotal + total_cgst + total_sgst
 
-        # Create SimpleNamespace invoice instead of Invoice model
         invoice = SimpleNamespace(
             invoice_number="PREVIEW",
             invoice_date=invoice_date,
@@ -733,29 +732,30 @@ def preview_invoice():
             subtotal=subtotal,
             cgst=total_cgst,
             sgst=total_sgst,
-            igst=total_igst,           # = total_cgst + total_sgst
+            igst=total_igst,
             total_amount=grand_total,
-            invoice_format=invoice_format,
             line_items=line_items,
             payment_status='Unpaid'
         )
-        
-        # Fetch company from cloud API
+
+        # Fetch company
         company_res = cloud_request("GET", "/company")
         if company_res and company_res.status_code == 200:
             company = SimpleNamespace(**company_res.json())
         else:
-            # Fallback to local if cloud fails
             company = Company.query.first()
-            
+
         bank = BankDetails.query.first()
 
-        # Select Template
+        # ✅ Map template_id → HTML template
         template_map = {
-            "default": "invoice_detail.html",
-            "excel_customer_A": "invoice_excel_customer_A.html"
+            1: "invoice_detail.html",
+            2: "invoice_excel_customer_A.html"
         }
-        template_name = template_map.get(invoice_format, "invoice_detail.html")
+
+        template_name = template_map.get(template_id, "invoice_detail.html")
+
+        print("Preview Rendering Template:", template_name)
 
         return render_template(
             template_name,
@@ -770,18 +770,18 @@ def preview_invoice():
     except Exception as e:
         logging.error(f"Preview failed: {e}")
         return f"Error creating preview: {str(e)}", 500
-
+    
 @app.route('/invoice/<int:id>')
 @login_required
 def invoice_detail(id):
 
     invoice_data = fetch_cloud_invoice_by_id(id)
 
-    # 🔍 DEBUG FORMAT
-    print("===== FORMAT DEBUG =====")
+    # 🔍 DEBUG TEMPLATE
+    print("===== TEMPLATE DEBUG =====")
     print("Invoice ID:", id)
-    print("invoice_format from cloud:", invoice_data.get("invoice_format") if invoice_data else None)
-    print("========================")
+    print("template_id from cloud:", invoice_data.get("template_id") if invoice_data else None)
+    print("==========================")
 
     if not invoice_data:
         flash('Invoice not found', 'error')
@@ -833,28 +833,30 @@ def invoice_detail(id):
             quantity=quantity,
             unit=item.get("unit", "Nos"),
             unit_price=unit_price,
-            tax_percentage=item.get("tax_percentage", 18), # Used by pdf_generator.py
+            tax_percentage=item.get("tax_percentage", 18),
             cgst_amount=cgst_amount,
             sgst_amount=sgst_amount,
             igst_amount=igst_amount,
             total_amount=total_amount
         ))
 
-    # 🔥 Get stored format
-    invoice_format = invoice_data.get("invoice_format", "default")
+    # ✅ Get stored template_id
+    template_id = invoice_data.get("template_id")
+
+    if template_id:
+        template_id = int(template_id)
 
     invoice = SimpleNamespace(
         id=invoice_data.get('id'),
         invoice_number=invoice_data.get('invoice_number'),
         invoice_date=datetime.strptime(invoice_data.get('invoice_date'), '%Y-%m-%d'),
-        total_amount=subtotal + total_cgst + total_sgst,   # grand total = subtotal + CGST + SGST
+        total_amount=subtotal + total_cgst + total_sgst,
         payment_status=invoice_data.get('payment_status'),
         line_items=line_items,
         subtotal=subtotal,
         cgst=total_cgst,
         sgst=total_sgst,
-        igst=total_igst,
-        invoice_format=invoice_format
+        igst=total_igst
     )
 
     invoice.client = SimpleNamespace(
@@ -864,23 +866,22 @@ def invoice_detail(id):
         address=''
     )
 
-    # Fetch company from cloud API
+    # Fetch company
     company_res = cloud_request("GET", "/company")
     if company_res and company_res.status_code == 200:
         company = SimpleNamespace(**company_res.json())
     else:
-        # Fallback to local if cloud fails
         company = Company.query.first()
-        
+
     bank = BankDetails.query.first()
 
-    # 🔥 SELECT TEMPLATE BASED ON SAVED FORMAT
+    # ✅ TEMPLATE SELECTION USING template_id
     template_map = {
-        "default": "invoice_detail.html",
-        "excel_customer_A": "invoice_excel_customer_A.html"
+        1: "invoice_detail.html",
+        2: "invoice_excel_customer_A.html"
     }
 
-    template_name = template_map.get(invoice_format, "invoice_detail.html")
+    template_name = template_map.get(template_id, "invoice_detail.html")
 
     print("Rendering Template:", template_name)
 
