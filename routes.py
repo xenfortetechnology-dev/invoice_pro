@@ -2874,19 +2874,41 @@ def crm():
     # 6. Follow-ups
     follow_ups = [r for r in reminders if r.reminder_type == 'Follow-up']
     
-    # Fallback: If no follow-ups, synthesize them from New Leads to keep dashboard alive
+    # Fallback: If no follow-ups, synthesize them from other lead stages to keep dashboard alive
     if not follow_ups and processed_clients:
         from types import SimpleNamespace
-        # Take up to 3 'New' clients
-        new_leads = [c for c in processed_clients if c.get('lead_stage') == 'New'][:3]
-        for c in new_leads:
+        # Provide follow ups for clients that aren't closed yet
+        attention_leads = [
+            c for c in processed_clients 
+            if c.get('lead_stage', '').lower() in ['new', 'in discussion', 'quoted', 'discussion', 'proposal']
+        ]
+        
+        # Sort to prioritize Quoted/Proposal, then Discussion, then New
+        def stage_weight(c):
+            stage = c.get('lead_stage', '').lower()
+            if stage in ['quoted', 'proposal']: return 0
+            if stage in ['in discussion', 'discussion']: return 1
+            return 2
+            
+        attention_leads.sort(key=stage_weight)
+        
+        for c in attention_leads[:3]:
              c_obj = SimpleNamespace(id=c['id'], name=c['name'])
+             stage = c.get('lead_stage', 'New').lower()
+             
+             if stage in ['quoted', 'proposal']:
+                 note = "Follow up on assigned quote"
+             elif stage in ['in discussion', 'discussion']:
+                 note = "Follow up with discussion details"
+             else:
+                 note = "New Lead - Please contact"
+                 
              # Mock a reminder object
              mock_rem = SimpleNamespace(
                 id=0,
                 client=c_obj,
                 reminder_date=datetime.now(),
-                note="New Lead - Please contact",
+                note=note,
                 status="Pending",
                 reminder_type="Follow-up"
              )

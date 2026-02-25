@@ -817,7 +817,7 @@ class AnalyticsEngine:
             logging.error(f"Cloud API error in get_lead_stats: {e}")
             clients = []
 
-        stats = {"new": 0, "discussion": 0, "quoted": 0, "closed": 0}
+        stats = {"new": 0, "discussion": 0, "quoted": 0, "closed": 0, "unknown": 0}
 
         for client in clients:
 
@@ -826,7 +826,7 @@ class AnalyticsEngine:
             if stage == "new":
                 stats["new"] += 1
 
-            elif stage in ["qualified", "discussion"]:
+            elif stage in ["qualified", "discussion", "in discussion"]:
                 stats["discussion"] += 1
 
             elif stage in ["quoted", "proposal"]:
@@ -836,7 +836,7 @@ class AnalyticsEngine:
                 stats["closed"] += 1
 
             else:
-                stats["new"] += 1
+                stats["unknown"] += 1
 
         print("Lead stats computed:", stats)
 
