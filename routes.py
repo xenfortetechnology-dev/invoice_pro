@@ -431,7 +431,7 @@ def invoice_management():
 
     # --- PAGINATION ---
     page = request.args.get('page', 1, type=int)
-    per_page = 30
+    per_page = 15
     total_invoices = len(filtered_data)
     
     start = (page - 1) * per_page
