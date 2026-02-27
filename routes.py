@@ -13,7 +13,7 @@ from app import app, mail
 from models import *
 from utils import *
 from utils import safe_dict
-from pdf_generator import generate_invoice_pdf, generate_challan_pdf, AnalyticsReportGenerator
+from pdf_generator import generate_invoice_pdf, generate_challan_pdf, generate_triple_invoice_pdf, AnalyticsReportGenerator
 from ai_services import ai_assistant, predictive_analytics, inventory_ai
 from blockchain_service import blockchain_service, smart_contract_manager
 from ocr_service import ocr_processor, receipt_processor
@@ -1016,14 +1016,15 @@ def download_invoice_pdf(id):
         bank_res = cloud_request("GET", "/bank-details")
         bank = SimpleNamespace(**bank_res.json()) if bank_res and bank_res.status_code == 200 else None
 
-        pdf_buffer = generate_invoice_pdf(invoice, company=company, bank=bank)
+        # Generate 3-copy PDF: 1 Original + 2 Duplicate (watermarked)
+        pdf_buffer = generate_triple_invoice_pdf(invoice, company=company, bank=bank)
         pdf_buffer.seek(0)
 
         # The JS passes ?t=<timestamp> so each download gets a unique filename –
         # Chrome will never overwrite a previous download of the same invoice.
         ts = request.args.get('t', datetime.now().strftime('%Y%m%d%H%M%S'))
         invoice_number = invoice_data.get('invoice_number', str(id))
-        filename = f'Invoice_{invoice_number}_{ts}.pdf'
+        filename = f'Invoice_{invoice_number}_{ts}_3copies.pdf'
 
         logging.info(f"Streaming PDF to browser as: {filename}")
         return Response(
@@ -1118,11 +1119,12 @@ def save_invoice_pdf_to_disk(id):
         company_res = cloud_request("GET", "/company")
         company = SimpleNamespace(**company_res.json()) if company_res and company_res.status_code == 200 else None
 
-        pdf_buffer = generate_invoice_pdf(invoice, company=company)
+        # Generate 3-copy PDF: 1 Original + 2 Duplicate (watermarked)
+        pdf_buffer = generate_triple_invoice_pdf(invoice, company=company)
         pdf_buffer.seek(0)
 
         ts = datetime.now().strftime('%Y%m%d%H%M%S')
-        filename = f'Invoice_{invoice_data.get("invoice_number", id)}_{ts}.pdf'
+        filename = f'Invoice_{invoice_data.get("invoice_number", id)}_{ts}_3copies.pdf'
         saved_path = save_pdf_to_downloads(pdf_buffer, filename)
 
         if saved_path:
