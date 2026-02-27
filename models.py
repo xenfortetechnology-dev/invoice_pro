@@ -410,7 +410,7 @@ def validate_line_item(mapper, connection, target):
 
 @event.listens_for(Invoice, 'before_insert')
 def set_invoice_defaults(mapper, connection, target):
-    """Set defaults for invoice."""
+    """Set defaults for invoice.""" 
     if not target.invoice_date:
         target.invoice_date = datetime.utcnow().date()
         

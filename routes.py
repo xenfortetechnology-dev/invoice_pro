@@ -2369,6 +2369,7 @@ def update_settings():
 
         if request.content_type and "multipart/form-data" in request.content_type:
             logo_file = request.files.get("logo")
+            signature_file = request.files.get("authorized_signature") 
 
             # 🔥 Parse JSON strings properly
             data = {
@@ -2380,6 +2381,7 @@ def update_settings():
         else:
             data = request.get_json()
             logo_file = None
+            signature_file = None
 
         # ---------------------------------------
         # 1️⃣ UPDATE COMPANY (WITH LOGO SUPPORT)
@@ -2409,15 +2411,21 @@ def update_settings():
 
             files = {}
 
-            # ✅ CORRECT FILE HANDLING
+            # Add logo if present
             if logo_file and logo_file.filename != "":
-                files = {
-                    "logo": (
-                        logo_file.filename,
-                        logo_file.stream,   # 🔥 NOT .read()
-                        logo_file.mimetype
-                    )
-                }
+                files["logo"] = (
+                    logo_file.filename,
+                    logo_file.stream,
+                    logo_file.mimetype
+                )
+
+            # ✅ Add signature if present
+            if signature_file and signature_file.filename != "":
+                files["authorized_signature"] = (
+                    signature_file.filename,
+                    signature_file.stream,
+                    signature_file.mimetype
+                )
 
             response = cloud_request(
                 "POST",
@@ -2518,8 +2526,6 @@ def update_settings():
         }), 500
 
 
-
-
 from flask import Response
 
 @app.route("/company/logo")
@@ -2535,6 +2541,20 @@ def company_logo():
 
     return "", 404
 
+
+
+@app.route("/company/signature")
+@login_required
+def company_signature():
+    response = cloud_request("GET", "/company/signature")
+
+    if response and response.status_code == 200:
+        return Response(
+            response.content,
+            content_type=response.headers.get("Content-Type")
+        )
+
+    return "", 404
 
 @app.route("/create-challan", methods=['GET', 'POST'])
 @login_required

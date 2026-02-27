@@ -288,7 +288,9 @@
             {% endif %}
         </div>
         <div style="text-align: center;">
-            <img src="{{ url_for('static', filename='images/stamp.png') }}" style="height: 80px;"><br>
+            <img src="{{ url_for('company_signature') }}"
+                style="height: 80px;"
+                onerror="this.style.display='none'">
         </div>
         <div style="text-align: center;">
             Authorised Signatory
