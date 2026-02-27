@@ -13,7 +13,7 @@ from app import app, mail
 from models import *
 from utils import *
 from utils import safe_dict
-from pdf_generator import generate_invoice_pdf, generate_challan_pdf, AnalyticsReportGenerator
+from pdf_generator import generate_invoice_pdf, generate_challan_pdf, generate_triple_invoice_pdf, AnalyticsReportGenerator
 from ai_services import ai_assistant, predictive_analytics, inventory_ai
 from blockchain_service import blockchain_service, smart_contract_manager
 from ocr_service import ocr_processor, receipt_processor
@@ -670,8 +670,6 @@ def preview_invoice():
         due_date_str = request.form.get('due_date')
         notes = request.form.get('notes', '')
         terms_conditions = request.form.get('terms_conditions', '')
-        template_id = request.form.get("format_choice")
-        print("Saving Invoice Format:", invoice_format)
 
         # ✅ Get template_id instead of invoice_format
         template_id = request.form.get("template_id")
@@ -775,8 +773,10 @@ def preview_invoice():
         bank_res = cloud_request("GET", "/bank-details")
         bank = SimpleNamespace(**bank_res.json()) if bank_res and bank_res.status_code == 200 else None
 
-        template_id = invoice.get("template_id")
-        print("TEMPLATE DEBUG:", invoice.get("template_id"))
+        print("TEMPLATE DEBUG:", template_id)
+        
+        # Add template_id to invoice namespace just in case the template needs it
+        invoice.template_id = template_id
 
         template_map = {
             5: "invoice_detail.html",              
@@ -1016,14 +1016,15 @@ def download_invoice_pdf(id):
         bank_res = cloud_request("GET", "/bank-details")
         bank = SimpleNamespace(**bank_res.json()) if bank_res and bank_res.status_code == 200 else None
 
-        pdf_buffer = generate_invoice_pdf(invoice, company=company, bank=bank)
+        # Generate 3-copy PDF: 1 Original + 2 Duplicate (watermarked)
+        pdf_buffer = generate_triple_invoice_pdf(invoice, company=company, bank=bank)
         pdf_buffer.seek(0)
 
         # The JS passes ?t=<timestamp> so each download gets a unique filename –
         # Chrome will never overwrite a previous download of the same invoice.
         ts = request.args.get('t', datetime.now().strftime('%Y%m%d%H%M%S'))
         invoice_number = invoice_data.get('invoice_number', str(id))
-        filename = f'Invoice_{invoice_number}_{ts}.pdf'
+        filename = f'Invoice_{invoice_number}_{ts}_3copies.pdf'
 
         logging.info(f"Streaming PDF to browser as: {filename}")
         return Response(
@@ -1118,11 +1119,12 @@ def save_invoice_pdf_to_disk(id):
         company_res = cloud_request("GET", "/company")
         company = SimpleNamespace(**company_res.json()) if company_res and company_res.status_code == 200 else None
 
-        pdf_buffer = generate_invoice_pdf(invoice, company=company)
+        # Generate 3-copy PDF: 1 Original + 2 Duplicate (watermarked)
+        pdf_buffer = generate_triple_invoice_pdf(invoice, company=company)
         pdf_buffer.seek(0)
 
         ts = datetime.now().strftime('%Y%m%d%H%M%S')
-        filename = f'Invoice_{invoice_data.get("invoice_number", id)}_{ts}.pdf'
+        filename = f'Invoice_{invoice_data.get("invoice_number", id)}_{ts}_3copies.pdf'
         saved_path = save_pdf_to_downloads(pdf_buffer, filename)
 
         if saved_path:
@@ -1533,27 +1535,53 @@ def edit_invoice(id):
 @app.route('/invoice/<int:id>/duplicate', methods=['POST'])
 @login_required
 def duplicate_invoice(id):
-    invoice = Invoice.query.get_or_404(id)
-
+    """Duplicate an invoice by fetching it from the cloud API and re-creating it."""
     try:
-        new_invoice = Invoice(
-            client_id=invoice.client_id,
-            notes=invoice.notes,
-            terms_conditions=invoice.terms_conditions,
-            total_amount=invoice.total_amount,
-            payment_status='Unpaid',
-            invoice_date=datetime.utcnow(),
-            # make sure invoice_number is unique, e.g.,
-            invoice_number=f"{invoice.invoice_number}-COPY"
-        )
+        # 1. Fetch the original invoice from cloud
+        invoice_data = fetch_cloud_invoice_by_id(id)
+        if not invoice_data:
+            return jsonify({'message': 'Original invoice not found in cloud'}), 404
 
-        db.session.add(new_invoice)
-        db.session.commit()
-        return jsonify({'message': 'Invoice duplicated successfully!'}), 200
+        # 2. Build the new invoice payload
+        #    - New invoice number = original + "-COPY"
+        #    - Reset payment status to Unpaid
+        #    - Use today's date
+        #    - Strip 'id' from each line item so the cloud creates new records
+        original_number = invoice_data.get('invoice_number', str(id))
+        new_number = f"{original_number}-COPY"
+
+        raw_line_items = invoice_data.get('line_items', [])
+        new_line_items = []
+        for item in raw_line_items:
+            new_item = {k: v for k, v in item.items() if k != 'id'}
+            new_line_items.append(new_item)
+
+        payload = {
+            'invoice_number':    new_number,
+            'client_id':         invoice_data.get('client_id'),
+            'invoice_date':      datetime.now().strftime('%Y-%m-%d'),
+            'total_amount':      invoice_data.get('total_amount', 0),
+            'payment_status':    'Unpaid',
+            'notes':             invoice_data.get('notes', ''),
+            'terms_conditions':  invoice_data.get('terms_conditions', ''),
+            'line_items':        new_line_items,
+        }
+
+        # 3. POST new invoice to cloud API
+        response = cloud_request('POST', '/invoices', json=payload)
+
+        if response and response.status_code in (200, 201):
+            logging.info(f"Invoice {id} duplicated as {new_number} on cloud")
+            return jsonify({'message': f'Invoice duplicated successfully as {new_number}!'}), 200
+        else:
+            err = response.text if response else 'No response from cloud'
+            logging.error(f"Cloud duplicate failed: {err}")
+            return jsonify({'message': f'Failed to duplicate invoice on cloud: {err}'}), 400
 
     except Exception as e:
-        db.session.rollback()
+        logging.error(f"duplicate_invoice error: {e}", exc_info=True)
         return jsonify({'message': f'Failed to duplicate invoice: {str(e)}'}), 400
+
 
 @app.route('/invoice/<int:id>/send', methods=['POST'])
 @login_required
@@ -2954,58 +2982,38 @@ def crm():
     # 5. Reminders (Local)
     reminders = []
     try:
-        local_reminders = PaymentReminder.query.filter(PaymentReminder.status == 'Pending').all()
-        for r in local_reminders:
-            if r.invoice and r.invoice.client:
-                 reminders.append(r)
-            else:
-                # Local link broken? adhere to safety.
-                pass
+        from models import Reminder
+        from types import SimpleNamespace
+        
+        db_reminders = Reminder.query.filter(Reminder.status != 'Completed') \
+            .order_by(Reminder.reminder_date.asc()) \
+            .all()
+            
+        for r in db_reminders:
+            client_dict = next((c for c in processed_clients if c['id'] == r.client_id), None)
+            if client_dict:
+                c_obj = SimpleNamespace(
+                    id=client_dict['id'], 
+                    name=client_dict['name'], 
+                    email=client_dict.get('email', '')
+                )
+                rem = SimpleNamespace(
+                    id=r.id,
+                    client=c_obj,
+                    reminder_date=r.reminder_date,
+                    note=r.notes,
+                    status=r.status,
+                    reminder_type=r.reminder_type
+                )
+                reminders.append(rem)
+                
     except Exception as e:
         app.logger.error(f"Error fetching local reminders: {e}")
 
     # 6. Follow-ups
     follow_ups = [r for r in reminders if r.reminder_type == 'Follow-up']
     
-    # Fallback: If no follow-ups, synthesize them from other lead stages to keep dashboard alive
-    if not follow_ups and processed_clients:
-        from types import SimpleNamespace
-        # Provide follow ups for clients that aren't closed yet
-        attention_leads = [
-            c for c in processed_clients 
-            if c.get('lead_stage', '').lower() in ['new', 'in discussion', 'quoted', 'discussion', 'proposal']
-        ]
-        
-        # Sort to prioritize Quoted/Proposal, then Discussion, then New
-        def stage_weight(c):
-            stage = c.get('lead_stage', '').lower()
-            if stage in ['quoted', 'proposal']: return 0
-            if stage in ['in discussion', 'discussion']: return 1
-            return 2
-            
-        attention_leads.sort(key=stage_weight)
-        
-        for c in attention_leads[:3]:
-             c_obj = SimpleNamespace(id=c['id'], name=c['name'])
-             stage = c.get('lead_stage', 'New').lower()
-             
-             if stage in ['quoted', 'proposal']:
-                 note = "Follow up on assigned quote"
-             elif stage in ['in discussion', 'discussion']:
-                 note = "Follow up with discussion details"
-             else:
-                 note = "New Lead - Please contact"
-                 
-             # Mock a reminder object
-             mock_rem = SimpleNamespace(
-                id=0,
-                client=c_obj,
-                reminder_date=datetime.now(),
-                note=note,
-                status="Pending",
-                reminder_type="Follow-up"
-             )
-             follow_ups.append(mock_rem)
+
 
     # DEBUG: Print what we're passing to template
     print(f"\n🔍 [CRM DEBUG] Data being passed to template:")
@@ -3031,8 +3039,63 @@ def crm():
 
 @app.route('/create-reminder')
 @login_required
-def create_reminder():
+def create_reminder_page():
     return render_template('create_reminder.html', title='Create Reminder')
+
+@app.route('/reminder/create', methods=['POST'])
+@login_required
+def create_reminder():
+    try:
+        client_id = request.form.get('client_id')
+        reminder_date_str = request.form.get('reminder_date')
+        reminder_type = request.form.get('reminder_type')
+        notes = request.form.get('notes', '')
+        
+        reminder_date = datetime.strptime(reminder_date_str, '%Y-%m-%dT%H:%M') if reminder_date_str else None
+        
+        reminder = Reminder(
+            client_id=client_id,
+            reminder_date=reminder_date,
+            reminder_type=reminder_type,
+            notes=notes,
+            status='Pending'
+        )
+        
+        db.session.add(reminder)
+        db.session.commit()
+        flash('Reminder created successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error creating reminder: {str(e)}', 'error')
+    
+    return redirect(url_for('crm'))
+
+@app.route('/reminder/<int:id>/complete', methods=['POST'])
+@login_required
+def complete_reminder(id):
+    try:
+        if id == 0:
+            flash('System-generated follow-up acknowledged.', 'success')
+            return redirect(url_for('crm'))
+            
+        reminder = Reminder.query.get_or_404(id)
+        reminder.status = 'Completed'
+        db.session.commit()
+        flash('Reminder marked as completed.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating reminder: {str(e)}', 'error')
+    return redirect(url_for('crm'))
+
+@app.route('/api/contact_client_whatsapp', methods=['POST'])
+@login_required
+def contact_client_whatsapp():
+    return jsonify({'success': False, 'error': 'WhatsApp integration pending client setup'}), 501
+
+@app.route('/api/send_invoice_whatsapp', methods=['POST'])
+@login_required
+def send_invoice_whatsapp():
+    return jsonify({'success': False, 'error': 'WhatsApp integration pending client setup'}), 501
 
 
 from flask import send_file, request

@@ -313,6 +313,101 @@ def generate_invoice_pdf(invoice, company=None, bank=None):
         logging.error(f"PDF generation failed: {e}")
         raise
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Watermark helpers for triple-copy download
+# ─────────────────────────────────────────────────────────────────────────────
+
+def add_watermark_to_pdf(source_buffer, watermark_text="DUPLICATE"):
+    """Overlay a diagonal watermark on every page of *source_buffer*.
+
+    Args:
+        source_buffer : io.BytesIO containing a valid PDF.
+        watermark_text: text to stamp diagonally across each page.
+
+    Returns:
+        io.BytesIO with the watermarked PDF.
+    """
+    from pypdf import PdfReader, PdfWriter
+    import math
+
+    # 1. Build a single-page watermark PDF in memory using reportlab canvas
+    wm_buffer = io.BytesIO()
+    page_width, page_height = A4  # (595.27, 841.89) in points
+
+    c = canvas.Canvas(wm_buffer, pagesize=A4)
+
+    # Semi-transparent red diagonal text
+    c.saveState()
+    c.setFont("Helvetica-Bold", 72)
+    c.setFillColorRGB(0.85, 0.1, 0.1, alpha=0.18)   # light-red, near-transparent
+    c.translate(page_width / 2, page_height / 2)
+    c.rotate(45)
+    text_width = c.stringWidth(watermark_text, "Helvetica-Bold", 72)
+    c.drawString(-text_width / 2, 0, watermark_text)
+    c.restoreState()
+    c.save()
+    wm_buffer.seek(0)
+
+    # 2. Read the watermark page and the source PDF
+    wm_reader = PdfReader(wm_buffer)
+    wm_page   = wm_reader.pages[0]
+
+    source_buffer.seek(0)
+    src_reader = PdfReader(source_buffer)
+    writer = PdfWriter()
+
+    for page in src_reader.pages:
+        page.merge_page(wm_page)   # merge watermark on top of content
+        writer.add_page(page)
+
+    out_buffer = io.BytesIO()
+    writer.write(out_buffer)
+    out_buffer.seek(0)
+    return out_buffer
+
+
+def generate_triple_invoice_pdf(invoice, company=None, bank=None):
+    """Generate a single PDF containing 3 copies of the invoice.
+
+    Page layout:
+      • Copy 1 – ORIGINAL  (no watermark)
+      • Copy 2 – DUPLICATE (diagonal watermark)
+      • Copy 3 – DUPLICATE (diagonal watermark)
+
+    Returns:
+        io.BytesIO  — merged PDF with all 3 copies.
+    """
+    from pypdf import PdfReader, PdfWriter
+
+    # Generate the base invoice once
+    base_buffer = generate_invoice_pdf(invoice, company=company, bank=bank)
+    base_buffer.seek(0)
+    base_bytes = base_buffer.read()
+
+    # Copy 1 – original (no watermark)
+    copy1 = io.BytesIO(base_bytes)
+
+    # Copy 2 – duplicate watermark
+    copy2 = add_watermark_to_pdf(io.BytesIO(base_bytes), "DUPLICATE")
+
+    # Copy 3 – duplicate watermark
+    copy3 = add_watermark_to_pdf(io.BytesIO(base_bytes), "DUPLICATE")
+
+    # Merge all 3 copies into one PDF
+    writer = PdfWriter()
+    for buf in (copy1, copy2, copy3):
+        buf.seek(0)
+        reader = PdfReader(buf)
+        for page in reader.pages:
+            writer.add_page(page)
+
+    merged = io.BytesIO()
+    writer.write(merged)
+    merged.seek(0)
+    return merged
+
+
 def generate_challan_pdf(challan, company=None):
     #Generate delivery challan PDF
     try:
