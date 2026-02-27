@@ -18,6 +18,29 @@
     </div>
     <button class="toast-close" onclick="hidePdfToast()" title="Close">&times;</button>
 </div>
+
+<!-- Duplicate Invoice Toast -->
+<div id="dupToast">
+    <div class="toast-icon" id="dupToastIcon">
+        <!-- Icon swapped dynamically: copy (success) or x-circle (error) -->
+        <svg id="dupIconSuccess" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+            fill="none" stroke="#198754" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+        <svg id="dupIconError" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+            stroke="#dc3545" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="15" y1="9" x2="9" y2="15"></line>
+            <line x1="9" y1="9" x2="15" y2="15"></line>
+        </svg>
+    </div>
+    <div class="toast-body">
+        <div class="toast-title" id="dupToastTitle">Invoice Duplicated</div>
+        <div class="toast-msg" id="dupToastMsg">Invoice duplicated successfully!</div>
+    </div>
+    <button class="toast-close" onclick="hideDupToast()" title="Close">&times;</button>
+</div>
 <div class="container-fluid">
     <!-- Header -->
     <div class="row mb-4">
@@ -477,27 +500,21 @@
     }
 
     function duplicateInvoice(invoiceId) {
-        if (confirm('Duplicate this invoice?')) {
-            fetch(`/invoice/${invoiceId}/duplicate`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
+        showDupToast('Duplicating invoice…', 'Processing', false);
+        fetch(`/invoice/${invoiceId}/duplicate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+            .then(response => response.json().then(data => ({ ok: response.ok, data })))
+            .then(({ ok, data }) => {
+                if (ok) {
+                    showDupToast(data.message || 'Invoice duplicated successfully!', 'Invoice Duplicated', true);
+                    setTimeout(() => window.location.reload(), 1500);
+                } else {
+                    showDupToast(data.message || 'Failed to duplicate invoice.', 'Duplicate Failed', false);
                 }
             })
-                .then(response => {
-                    if (response.ok) {
-                        alert('Invoice duplicated successfully!');
-                        window.location.reload();
-                    } else {
-                        response.json().then(data => {
-                            alert(data.message || 'Failed to duplicate invoice.');
-                        }).catch(() => {
-                            alert('Failed to duplicate invoice1.');
-                        });
-                    }
-                })
-                .catch(() => alert('Failed to duplicate invoice.'));
-        }
+            .catch(() => showDupToast('Network error. Could not duplicate invoice.', 'Duplicate Failed', false));
     }
 
 
@@ -641,6 +658,30 @@
     }
     function hidePdfToast() {
         const toast = document.getElementById('pdfToast');
+        if (toast) toast.classList.remove('show');
+    }
+
+    let _dupToastTimer = null;
+    function showDupToast(msg, title, isSuccess) {
+        const toast = document.getElementById('dupToast');
+        const msgEl = document.getElementById('dupToastMsg');
+        const titleEl = document.getElementById('dupToastTitle');
+        const iconOk = document.getElementById('dupIconSuccess');
+        const iconErr = document.getElementById('dupIconError');
+        if (titleEl) titleEl.textContent = title || 'Invoice Duplicated';
+        if (msgEl) msgEl.textContent = msg || '';
+        // Swap icon & border colour based on success/error
+        if (iconOk) iconOk.style.display = isSuccess ? '' : 'none';
+        if (iconErr) iconErr.style.display = isSuccess ? 'none' : '';
+        if (toast) {
+            toast.style.borderLeftColor = isSuccess ? 'var(--bs-success, #198754)' : 'var(--bs-danger, #dc3545)';
+            toast.classList.add('show');
+            clearTimeout(_dupToastTimer);
+            _dupToastTimer = setTimeout(hideDupToast, isSuccess ? 2000 : 4000);
+        }
+    }
+    function hideDupToast() {
+        const toast = document.getElementById('dupToast');
         if (toast) toast.classList.remove('show');
     }
 

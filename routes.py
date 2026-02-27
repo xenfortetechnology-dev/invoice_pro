@@ -1535,27 +1535,53 @@ def edit_invoice(id):
 @app.route('/invoice/<int:id>/duplicate', methods=['POST'])
 @login_required
 def duplicate_invoice(id):
-    invoice = Invoice.query.get_or_404(id)
-
+    """Duplicate an invoice by fetching it from the cloud API and re-creating it."""
     try:
-        new_invoice = Invoice(
-            client_id=invoice.client_id,
-            notes=invoice.notes,
-            terms_conditions=invoice.terms_conditions,
-            total_amount=invoice.total_amount,
-            payment_status='Unpaid',
-            invoice_date=datetime.utcnow(),
-            # make sure invoice_number is unique, e.g.,
-            invoice_number=f"{invoice.invoice_number}-COPY"
-        )
+        # 1. Fetch the original invoice from cloud
+        invoice_data = fetch_cloud_invoice_by_id(id)
+        if not invoice_data:
+            return jsonify({'message': 'Original invoice not found in cloud'}), 404
 
-        db.session.add(new_invoice)
-        db.session.commit()
-        return jsonify({'message': 'Invoice duplicated successfully!'}), 200
+        # 2. Build the new invoice payload
+        #    - New invoice number = original + "-COPY"
+        #    - Reset payment status to Unpaid
+        #    - Use today's date
+        #    - Strip 'id' from each line item so the cloud creates new records
+        original_number = invoice_data.get('invoice_number', str(id))
+        new_number = f"{original_number}-COPY"
+
+        raw_line_items = invoice_data.get('line_items', [])
+        new_line_items = []
+        for item in raw_line_items:
+            new_item = {k: v for k, v in item.items() if k != 'id'}
+            new_line_items.append(new_item)
+
+        payload = {
+            'invoice_number':    new_number,
+            'client_id':         invoice_data.get('client_id'),
+            'invoice_date':      datetime.now().strftime('%Y-%m-%d'),
+            'total_amount':      invoice_data.get('total_amount', 0),
+            'payment_status':    'Unpaid',
+            'notes':             invoice_data.get('notes', ''),
+            'terms_conditions':  invoice_data.get('terms_conditions', ''),
+            'line_items':        new_line_items,
+        }
+
+        # 3. POST new invoice to cloud API
+        response = cloud_request('POST', '/invoices', json=payload)
+
+        if response and response.status_code in (200, 201):
+            logging.info(f"Invoice {id} duplicated as {new_number} on cloud")
+            return jsonify({'message': f'Invoice duplicated successfully as {new_number}!'}), 200
+        else:
+            err = response.text if response else 'No response from cloud'
+            logging.error(f"Cloud duplicate failed: {err}")
+            return jsonify({'message': f'Failed to duplicate invoice on cloud: {err}'}), 400
 
     except Exception as e:
-        db.session.rollback()
+        logging.error(f"duplicate_invoice error: {e}", exc_info=True)
         return jsonify({'message': f'Failed to duplicate invoice: {str(e)}'}), 400
+
 
 @app.route('/invoice/<int:id>/send', methods=['POST'])
 @login_required

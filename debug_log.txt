@@ -1,20 +1,20 @@
-TIMESTAMP: 2026-02-27 14:31:44.996019
+TIMESTAMP: 2026-02-27 14:48:43.103299
 FILTERS: Search='', Status='All Status', Client='All Clients', From='None', To='None'
-TOTAL INVOICES FETCHED: 35
-INV [0]: Num='ai-inv-2616', Client='dharani', ID='2616'
+TOTAL INVOICES FETCHED: 36
+INV [0]: Num='ai-inv-2619', Client='dharani', ID='2619'
   -> MATCHED!
-INV [1]: Num='ai-inv-2614', Client='abc', ID='2614'
+INV [1]: Num='ai-inv-2616', Client='dharani', ID='2616'
   -> MATCHED!
-INV [2]: Num='ai-inv-2613', Client='dharani', ID='2613'
+INV [2]: Num='ai-inv-2614', Client='abc', ID='2614'
   -> MATCHED!
-INV [3]: Num='ai-inv-2607', Client='aravind', ID='2607'
+INV [3]: Num='ai-inv-2613', Client='dharani', ID='2613'
   -> MATCHED!
-INV [4]: Num='ai-inv-2606', Client='closed1', ID='2606'
+INV [4]: Num='ai-inv-2607', Client='aravind', ID='2607'
   -> MATCHED!
-INV [5]: Num='ai-inv-2605', Client='seenu', ID='2605'
+INV [6]: Num='ai-inv-2605', Client='seenu', ID='2605'
   -> MATCHED!
-INV [13]: Num='inv-2591', Client='seenu', ID='2591'
+INV [14]: Num='inv-2591', Client='seenu', ID='2591'
   -> MATCHED!
-INV [19]: Num='inv-2580', Client='seenu', ID='2580'
+INV [20]: Num='inv-2580', Client='seenu', ID='2580'
   -> MATCHED!
-FINAL RESULT COUNT: 35
+FINAL RESULT COUNT: 36

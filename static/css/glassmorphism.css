@@ -981,3 +981,105 @@ select.form-select {
 [data-theme="dark"] #pdfToast .toast-close:hover {
   color: #cbd5e1;
 }
+
+/* ========================================
+   Invoice Management — Duplicate Toast
+   (mirrors pdfToast; border-left colour
+   is set dynamically by JS)
+   ======================================== */
+#dupToast {
+  position: fixed;
+  top: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  z-index: 10000;
+  /* above pdfToast */
+  min-width: 300px;
+  max-width: 90vw;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background: #ffffff;
+  border-left: 5px solid #198754;
+  /* default green; overridden by JS */
+  opacity: 0;
+  transition: opacity 0.35s ease, transform 0.35s ease, border-left-color 0.2s ease;
+  pointer-events: none;
+}
+
+#dupToast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(4.5rem);
+  /* sits just below pdfToast */
+  pointer-events: auto;
+}
+
+#dupToast .toast-icon {
+  width: 36px;
+  height: 36px;
+  background: #d1e7dd;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+#dupToast .toast-body {
+  flex: 1;
+}
+
+#dupToast .toast-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #198754;
+  margin-bottom: 2px;
+}
+
+#dupToast .toast-msg {
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+#dupToast .toast-close {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  color: #adb5bd;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+
+#dupToast .toast-close:hover {
+  color: #495057;
+}
+
+/* Dark-mode overrides for dupToast */
+[data-theme="dark"] #dupToast {
+  background: #1e293b;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] #dupToast .toast-icon {
+  background: rgba(52, 211, 153, 0.15);
+}
+
+[data-theme="dark"] #dupToast .toast-title {
+  color: #34d399;
+}
+
+[data-theme="dark"] #dupToast .toast-msg {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] #dupToast .toast-close {
+  color: #64748b;
+}
+
+[data-theme="dark"] #dupToast .toast-close:hover {
+  color: #cbd5e1;
+}
