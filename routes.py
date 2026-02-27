@@ -670,8 +670,6 @@ def preview_invoice():
         due_date_str = request.form.get('due_date')
         notes = request.form.get('notes', '')
         terms_conditions = request.form.get('terms_conditions', '')
-        template_id = request.form.get("format_choice")
-        print("Saving Invoice Format:", invoice_format)
 
         # ✅ Get template_id instead of invoice_format
         template_id = request.form.get("template_id")
@@ -775,8 +773,10 @@ def preview_invoice():
         bank_res = cloud_request("GET", "/bank-details")
         bank = SimpleNamespace(**bank_res.json()) if bank_res and bank_res.status_code == 200 else None
 
-        template_id = invoice.get("template_id")
-        print("TEMPLATE DEBUG:", invoice.get("template_id"))
+        print("TEMPLATE DEBUG:", template_id)
+        
+        # Add template_id to invoice namespace just in case the template needs it
+        invoice.template_id = template_id
 
         template_map = {
             5: "invoice_detail.html",              
