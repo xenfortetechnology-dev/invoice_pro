@@ -1,33 +1,34 @@
-function calculateExpiry() {
-    if (!quotation_date.value) return;
-    let d = new Date(quotation_date.value);
-    let days = parseInt(validity_days.value || 0);
-    d.setDate(d.getDate() + days);
-    expiry_preview.value = d.toISOString().slice(0,10);
-}
- 
 function calculate() {
+
     let sub = parseFloat(ui_subtotal.value) || 0;
-    let dis = parseFloat(ui_discount.value) || 0;
-    let tax = parseFloat(ui_tax.value) || 0;
+    let disPercent = parseFloat(ui_discount.value) || 0;   // Discount %
+    let taxPercent = parseFloat(ui_tax.value) || 0;        // Tax %
     let ship = parseFloat(ui_shipping.value) || 0;
     let round = parseFloat(ui_rounding.value) || 0;
 
-    let taxableVal = sub - dis;
-    let taxAmt = taxableVal * (tax / 100);
+    // 🔹 Convert Discount % to Amount
+    let discountAmount = (sub * disPercent) / 100;
+
+    // 🔹 Taxable value after discount
+    let taxableVal = sub - discountAmount;
+
+    // 🔹 Convert Tax % to Amount
+    let taxAmt = (taxableVal * taxPercent) / 100;
+
+    // 🔹 Final total
     let total = taxableVal + taxAmt + ship + round;
 
     ui_total.value = total.toFixed(2);
 
     // ✅ COPY VALUES INTO HIDDEN FIELDS
-    document.getElementById('subtotal').value      = sub;
-    document.getElementById('discount').value      = dis;
-    document.getElementById('taxable_value').value = taxableVal;
+    document.getElementById('subtotal').value      = sub.toFixed(2);
+    document.getElementById('discount').value      = discountAmount.toFixed(2);  // store actual amount
+    document.getElementById('taxable_value').value = taxableVal.toFixed(2);
     document.getElementById('cgst').value          = (taxAmt / 2).toFixed(2);
     document.getElementById('sgst').value          = (taxAmt / 2).toFixed(2);
     document.getElementById('igst').value          = 0;
-    document.getElementById('shipping').value      = ship;
-    document.getElementById('rounding').value      = round;
+    document.getElementById('shipping').value      = ship.toFixed(2);
+    document.getElementById('rounding').value      = round.toFixed(2);
     document.getElementById('grand_total').value   = total.toFixed(2);
 }
 
