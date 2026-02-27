@@ -1135,8 +1135,26 @@ def save_invoice_pdf_to_disk(id):
         company_res = cloud_request("GET", "/company")
         company = SimpleNamespace(**company_res.json()) if company_res and company_res.status_code == 200 else None
 
+        # Fetch bank details
+        bank_res = cloud_request("GET", "/bank-details")
+        bank = SimpleNamespace(**bank_res.json()) if bank_res and bank_res.status_code == 200 else None
+
+        # Fetch logo
+        logo_res = cloud_request("GET", "/company/logo")
+        logo_bytes = logo_res.content if logo_res and logo_res.status_code == 200 else None
+
+        # Fetch signature
+        signature_res = cloud_request("GET", "/company/signature")
+        signature_bytes = signature_res.content if signature_res and signature_res.status_code == 200 else None
+
         # Generate 3-copy PDF: 1 Original + 2 Duplicate (watermarked)
-        pdf_buffer = generate_triple_invoice_pdf(invoice, company=company)
+        pdf_buffer = generate_triple_invoice_pdf(
+            invoice,
+            company=company,
+            bank=bank,
+            logo_bytes=logo_bytes,
+            signature_bytes=signature_bytes
+        )
         pdf_buffer.seek(0)
 
         ts = datetime.now().strftime('%Y%m%d%H%M%S')

@@ -2,6 +2,7 @@ import io
 from io import BytesIO
 from app import db
 import os
+import requests
 from datetime import datetime
 import pandas as pd
 from flask import send_file
@@ -10,7 +11,10 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.platypus import Paragraph
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.utils import ImageReader
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 from reportlab.pdfgen import canvas
 import logging
  
@@ -20,7 +24,7 @@ from models import Company
 from analytics_engine import AnalyticsEngine
 import config
 
-def generate_invoice_pdf(invoice, company=None, bank=None):
+def generate_invoice_pdf(invoice, company=None, bank=None, logo_bytes=None, signature_bytes=None):
     """Generate invoice PDF matching the reference image layout."""
     try:
         # ── Resolve company ────────────────────────────────────────────────
@@ -85,11 +89,36 @@ def generate_invoice_pdf(invoice, company=None, bank=None):
         mid_x = ML + full_w * 0.6
         vline(mid_x, row1_bot, row1_top)
 
-        # "Logo" label (blank space)
-        c.setFont("Helvetica", 7)
-        c.setFillColor(colors.grey)
-        c.drawRightString(page_w - MR - 4, row1_bot + 4, "[Logo]")
-        c.setFillColor(colors.black)
+        # ================= COMPANY LOGO =================
+        if logo_bytes:
+            try:
+                logo_image = ImageReader(io.BytesIO(logo_bytes))
+
+                # Logo box dimensions (right side of row1)
+                logo_box_x = mid_x
+                logo_box_y = row1_bot
+                logo_box_w = page_w - MR - mid_x
+                logo_box_h = row1_h
+
+                img_width = 110
+                img_height = 35
+
+                # Center logo inside box
+                center_x = logo_box_x + (logo_box_w - img_width) / 2
+                center_y = logo_box_y + (logo_box_h - img_height) / 2
+
+                c.drawImage(
+                    logo_image,
+                    center_x,
+                    center_y,
+                    width=img_width,
+                    height=img_height,
+                    preserveAspectRatio=True,
+                    mask='auto'
+                )
+
+            except Exception as e:
+                logging.error(f"Logo rendering failed: {e}")
 
         # ── ROW 2: Invoice No/Date (left) | Company Name + Address (right) ─
         row2_top = row1_bot
@@ -121,13 +150,57 @@ def generate_invoice_pdf(invoice, company=None, bank=None):
         right_w   = page_w - MR - col_split
         right_cx  = col_split + right_w / 2
 
-        c.setFont("Helvetica-Bold", 11)
-        c.drawCentredString(right_cx, row2_top - 14, company.name.upper())
+        company_name = company.name.upper()
+        max_width = right_w - 10
+        base_font_size = 11
 
-        addr_line = f"{company.address}, {company.city} - {company.pincode}"
-        c.setFont("Helvetica", 7.5)
-        c.drawCentredString(right_cx, row2_top - 26, addr_line)
-        c.drawCentredString(right_cx, row2_top - 37, f"{company.state}")
+        c.setFont("Helvetica-Bold", base_font_size)
+
+        text_width = c.stringWidth(company_name, "Helvetica-Bold", base_font_size)
+
+        if text_width <= max_width:
+            # Single line
+            c.drawCentredString(right_cx, row2_top - 14, company_name)
+        else:
+            # Split into two lines intelligently
+            words = company_name.split()
+            line1 = ""
+            line2 = ""
+
+            for word in words:
+                test_line = (line1 + " " + word).strip()
+                if c.stringWidth(test_line, "Helvetica-Bold", base_font_size) <= max_width:
+                    line1 = test_line
+                else:
+                    line2 += " " + word
+
+            line2 = line2.strip()
+
+            # Draw two centered lines
+            c.drawCentredString(right_cx, row2_top - 12, line1)
+            c.drawCentredString(right_cx, row2_top - 24, line2)
+
+        # ---------------- WRAPPED ADDRESS ----------------
+        address_text = f"{company.address}, {company.city} - {company.pincode}, {company.state}"
+
+        address_style = ParagraphStyle(
+            name='CompanyAddress',
+            fontSize=7.5,
+            alignment=TA_CENTER,
+            fontName='Helvetica'
+        )
+
+        address_para = Paragraph(address_text, address_style)
+
+        # Wrap inside right column width
+        w, h = address_para.wrap(right_w - 10, row2_h)
+
+        # Draw paragraph centered in right column
+        address_para.drawOn(
+            c,
+            col_split + 5,
+            row2_top - 28 - h
+        )
 
         # ── ROW 3: To… (left) | Our Details (right) ───────────────────────
         row3_top = row2_bot
@@ -373,6 +446,32 @@ def generate_invoice_pdf(invoice, company=None, bank=None):
         c.rect(sig_box_x, sig_box_y, sig_box_w, sig_box_h, fill=0)
         c.setStrokeColor(colors.black)
 
+
+        # ================= SIGNATURE IMAGE =================
+        if signature_bytes:
+            try:
+                sign_image = ImageReader(io.BytesIO(signature_bytes))
+
+                img_width = 100
+                img_height = 40
+
+                # Calculate centered position
+                center_x = sig_box_x + (sig_box_w - img_width) / 2
+                center_y = sig_box_y + (sig_box_h - img_height) / 2
+
+                c.drawImage(
+                    sign_image,
+                    center_x,
+                    center_y,
+                    width=img_width,
+                    height=img_height,
+                    preserveAspectRatio=True,
+                    mask='auto'
+                )
+
+            except Exception as e:
+                logging.error(f"Signature rendering failed: {e}")
+
         # ── ROW 8: Footer ─────────────────────────────────────────────────
         footer_top = bank_bot
         footer_h   = 18
@@ -450,7 +549,7 @@ def add_watermark_to_pdf(source_buffer, watermark_text="DUPLICATE"):
     return out_buffer
 
 
-def generate_triple_invoice_pdf(invoice, company=None, bank=None):
+def generate_triple_invoice_pdf(invoice, company=None, bank=None, logo_bytes=None, signature_bytes=None):
     """Generate a single PDF containing 3 copies of the invoice.
 
     Page layout:
@@ -464,7 +563,13 @@ def generate_triple_invoice_pdf(invoice, company=None, bank=None):
     from pypdf import PdfReader, PdfWriter
 
     # Generate the base invoice once
-    base_buffer = generate_invoice_pdf(invoice, company=company, bank=bank)
+    base_buffer = generate_invoice_pdf(
+        invoice,
+        company=company,
+        bank=bank,
+        logo_bytes=logo_bytes,
+        signature_bytes=signature_bytes
+    )
     base_buffer.seek(0)
     base_bytes = base_buffer.read()
 
