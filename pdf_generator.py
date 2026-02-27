@@ -21,292 +21,375 @@ from analytics_engine import AnalyticsEngine
 import config
 
 def generate_invoice_pdf(invoice, company=None, bank=None):
-    #Generate a professional invoice PDF with modern styling""" 
+    """Generate invoice PDF matching the reference image layout."""
     try:
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=A4,
-            topMargin=0.5 * inch,
-            bottomMargin=0.5 * inch,
-            leftMargin=0.5 * inch,
-            rightMargin=0.5 * inch
-        )
-
-        styles = getSampleStyleSheet()
-        content = []
-
-        # Custom styles
-        title_style = ParagraphStyle(
-            name='InvoiceTitle',
-            fontSize=20,
-            alignment=TA_CENTER,
-            fontName='Helvetica-Bold',
-            textColor=colors.HexColor('#2563eb'),
-            spaceAfter=20
-        )
-        
-        header_style = ParagraphStyle(
-            name='Header',
-            fontSize=12,
-            fontName='Helvetica-Bold',
-            textColor=colors.HexColor('#1f2937')
-        )
-        
-        normal_style = ParagraphStyle(
-            name='Normal',
-            fontSize=10,
-            fontName='Helvetica',
-            textColor=colors.HexColor('#374151')
-        )
-
-        # Invoice title
-        if getattr(invoice, 'invoice_type', 'Invoice') == 'Proforma':
-            title_text = "PROFORMA INVOICE"
-        else:
-            title_text = "TAX INVOICE"
-        
-        content.append(Paragraph(title_text, title_style))
-        content.append(Spacer(1, 20))
-
-        # Company and invoice details header
+        # ── Resolve company ────────────────────────────────────────────────
         if not company:
             company = Company.query.first()
-        
         if not company:
             company = type('Company', (), {
-                'name': config.COMPANY_NAME,
+                'name':    config.COMPANY_NAME,
                 'address': config.COMPANY_ADDRESS,
-                'city': config.COMPANY_CITY,
-                'state': config.COMPANY_STATE,
+                'city':    config.COMPANY_CITY,
+                'state':   config.COMPANY_STATE,
                 'pincode': config.COMPANY_PINCODE,
-                'phone': config.COMPANY_PHONE,
-                'email': config.COMPANY_EMAIL,
-                'gstin': config.GSTIN,
-                'pan': config.PAN,
-                'tin': getattr(config, 'TIN', '')
+                'phone':   config.COMPANY_PHONE,
+                'email':   config.COMPANY_EMAIL,
+                'gstin':   config.GSTIN,
+                'pan':     config.PAN,
             })()
 
-        header_data = [
-            [
-                Paragraph(f"<b>Invoice No:</b> {invoice.invoice_number}<br/>"
-                         f"<b>Date:</b> {invoice.invoice_date.strftime('%d-%m-%Y')}<br/>"
-                         f"<b>Due Date:</b> {invoice.due_date.strftime('%d-%m-%Y') if invoice.due_date else 'N/A'}", 
-                         normal_style),
-                Paragraph(f"<b>{company.name}</b><br/>"
-                         f"{company.address}<br/>"
-                         f"{company.city}, {company.state} - {company.pincode}<br/>"
-                         f"Phone: {company.phone}<br/>"
-                         f"Email: {company.email}", 
-                         normal_style)
-            ]
-        ]
-        
-        header_table = Table(header_data, colWidths=[3.5 * inch, 3.5 * inch])
-        header_table.setStyle(TableStyle([
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f9fafb')),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('LEFTPADDING', (0, 0), (-1, -1), 12),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 12),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ]))
-        content.append(header_table)
-        content.append(Spacer(1, 20))
-
-        # Bill to and company GST details
         client = invoice.client
-        bill_to_data = [
-            [
-                Paragraph("<b>Bill To</b>", header_style),
-                Paragraph("<b>Company Details</b>", header_style)
-            ],
-            [
-                Paragraph(f"<b>{client.name}</b><br/>"
-                         f"{client.contact_person}<br/>" if client.contact_person else "" +
-                         f"{client.address}<br/>"
-                         f"{client.city}, {client.state} - {client.pincode}<br/>"
-                         f"Phone: {client.phone}<br/>"
-                         f"Email: {client.email}<br/>"
-                         f"<b>GSTIN:</b> {client.gstin or 'N/A'}", 
-                         normal_style),
-                Paragraph(f"<b>GSTIN:</b> {company.gstin}<br/>"
-                         f"<b>PAN:</b> {company.pan}<br/>"
-                         f"<b>State:</b> {company.state}<br/>"
-                         f"<b>State Code:</b> {company.gstin[:2] if company.gstin else 'N/A'}", 
-                         normal_style)
-            ]
-        ]
-        
-        bill_to_table = Table(bill_to_data, colWidths=[3.5 * inch, 3.5 * inch])
-        bill_to_table.setStyle(TableStyle([
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('BACKGROUND', (0, 0), (1, 0), colors.HexColor('#3b82f6')),
-            ('TEXTCOLOR', (0, 0), (1, 0), colors.white),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('LEFTPADDING', (0, 0), (-1, -1), 12),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 12),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ]))
-        content.append(bill_to_table)
-        content.append(Spacer(1, 20))
 
-        # Line items table
-        items_data = [['S.No', 'HSN/SAC', 'Description', 'Qty', 'Unit', 'Rate', 'Tax%', 'Amount']]
-        
-        for item in invoice.line_items:
-            items_data.append([
+        # ── Canvas setup ───────────────────────────────────────────────────
+        buffer = io.BytesIO()
+        page_w, page_h = A4          # 595.27 x 841.89 pt
+        c = canvas.Canvas(buffer, pagesize=A4)
+
+        # Margins
+        ML = 30   # left
+        MR = 30   # right
+        MT = 30   # top
+        full_w = page_w - ML - MR    # usable width  ≈ 535 pt
+
+        # Helper: thin black border line
+        def hline(y, x0=ML, x1=page_w - MR, lw=0.5):
+            c.setLineWidth(lw)
+            c.setStrokeColor(colors.black)
+            c.line(x0, y, x1, y)
+
+        def vline(x, y0, y1, lw=0.5):
+            c.setLineWidth(lw)
+            c.setStrokeColor(colors.black)
+            c.line(x, y0, x, y1)
+
+        def rect(x, y, w, h, fill=0):
+            c.setLineWidth(0.5)
+            c.setStrokeColor(colors.black)
+            c.rect(x, y, w, h, fill=fill)
+
+        # ── ROW 1: INVOICE title (left) | blank logo area (right) ─────────
+        row1_top  = page_h - MT
+        row1_h    = 40
+        row1_bot  = row1_top - row1_h
+
+        # Outer border for row 1
+        rect(ML, row1_bot, full_w, row1_h)
+
+        # "INVOICE" text
+        c.setFont("Helvetica-Bold", 22)
+        c.setFillColor(colors.black)
+        c.drawString(ML + 6, row1_bot + 12, "INVOICE")
+
+        # Divider between title and logo area
+        mid_x = ML + full_w * 0.6
+        vline(mid_x, row1_bot, row1_top)
+
+        # "Logo" label (blank space)
+        c.setFont("Helvetica", 7)
+        c.setFillColor(colors.grey)
+        c.drawRightString(page_w - MR - 4, row1_bot + 4, "[Logo]")
+        c.setFillColor(colors.black)
+
+        # ── ROW 2: Invoice No/Date (left) | Company Name + Address (right) ─
+        row2_top = row1_bot
+        row2_h   = 50
+        row2_bot = row2_top - row2_h
+        col_split = mid_x   # align exactly with Row 1 divider
+
+        rect(ML, row2_bot, full_w, row2_h)
+        vline(col_split, row2_bot, row2_top)
+
+        # Left: Invoice No / Date
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(ML + 4, row2_top - 13, "Invoice No :")
+        c.setFont("Helvetica", 8)
+        c.drawString(ML + 62, row2_top - 13, str(invoice.invoice_number))
+
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(ML + 4, row2_top - 27, "Date       :")
+        c.setFont("Helvetica", 8)
+        c.drawString(ML + 62, row2_top - 27, invoice.invoice_date.strftime('%d-%m-%Y'))
+
+        if invoice.due_date:
+            c.setFont("Helvetica-Bold", 8)
+            c.drawString(ML + 4, row2_top - 41, "Due Date   :")
+            c.setFont("Helvetica", 8)
+            c.drawString(ML + 62, row2_top - 41, invoice.due_date.strftime('%d-%m-%Y'))
+
+        # Right: Company Name centered, address right-aligned
+        right_w   = page_w - MR - col_split
+        right_cx  = col_split + right_w / 2
+
+        c.setFont("Helvetica-Bold", 11)
+        c.drawCentredString(right_cx, row2_top - 14, company.name.upper())
+
+        addr_line = f"{company.address}, {company.city} - {company.pincode}"
+        c.setFont("Helvetica", 7.5)
+        c.drawCentredString(right_cx, row2_top - 26, addr_line)
+        c.drawCentredString(right_cx, row2_top - 37, f"{company.state}")
+
+        # ── ROW 3: To… (left) | Our Details (right) ───────────────────────
+        row3_top = row2_bot
+        row3_h   = 72
+        row3_bot = row3_top - row3_h
+
+        rect(ML, row3_bot, full_w, row3_h)
+        vline(col_split, row3_bot, row3_top)
+
+        # Left — "To:" header (bold, underline look via font)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(ML + 4, row3_top - 12, "To,")
+
+        # Client name bold
+        c.setFont("Helvetica-Bold", 9)
+        client_name = getattr(client, 'name', '') or ''
+        c.drawString(ML + 4, row3_top - 24, client_name)
+
+        c.setFont("Helvetica", 8)
+        y_cl = row3_top - 36
+        for part in [
+            getattr(client, 'address', '') or '',
+            f"{getattr(client, 'city', '') or ''}, {getattr(client, 'state', '') or ''}",
+            getattr(client, 'pincode', '') or '',
+        ]:
+            if part.strip().strip(','):
+                c.drawString(ML + 4, y_cl, part)
+                y_cl -= 11
+
+        # Right — "Our Details" box with black header
+        c.setFillColor(colors.black)
+        c.rect(col_split, row3_top - 14, right_w, 14, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawCentredString(right_cx, row3_top - 10, "Our Details")
+        c.setFillColor(colors.black)
+
+        # GSTIN
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(col_split + 4, row3_top - 26, "GSTIN :")
+        c.setFont("Helvetica", 8)
+        c.drawString(col_split + 48, row3_top - 26, company.gstin or '')
+
+        # PAN
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(col_split + 4, row3_top - 38, "PAN   :")
+        c.setFont("Helvetica", 8)
+        c.drawString(col_split + 48, row3_top - 38, getattr(company, 'pan', '') or '')
+
+        # ── ROW 4: Items table header ──────────────────────────────────────
+        row4_top = row3_bot
+        row4_h   = 20   # header row height
+        row4_bot = row4_top - row4_h
+
+        # Column widths (must sum to full_w) — 8 columns
+        col_w = [
+            full_w * 0.048,   # Sl No
+            full_w * 0.08,    # HSM Code
+            full_w * 0.30,    # Description
+            full_w * 0.065,   # Qty
+            full_w * 0.065,   # Unit
+            full_w * 0.11,    # Rate
+            full_w * 0.065,   # Tax%
+            full_w * 0.167,   # Amount
+        ]
+        col_labels = ["Sl.\nNo.", "HSM\nCode", "Product Name / Description", "Qty.", "Unit", "Rate", "Tax\n%", "Amount"]
+        col_aligns = ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+
+        # Draw header background
+        c.setFillColor(colors.black)
+        c.rect(ML, row4_bot, full_w, row4_h, fill=1, stroke=0)
+        c.setStrokeColor(colors.black)
+        c.setLineWidth(0.5)
+        c.rect(ML, row4_bot, full_w, row4_h, fill=0)
+
+        # Header text + vertical dividers
+        x_cur = ML
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica-Bold", 7)
+        for i, (w, label) in enumerate(zip(col_w, col_labels)):
+            cx = x_cur + w / 2
+            # two-line labels: split on \n
+            parts = label.split('\n')
+            if len(parts) == 2:
+                c.drawCentredString(cx, row4_bot + 11, parts[0])
+                c.drawCentredString(cx, row4_bot + 3,  parts[1])
+            else:
+                c.drawCentredString(cx, row4_bot + 7, label)
+            if i < len(col_w) - 1:
+                c.setStrokeColor(colors.white)
+                c.setLineWidth(0.3)
+                vline(x_cur + w, row4_bot, row4_top, lw=0.3)
+                c.setStrokeColor(colors.black)
+            x_cur += w
+        c.setFillColor(colors.black)
+
+        # ── ROW 5: Item rows (only real items) ────────────────────────────
+        item_row_h = 18
+        line_items = list(invoice.line_items)
+        items_top  = row4_bot
+        items_bot  = items_top - item_row_h * len(line_items)
+
+        for idx, item in enumerate(line_items):
+            y_top = items_top - idx * item_row_h
+            y_bot = y_top - item_row_h
+            # alternating light background
+            if idx % 2 == 1:
+                c.setFillColor(colors.HexColor('#f5f5f5'))
+                c.rect(ML, y_bot, full_w, item_row_h, fill=1, stroke=0)
+                c.setFillColor(colors.black)
+
+            # outer border for this row
+            c.setStrokeColor(colors.black)
+            c.setLineWidth(0.4)
+            c.rect(ML, y_bot, full_w, item_row_h, fill=0)
+
+            x_cur = ML
+            row_vals = [
                 str(item.sr_no),
                 item.hsn_code or '',
-                Paragraph(item.description.replace('\n', '<br/>'), normal_style),
+                item.description or '',
                 f"{item.quantity:g}",
-                item.unit,
-                f"Rs. {item.unit_price:,.2f}",
-                f"{item.tax_percentage:g}%",
-                f"Rs. {item.total_amount:,.2f}"
-            ])
-
-        # Add empty rows to maintain table structure
-        while len(items_data) < 12:  # Minimum 10 rows for professional look
-            items_data.append(['', '', '', '', '', '', '', ''])
-
-        items_table = Table(items_data, colWidths=[
-            0.5*inch, 0.8*inch, 2.8*inch, 0.6*inch, 0.6*inch, 0.8*inch, 0.5*inch, 1*inch
-        ])
-        
-        items_table.setStyle(TableStyle([
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3b82f6')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('ALIGN', (2, 1), (2, -1), 'LEFT'),
-            ('ALIGN', (5, 1), (-1, -1), 'RIGHT'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 6),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ]))
-        content.append(items_table)
-        content.append(Spacer(1, 15))
-
-        # Tax summary and totals
-        tax_data = [
-            ['', '', 'Subtotal:', f"Rs. {invoice.subtotal:,.2f}"],
-            ['', '', 'CGST:', f"Rs. {invoice.cgst:,.2f}"],
-            ['', '', 'SGST:', f"Rs. {invoice.sgst:,.2f}"],
-            ['', '', 'IGST:', f"Rs. {invoice.igst:,.2f}"],
-            ['', '', 'Round Off:', 'Rs. 0.00'],
-            ['', '', Paragraph('<b>Total Amount:</b>', header_style), 
-             Paragraph(f'<b>Rs. {invoice.total_amount:,.2f}</b>', header_style)]
-        ]
-        
-        tax_table = Table(tax_data, colWidths=[2*inch, 2*inch, 1.5*inch, 1.5*inch])
-        tax_table.setStyle(TableStyle([
-            ('GRID', (2, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
-            ('ALIGN', (2, 0), (-1, -1), 'RIGHT'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('BACKGROUND', (2, -1), (-1, -1), colors.HexColor('#f3f4f6')),
-            ('LEFTPADDING', (2, 0), (-1, -1), 8),
-            ('RIGHTPADDING', (2, 0), (-1, -1), 8),
-            ('TOPPADDING', (2, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (2, 0), (-1, -1), 4),
-        ]))
-        content.append(tax_table)
-        content.append(Spacer(1, 15))
-
-        # Amount in words
-        amount_words = number_to_words(int(invoice.total_amount))
-        words_text = f"Amount in Words: {amount_words.title()} Rupees Only"
-        
-        words_table = Table([[Paragraph(f'<b>{words_text}</b>', normal_style)]], 
-                           colWidths=[7*inch])
-        words_table.setStyle(TableStyle([
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f9fafb')),
-            ('LEFTPADDING', (0, 0), (-1, -1), 12),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 12),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ]))
-        content.append(words_table)
-        content.append(Spacer(1, 20))
-
-        from flask import g
-
-        # bank = BankDetails.query.filter_by(company_id=invoice.company_id).first()
-        # Terms and bank details
-        terms_data = [
-            [
-                Paragraph("<b>Terms & Conditions:</b><br/>" + 
-                         (invoice.terms_conditions or 
-                          "1. Payment due within 30 days of invoice date.<br/>"
-                          "2. Interest @ 2% per month will be charged on overdue amounts.<br/>"
-                          "3. Subject to local jurisdiction only."), 
-                         normal_style),
-                Paragraph(
-                    f"<b>Bank Details:</b><br/>"
-                    f"Bank: {bank.bank_name if bank else ''}<br/>"
-                    f"A/c No: {bank.account_number if bank else ''}<br/>"
-                    f"A/c Name: {bank.account_name if bank else ''}<br/>"
-                    f"IFSC: {bank.ifsc_code if bank else ''}<br/>"
-                    f"Branch: {bank.branch if bank else ''}",
-                    normal_style
-                )
+                getattr(item, 'unit', '') or '',
+                f"{item.unit_price:,.2f}",
+                f"{getattr(item, 'tax_percentage', 0) or 0:g}%",
+                f"{item.total_amount:,.2f}",
             ]
+            c.setFont("Helvetica", 7)
+            for i, (w, val) in enumerate(zip(col_w, row_vals)):
+                # vertical divider
+                if i < len(col_w) - 1:
+                    vline(x_cur + w, y_bot, y_top, lw=0.4)
+                # text align: description left, rate/amount right, others center
+                if i == 2:
+                    # Description — truncate if too long
+                    max_chars = int(w / 3.8)
+                    display = val if len(val) <= max_chars else val[:max_chars - 1] + '…'
+                    c.drawString(x_cur + 3, y_bot + 5, display)
+                elif i in (5, 7):  # Rate and Amount — right aligned
+                    c.drawRightString(x_cur + w - 3, y_bot + 5, val)
+                else:
+                    c.drawCentredString(x_cur + w / 2, y_bot + 5, val)
+                x_cur += w
+
+        # ── If no items just draw an empty row placeholder ─────────────────
+        if not line_items:
+            items_bot = items_top - item_row_h
+            c.setLineWidth(0.4)
+            c.rect(ML, items_bot, full_w, item_row_h, fill=0)
+
+        # ── Gap between items and totals section ────────────────────────
+        gap = 10
+
+        # ── ROW 6: Reference fields (left) | Totals (right) ───────────────
+        ref_top = items_bot - gap
+
+        # Collect ref fields
+        ref_fields = [
+            ("Party GST NO", getattr(invoice, 'parts_gst_no', '') or ''),
+            ("Ref Dc",        getattr(invoice, 'ref_dc',       '') or ''),
+            ("Ref Dc Date",   getattr(invoice, 'ref_dc_date',  '') or ''),
+            ("PO No",         getattr(invoice, 'po_number',    '') or ''),
+            ("Date",          getattr(invoice, 'po_date',      '') or ''),
+            ("Vehicle No",    getattr(invoice, 'vehicle_no',   '') or ''),
         ]
-        
-        terms_table = Table(terms_data, colWidths=[3.5*inch, 3.5*inch])
-        terms_table.setStyle(TableStyle([
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 12),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 12),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ]))
-        content.append(terms_table)
-        content.append(Spacer(1, 30))
-
-        # Signature section
-        signature_data = [
-            ['', f"For {company.name}"],
-            ['', ''],
-            ['', ''],
-            ['Customer Signature', 'Authorized Signatory']
+        # Totals
+        totals = [
+            ("Sub Total",   f"{invoice.subtotal:,.2f}"),
+            ("SGST 9%",     f"{invoice.sgst:,.2f}"),
+            ("CGST 9%",     f"{invoice.cgst:,.2f}"),
+            ("IGST 18%",    f"{invoice.igst:,.2f}"),
+            ("Grand Total", f"{invoice.total_amount:,.2f}"),
         ]
-        
-        signature_table = Table(signature_data, colWidths=[3.5*inch, 3.5*inch])
-        signature_table.setStyle(TableStyle([
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
-            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-            ('LINEABOVE', (0, -1), (-1, -1), 0.5, colors.HexColor('#6b7280')),
-        ]))
-        content.append(signature_table)
+        ref_row_h = 13
+        n_rows    = max(len(ref_fields), len(totals))
+        ref_bot   = ref_top - ref_row_h * n_rows
 
-        # Add footer
-        footer_text = f"This is a computer generated invoice | Generated on {datetime.now().strftime('%d-%m-%Y %H:%M')}"
-        if invoice.blockchain_hash:
-            footer_text += f" | Blockchain Verified: {invoice.blockchain_hash[:16]}..."
-        
-        footer_para = Paragraph(footer_text, 
-                               ParagraphStyle('Footer', fontSize=8, alignment=TA_CENTER, 
-                                            textColor=colors.HexColor('#6b7280')))
-        content.append(Spacer(1, 20))
-        content.append(footer_para)
+        # outer border
+        rect(ML, ref_bot, full_w, ref_top - ref_bot)
+        vline(col_split, ref_bot, ref_top)
 
-        # Build PDF
-        doc.build(content)
+        # Left: ref fields
+        for i, (label, val) in enumerate(ref_fields):
+            y = ref_top - (i + 1) * ref_row_h + 3
+            c.setFont("Helvetica-Bold", 7.5)
+            c.drawString(ML + 4, y, f"{label}:")
+            c.setFont("Helvetica", 7.5)
+            c.drawString(ML + 72, y, str(val))
+            if i < len(ref_fields) - 1:
+                hline(ref_top - (i + 1) * ref_row_h, x0=ML, x1=col_split, lw=0.3)
+
+        # Right: totals
+        for i, (label, val) in enumerate(totals):
+            y = ref_top - (i + 1) * ref_row_h + 3
+            bold = (label == "Grand Total")
+            c.setFont("Helvetica-Bold" if bold else "Helvetica", 7.5)
+            c.drawString(col_split + 4, y, f"{label}:")
+            c.drawRightString(page_w - MR - 4, y, val)
+            if i < len(totals) - 1:
+                hline(ref_top - (i + 1) * ref_row_h, x0=col_split, x1=page_w - MR, lw=0.3)
+
+        # ── ROW 7: Bank Details (left) | Signature blank (right) ──────────
+        bank_top = ref_bot
+        bank_h   = 80
+        bank_bot = bank_top - bank_h
+
+        rect(ML, bank_bot, full_w, bank_h)
+        vline(col_split, bank_bot, bank_top)
+
+        # "OUR BANK DETAILS" header underlined style
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(ML + 4, bank_top - 12, "OUR BANK DETAILS")
+        # underline
+        txt_w = c.stringWidth("OUR BANK DETAILS", "Helvetica-Bold", 8)
+        hline(bank_top - 13, x0=ML + 4, x1=ML + 4 + txt_w, lw=0.6)
+
+        bank_fields = [
+            ("Bank Name", bank.bank_name        if bank else ''),
+            ("A/C No",    bank.account_number   if bank else ''),
+            ("A/C Name",  bank.account_name     if bank else ''),
+            ("IFSC Code", bank.ifsc_code        if bank else ''),
+            ("Branch",    bank.branch           if bank else ''),
+        ]
+        c.setFont("Helvetica", 7.5)
+        y_b = bank_top - 24
+        for label, val in bank_fields:
+            c.setFont("Helvetica-Bold", 7.5)
+            c.drawString(ML + 4, y_b, f"{label}")
+            c.setFont("Helvetica", 7.5)
+            c.drawString(ML + 52, y_b, f": {val}")
+            y_b -= 11
+
+        # Right: blank signature space + "For Company"
+        c.setFont("Helvetica-Bold", 8)
+        c.drawCentredString(right_cx, bank_top - 12, f"For {company.name}")
+        # blank signature box outline
+        sig_box_x = col_split + 10
+        sig_box_y = bank_bot + 10
+        sig_box_w = right_w - 20
+        sig_box_h = bank_h - 30
+        c.setStrokeColor(colors.HexColor('#cccccc'))
+        c.setLineWidth(0.4)
+        c.rect(sig_box_x, sig_box_y, sig_box_w, sig_box_h, fill=0)
+        c.setStrokeColor(colors.black)
+
+        # ── ROW 8: Footer ─────────────────────────────────────────────────
+        footer_top = bank_bot
+        footer_h   = 18
+        footer_bot = footer_top - footer_h
+
+        rect(ML, footer_bot, full_w, footer_h)
+        c.setFont("Helvetica", 7.5)
+        footer_txt = f"Ph. {company.phone}   |   Email: {company.email}"
+        c.drawCentredString(ML + full_w / 2, footer_bot + 5, footer_txt)
+
+        # ── Outer page border ─────────────────────────────────────────────
+        c.setStrokeColor(colors.black)
+        c.setLineWidth(1)
+        c.rect(ML, footer_bot, full_w, page_h - MT - footer_bot, fill=0)
+
+        c.save()
         buffer.seek(0)
-        
         return buffer
 
     except Exception as e:
