@@ -192,6 +192,13 @@
                                 <small class="text-muted">Upload a logo for your invoices (Max: 2MB,
                                     PNG/JPG/SVG)</small>
                             </div>
+                            <div class="mb-3">
+                                <label for="companySignature" class="form-label">Authorized Signature</label>
+                                <input type="file" class="form-control glass-input" id="companySignature" accept="image/*">
+                                <small class="text-muted">
+                                    Upload authorized signature for invoices (Transparent PNG recommended)
+                                </small>
+                            </div>
                         </form>
                     </div>
                 </div>
@@ -1151,6 +1158,10 @@ function saveAllSettings() {
         formData.append("logo", logoInput.files[0]);
     }
 
+    const signatureInput = document.getElementById("companySignature");
+    if (signatureInput && signatureInput.files.length > 0) {
+        formData.append("authorized_signature", signatureInput.files[0]);
+    }
     fetch('/settings/update', {
         method: 'POST',
         body: formData   // ❌ NO Content-Type header

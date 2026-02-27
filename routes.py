@@ -2397,6 +2397,7 @@ def update_settings():
 
         if request.content_type and "multipart/form-data" in request.content_type:
             logo_file = request.files.get("logo")
+            signature_file = request.files.get("authorized_signature") 
 
             # 🔥 Parse JSON strings properly
             data = {
@@ -2408,6 +2409,7 @@ def update_settings():
         else:
             data = request.get_json()
             logo_file = None
+            signature_file = None
 
         # ---------------------------------------
         # 1️⃣ UPDATE COMPANY (WITH LOGO SUPPORT)
@@ -2437,15 +2439,21 @@ def update_settings():
 
             files = {}
 
-            # ✅ CORRECT FILE HANDLING
+            # Add logo if present
             if logo_file and logo_file.filename != "":
-                files = {
-                    "logo": (
-                        logo_file.filename,
-                        logo_file.stream,   # 🔥 NOT .read()
-                        logo_file.mimetype
-                    )
-                }
+                files["logo"] = (
+                    logo_file.filename,
+                    logo_file.stream,
+                    logo_file.mimetype
+                )
+
+            # ✅ Add signature if present
+            if signature_file and signature_file.filename != "":
+                files["authorized_signature"] = (
+                    signature_file.filename,
+                    signature_file.stream,
+                    signature_file.mimetype
+                )
 
             response = cloud_request(
                 "POST",
@@ -2546,8 +2554,6 @@ def update_settings():
         }), 500
 
 
-
-
 from flask import Response
 
 @app.route("/company/logo")
@@ -2563,6 +2569,20 @@ def company_logo():
 
     return "", 404
 
+
+
+@app.route("/company/signature")
+@login_required
+def company_signature():
+    response = cloud_request("GET", "/company/signature")
+
+    if response and response.status_code == 200:
+        return Response(
+            response.content,
+            content_type=response.headers.get("Content-Type")
+        )
+
+    return "", 404
 
 @app.route("/create-challan", methods=['GET', 'POST'])
 @login_required
@@ -2962,58 +2982,38 @@ def crm():
     # 5. Reminders (Local)
     reminders = []
     try:
-        local_reminders = PaymentReminder.query.filter(PaymentReminder.status == 'Pending').all()
-        for r in local_reminders:
-            if r.invoice and r.invoice.client:
-                 reminders.append(r)
-            else:
-                # Local link broken? adhere to safety.
-                pass
+        from models import Reminder
+        from types import SimpleNamespace
+        
+        db_reminders = Reminder.query.filter(Reminder.status != 'Completed') \
+            .order_by(Reminder.reminder_date.asc()) \
+            .all()
+            
+        for r in db_reminders:
+            client_dict = next((c for c in processed_clients if c['id'] == r.client_id), None)
+            if client_dict:
+                c_obj = SimpleNamespace(
+                    id=client_dict['id'], 
+                    name=client_dict['name'], 
+                    email=client_dict.get('email', '')
+                )
+                rem = SimpleNamespace(
+                    id=r.id,
+                    client=c_obj,
+                    reminder_date=r.reminder_date,
+                    note=r.notes,
+                    status=r.status,
+                    reminder_type=r.reminder_type
+                )
+                reminders.append(rem)
+                
     except Exception as e:
         app.logger.error(f"Error fetching local reminders: {e}")
 
     # 6. Follow-ups
     follow_ups = [r for r in reminders if r.reminder_type == 'Follow-up']
     
-    # Fallback: If no follow-ups, synthesize them from other lead stages to keep dashboard alive
-    if not follow_ups and processed_clients:
-        from types import SimpleNamespace
-        # Provide follow ups for clients that aren't closed yet
-        attention_leads = [
-            c for c in processed_clients 
-            if c.get('lead_stage', '').lower() in ['new', 'in discussion', 'quoted', 'discussion', 'proposal']
-        ]
-        
-        # Sort to prioritize Quoted/Proposal, then Discussion, then New
-        def stage_weight(c):
-            stage = c.get('lead_stage', '').lower()
-            if stage in ['quoted', 'proposal']: return 0
-            if stage in ['in discussion', 'discussion']: return 1
-            return 2
-            
-        attention_leads.sort(key=stage_weight)
-        
-        for c in attention_leads[:3]:
-             c_obj = SimpleNamespace(id=c['id'], name=c['name'])
-             stage = c.get('lead_stage', 'New').lower()
-             
-             if stage in ['quoted', 'proposal']:
-                 note = "Follow up on assigned quote"
-             elif stage in ['in discussion', 'discussion']:
-                 note = "Follow up with discussion details"
-             else:
-                 note = "New Lead - Please contact"
-                 
-             # Mock a reminder object
-             mock_rem = SimpleNamespace(
-                id=0,
-                client=c_obj,
-                reminder_date=datetime.now(),
-                note=note,
-                status="Pending",
-                reminder_type="Follow-up"
-             )
-             follow_ups.append(mock_rem)
+
 
     # DEBUG: Print what we're passing to template
     print(f"\n🔍 [CRM DEBUG] Data being passed to template:")
@@ -3039,8 +3039,63 @@ def crm():
 
 @app.route('/create-reminder')
 @login_required
-def create_reminder():
+def create_reminder_page():
     return render_template('create_reminder.html', title='Create Reminder')
+
+@app.route('/reminder/create', methods=['POST'])
+@login_required
+def create_reminder():
+    try:
+        client_id = request.form.get('client_id')
+        reminder_date_str = request.form.get('reminder_date')
+        reminder_type = request.form.get('reminder_type')
+        notes = request.form.get('notes', '')
+        
+        reminder_date = datetime.strptime(reminder_date_str, '%Y-%m-%dT%H:%M') if reminder_date_str else None
+        
+        reminder = Reminder(
+            client_id=client_id,
+            reminder_date=reminder_date,
+            reminder_type=reminder_type,
+            notes=notes,
+            status='Pending'
+        )
+        
+        db.session.add(reminder)
+        db.session.commit()
+        flash('Reminder created successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error creating reminder: {str(e)}', 'error')
+    
+    return redirect(url_for('crm'))
+
+@app.route('/reminder/<int:id>/complete', methods=['POST'])
+@login_required
+def complete_reminder(id):
+    try:
+        if id == 0:
+            flash('System-generated follow-up acknowledged.', 'success')
+            return redirect(url_for('crm'))
+            
+        reminder = Reminder.query.get_or_404(id)
+        reminder.status = 'Completed'
+        db.session.commit()
+        flash('Reminder marked as completed.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating reminder: {str(e)}', 'error')
+    return redirect(url_for('crm'))
+
+@app.route('/api/contact_client_whatsapp', methods=['POST'])
+@login_required
+def contact_client_whatsapp():
+    return jsonify({'success': False, 'error': 'WhatsApp integration pending client setup'}), 501
+
+@app.route('/api/send_invoice_whatsapp', methods=['POST'])
+@login_required
+def send_invoice_whatsapp():
+    return jsonify({'success': False, 'error': 'WhatsApp integration pending client setup'}), 501
 
 
 from flask import send_file, request
