@@ -689,7 +689,9 @@ body {
 .table {
   background-color: var(--card-bg, #ffffff);
 }
-
+.card{
+  border-radius: 15px;
+}
 /* Allow dropdowns to escape table wrapper */
 .table-responsive {
   overflow: visible !important;

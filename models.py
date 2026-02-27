@@ -15,8 +15,8 @@ class Company(db.Model):
     email = db.Column(db.String(120))
     website = db.Column(db.String(200))
     gstin = db.Column(db.String(15))
-    pan = db.Column(db.String(10))
-    logo_path = db.Column(db.String(200))
+    # logo = db.Column(db.LargeBinary)
+    # signature = db.Column(db.LargeBinary)
     
     # AI-Enhanced Company Features
     ai_brand_voice = db.Column(db.Text)  # AI-generated brand voice description

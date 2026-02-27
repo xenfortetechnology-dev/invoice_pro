@@ -1015,9 +1015,25 @@ def download_invoice_pdf(id):
         # Fetch bank details from cloud API
         bank_res = cloud_request("GET", "/bank-details")
         bank = SimpleNamespace(**bank_res.json()) if bank_res and bank_res.status_code == 200 else None
+        # 🔥 Fetch logo from cloud
+        logo_res = cloud_request("GET", "/company/logo")
+        logo_bytes = logo_res.content if logo_res and logo_res.status_code == 200 else None
+
+        # 🔥 Fetch signature from cloud
+        signature_res = cloud_request("GET", "/company/signature")
+        signature_bytes = signature_res.content if signature_res and signature_res.status_code == 200 else None
+
+        print("Logo bytes:", len(logo_bytes) if logo_bytes else "None")
+        print("Signature bytes:", len(signature_bytes) if signature_bytes else "None")
 
         # Generate 3-copy PDF: 1 Original + 2 Duplicate (watermarked)
-        pdf_buffer = generate_triple_invoice_pdf(invoice, company=company, bank=bank)
+        pdf_buffer = generate_triple_invoice_pdf(
+            invoice,
+            company=company,
+            bank=bank,
+            logo_bytes=logo_bytes,
+            signature_bytes=signature_bytes
+        )
         pdf_buffer.seek(0)
 
         # The JS passes ?t=<timestamp> so each download gets a unique filename –
