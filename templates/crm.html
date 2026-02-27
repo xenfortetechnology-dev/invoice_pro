@@ -96,7 +96,7 @@
                             <i class="fas fa-user-clock fa-2x text-warning"></i>
                         </div>
                         <div class="flex-grow-1 ms-3">
-                            <h6 class="mb-1">{{ reminder.client.name }}</h6>
+                            <h6 class="mb-1">{{ reminder.client.name if reminder.client.name else reminder.client['name'] if reminder.client is mapping else 'Unknown Client' }}</h6>
                             <p class="mb-1 text-muted small">
                                 Follow-up due: {{ reminder.reminder_date.strftime('%d-%m-%Y') }}
                             </p>
@@ -106,10 +106,9 @@
                             </p>
                             {% endif %}
                             <div class="btn-group btn-group-sm">
-                                <button class="btn btn-outline-primary"
-                                    onclick="contactClientWhatsApp({{ reminder.client.id }})">
-                                    <i class="fas fa-phone me-1"></i>Contact
-                                </button>
+                                <a href="mailto:{{ reminder.client.email if reminder.client.email else '' }}" class="btn btn-outline-primary">
+                                    <i class="fas fa-envelope me-1"></i>Contact
+                                </a>
                                 <button class="btn btn-outline-success"
                                     onclick="markCompleteReminder({{ reminder.id }})">
                                     <i class="fas fa-check me-1"></i>Done
@@ -341,7 +340,7 @@
                         {% for reminder in reminders %}
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             <div>
-                                <strong>{{ reminder.client.name }}</strong> - {{ reminder.reminder_type }}<br>
+                                <strong>{{ reminder.client.name if reminder.client.name else reminder.client['name'] if reminder.client is mapping else 'Unknown Client' }}</strong> - {{ reminder.reminder_type }}<br>
                                 <small class="text-muted">{{ reminder.reminder_date.strftime('%d-%m-%Y %H:%M')
                                     }}</small><br>
                                 <small>{{ reminder.notes }}</small>
@@ -423,33 +422,19 @@
 <script>
 
     function markCompleteReminder(reminderId) {
-        // Create a form programmatically
+        if (reminderId === 0) {
+            // Dismiss synthetic reminder (UI only)
+            alert("Follow-up acknowledged.");
+            window.location.reload();
+            return;
+        }
+        
+        // Create a form programmatically for real Reminders
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = `/reminder/${reminderId}/complete`;
         document.body.appendChild(form);
         form.submit();
-    }
-    function contactClientWhatsApp(clientId) {
-        fetch('/api/contact_client_whatsapp', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ client_id: clientId })
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert('WhatsApp message sent successfully!');
-                } else {
-                    alert('Failed to send message: ' + data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Error sending WhatsApp message:', error);
-                alert('Something went wrong while sending the message.');
-            });
     }
 
     // Overdue Invoices Pagination Logic
