@@ -2625,7 +2625,7 @@ def update_settings():
             data = request.get_json()
             logo_file = None
             signature_file = None
-
+        print("FULL DATA RECEIVED:", data)    
         # ---------------------------------------
         # 1️⃣ UPDATE COMPANY (WITH LOGO SUPPORT)
         # ---------------------------------------
