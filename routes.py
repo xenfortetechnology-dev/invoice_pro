@@ -1358,157 +1358,191 @@ def save_invoice_pdf_to_disk(id):
 
 
 
+
 @app.route('/invoice/<int:id>/send', methods=['POST'])
 @login_required
 def send_invoice_to_client(id):
-    """Generate invoice PDF and email it to the client as an attachment."""
+    """Generate invoice PDF and email it to the client (Multi-Tenant Secure)."""
     try:
         from email_service import send_email
+        from types import SimpleNamespace
+        
 
-        # ── 1. Fetch invoice data ──────────────────────────────────────────
+        # ─────────────────────────────────────────────
+        # 1️⃣ Fetch Invoice
+        # ─────────────────────────────────────────────
         invoice_data = fetch_cloud_invoice_by_id(id)
+
         if not invoice_data:
             return jsonify({'success': False, 'message': 'Invoice not found'}), 404
 
-        # ── 2. Fetch client data ───────────────────────────────────────────
+        # ─────────────────────────────────────────────
+        # 2️⃣ Fetch Client
+        # ─────────────────────────────────────────────
         client_data = fetch_cloud_client_by_id(invoice_data.get('client_id'))
+
         if not client_data:
             return jsonify({'success': False, 'message': 'Client not found'}), 404
 
         client_email = client_data.get('email')
+        client_name  = client_data.get('name', 'Client')
+
         if not client_email:
             return jsonify({'success': False, 'message': 'Client email not found'}), 400
 
-        client_name  = client_data.get('name', 'Client')
+        # ─────────────────────────────────────────────
+        # 3️⃣ Fetch Logged-In User (Sender)
+        # ─────────────────────────────────────────────
+        user_res = cloud_request("GET", "/user/profile")
 
-        # ── 3. Build line items for PDF generator ─────────────────────────
+        if not user_res or user_res.status_code != 200:
+            return jsonify({'success': False, 'message': 'Unable to fetch user profile'}), 500
+
+        user_data = user_res.json()
+
+        sender_email = user_data.get("email")
+        encrypted_password = user_data.get("email_app_password")
+
+        if not sender_email or not encrypted_password:
+            return jsonify({
+                'success': False,
+                'message': 'Email not configured. Please set your App Password in Settings.'
+            }), 400
+
+        sender_password = encrypted_password
+
+        # ─────────────────────────────────────────────
+        # 4️⃣ Build Invoice Object
+        # ─────────────────────────────────────────────
         raw_items  = invoice_data.get('line_items', [])
         line_items = []
-        subtotal   = total_cgst = total_sgst = total_igst = 0
+        subtotal = total_cgst = total_sgst = total_igst = 0
 
         for i, item in enumerate(raw_items):
             qty        = item.get('quantity', 0)
             price      = item.get('unit_price', 0)
             line_total = qty * price
             tax_amt    = item.get('tax_amount', 0)
-            cgst_amt   = round(tax_amt / 2, 2)
-            sgst_amt   = round(tax_amt / 2, 2)
-            igst_amt   = cgst_amt + sgst_amt
+
+            cgst_amt = round(tax_amt / 2, 2)
+            sgst_amt = round(tax_amt / 2, 2)
+            igst_amt = cgst_amt + sgst_amt
+
             subtotal   += line_total
             total_cgst += cgst_amt
             total_sgst += sgst_amt
             total_igst += igst_amt
+
             line_items.append(SimpleNamespace(
-                sr_no        = item.get('sr_no', i + 1),
-                hsn_code     = item.get('hsn_code', ''),
-                description  = item.get('description', ''),
-                quantity     = qty,
-                unit         = item.get('unit', 'Nos'),
-                unit_price   = price,
-                tax_percentage = item.get('tax_percentage', 18),
-                cgst_amount  = cgst_amt,
-                sgst_amount  = sgst_amt,
-                igst_amount  = igst_amt,
-                total_amount = line_total + cgst_amt + sgst_amt,
-                cost_price   = item.get('cost_price', 0)
+                sr_no=i + 1,
+                hsn_code=item.get('hsn_code', ''),
+                description=item.get('description', ''),
+                quantity=qty,
+                unit=item.get('unit', 'Nos'),
+                unit_price=price,
+                tax_percentage=item.get('tax_percentage', 0),
+                total_amount=line_total + cgst_amt + sgst_amt
             ))
 
         invoice_number = invoice_data.get('invoice_number', str(id))
 
         invoice = SimpleNamespace(
-            id                = invoice_data.get('id'),
-            invoice_number    = invoice_number,
-            invoice_date      = datetime.strptime(invoice_data.get('invoice_date'), '%Y-%m-%d').date()
-                                if invoice_data.get('invoice_date') else datetime.now().date(),
-            due_date          = None,
-            total_amount      = subtotal + total_cgst + total_sgst,
-            payment_status    = invoice_data.get('payment_status', 'Unpaid'),
-            notes             = invoice_data.get('notes', ''),
-            terms_conditions  = invoice_data.get('terms_conditions', ''),
-            line_items        = line_items,
-            subtotal          = subtotal,
-            cgst              = total_cgst,
-            sgst              = total_sgst,
-            igst              = total_igst,
-            invoice_type      = 'Invoice',
-            blockchain_hash   = None
+            id=invoice_data.get('id'),
+            invoice_number=invoice_number,
+            invoice_date=datetime.strptime(
+                invoice_data.get('invoice_date'), '%Y-%m-%d'
+            ).date() if invoice_data.get('invoice_date') else datetime.now().date(),
+            due_date=None,
+            total_amount=subtotal + total_cgst + total_sgst,
+            payment_status=invoice_data.get('payment_status', 'Unpaid'),
+            notes=invoice_data.get('notes', ''),
+            terms_conditions=invoice_data.get('terms_conditions', ''),
+            line_items=line_items,
+            subtotal=subtotal,
+            cgst=total_cgst,
+            sgst=total_sgst,
+            igst=total_igst
         )
+
+        # ✅ FULL CLIENT DETAILS (IMPORTANT FIX)
         invoice.client = SimpleNamespace(
-            name           = client_name,
-            email          = client_email,
-            phone          = client_data.get('phone', ''),
-            address        = client_data.get('address', ''),
-            city           = client_data.get('city', ''),
-            state          = '', pincode='', gstin='', pan='', contact_person=''
+            name=client_data.get('name') or "",
+            address=client_data.get('address') or "",
+            city=client_data.get('city') or "",
+            state=client_data.get('state') or "",
+            pincode=client_data.get('pincode') or "",
+            gstin=client_data.get('gstin') or "",
+            phone=client_data.get('phone') or "",
+            email=client_data.get('email') or ""
         )
 
-        # ── 4. Fetch company info ──────────────────────────────────────────
-        company_res  = cloud_request("GET", "/company")
-        company      = SimpleNamespace(**company_res.json()) if company_res and company_res.status_code == 200 else None
-        company_name = getattr(company, 'name', 'Our Company')
-        company_email= getattr(company, 'email', '')
-        company_phone= getattr(company, 'phone', '')
+        # ─────────────────────────────────────────────
+        # 5️⃣ Fetch Company + Bank + Logo + Signature
+        # ─────────────────────────────────────────────
+        company_res = cloud_request("GET", "/company")
+        bank_res    = cloud_request("GET", "/bank-details")
 
-        # ── 5. Generate PDF ────────────────────────────────────────────────
-        pdf_buffer = generate_invoice_pdf(invoice, company=company)
+        company = SimpleNamespace(**company_res.json()) if company_res and company_res.status_code == 200 else None
+        bank    = SimpleNamespace(**bank_res.json()) if bank_res and bank_res.status_code == 200 else None
+
+        # Fetch logo
+        logo_bytes = None
+        logo_res = cloud_request("GET", "/company/logo")
+        if logo_res and logo_res.status_code == 200:
+            logo_bytes = logo_res.content
+
+        # Fetch signature
+        signature_bytes = None
+        sign_res = cloud_request("GET", "/company/signature")
+        if sign_res and sign_res.status_code == 200:
+            signature_bytes = sign_res.content
+
+        # ─────────────────────────────────────────────
+        # 6️⃣ Generate PDF
+        # ─────────────────────────────────────────────
+        pdf_buffer = generate_invoice_pdf(
+            invoice,
+            company=company,
+            bank=bank,
+            logo_bytes=logo_bytes,
+            signature_bytes=signature_bytes
+        )
+
         pdf_buffer.seek(0)
-        pdf_bytes  = pdf_buffer.read()
+        pdf_bytes = pdf_buffer.read()
         pdf_filename = f'Invoice_{invoice_number}.pdf'
 
-        # ── 6. Build email body ─────────────────────────────────────────────
-        subject = f"Invoice {invoice_number} from {company_name}"
+        # ─────────────────────────────────────────────
+        # 7️⃣ Build Email
+        # ─────────────────────────────────────────────
+        subject = f"Invoice {invoice_number} from {company.name if company else ''}"
+
         body = f"""
-        <h2>Invoice from {company_name}</h2>
+        <h2>Invoice from {company.name if company else ''}</h2>
         <p>Dear {client_name},</p>
-
-        <p>Please find your invoice attached to this email. Below is a summary:</p>
-
-        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse;">
-            <tr>
-                <td><b>Invoice Number</b></td>
-                <td>{invoice_number}</td>
-            </tr>
-            <tr>
-                <td><b>Invoice Date</b></td>
-                <td>{invoice.invoice_date}</td>
-            </tr>
-            <tr>
-                <td><b>Total Amount</b></td>
-                <td>&#8377; {invoice.total_amount:.2f}</td>
-            </tr>
-            <tr>
-                <td><b>Payment Status</b></td>
-                <td>{invoice.payment_status}</td>
-            </tr>
-        </table>
-
+        <p>Please find your invoice attached.</p>
+        <p><b>Total Amount:</b> ₹ {invoice.total_amount:,.2f}</p>
         <br>
-        <h3>Company Details</h3>
-        <p>
-            <b>{company_name}</b><br>
-            Email: {company_email}<br>
-            Phone: {company_phone}
-        </p>
-
-        <p>Regards,<br>{company_name}</p>
+        <p>Regards,<br>{company.name if company else ''}</p>
         """
 
-        # ── 7. Send email with PDF attachment ──────────────────────────────
-        print(f"Sending invoice PDF to: {client_email}")
+        # ─────────────────────────────────────────────
+        # 8️⃣ Send Email
+        # ─────────────────────────────────────────────
         success = send_email(
-            to_email            = client_email,
-            subject             = subject,
-            body                = body,
-            attachment_bytes    = pdf_bytes,
-            attachment_filename = pdf_filename
+            sender_email=sender_email,
+            sender_password=sender_password,
+            to_email=client_email,
+            subject=subject,
+            body=body,
+            attachment_bytes=pdf_bytes,
+            attachment_filename=pdf_filename
         )
 
         if success:
-            logging.info(f"Invoice {invoice_number} PDF sent to {client_email}")
             return jsonify({'success': True, 'message': f'Invoice sent to {client_email} ✅'})
         else:
-            logging.error(f"Failed to send invoice email to {client_email}")
-            return jsonify({'success': False, 'message': 'Email sending failed. Please try again.'}), 500
+            return jsonify({'success': False, 'message': 'Email sending failed.'}), 500
 
     except Exception as e:
         logging.error(f"send_invoice_to_client error: {e}", exc_info=True)
