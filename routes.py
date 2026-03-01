@@ -2549,6 +2549,7 @@ def ai_assistant_page():
 @login_required
 def settings():
 
+    print("SESSION TOKEN:", session.get("token"))
     try:
         # Fetch company from cloud (tenant scoped automatically)
         company_res = cloud_request("GET", "/company")
@@ -2563,6 +2564,21 @@ def settings():
 
         tax_res = cloud_request("GET", "/settings/default-tax")
         tax_data = tax_res.json() if tax_res and tax_res.status_code == 200 else {}
+
+        user_res = cloud_request("GET", "/user/profile")
+
+        if user_res.status_code == 200:
+            user_data = user_res.json()
+        else:
+            user_data = {}
+
+        settings_data = {
+            "company": company_data,
+            "bank": bank_data,
+            "user": user_data
+        }
+
+        return render_template("settings.html", settings_data=settings_data)
 
     except Exception:
         company_data = {}
@@ -2691,34 +2707,40 @@ def update_settings():
                     "message": "Bank update failed"
                 }), 400
 
-        # ---------------------------------------
-        # 3️⃣ UPDATE USER
-        # ---------------------------------------
+        # =============================
+        # UPDATE USER PROFILE (CLOUD)
+        # =============================
         if isinstance(data, dict) and "user" in data:
+
+            user_data = data.get("user", {})
+
             user_payload = {
-                "preferred_language": data["user"].get("preferredLanguage"),
-                "theme_preference": data["user"].get("themePreference"),
-                "ai_features_enabled": data["user"].get("aiFeatures", False),
-                "voice_commands_enabled": data["user"].get("voiceCommands", False),
-                "collaboration_access": data["user"].get("collaborationAccess", False),
-                "biometric_enabled": data["user"].get("biometricEnabled", False),
+                "email": user_data.get("userEmail"),
+                "preferred_language": user_data.get("preferredLanguage"),
+                "theme_preference": user_data.get("themePreference"),
+                "ai_features_enabled": user_data.get("aiFeatures"),
+                "voice_commands_enabled": user_data.get("voiceCommands"),
+                "collaboration_access": user_data.get("collaborationAccess"),
+                "biometric_enabled": user_data.get("biometricEnabled")
             }
 
-            if data["user"].get("newPassword"):
-                user_payload["new_password"] = data["user"]["newPassword"]
+            if user_data.get("newPassword"):
+                user_payload["new_password"] = user_data.get("newPassword")
 
-            response = cloud_request(
-                "PUT",
-                "/user/profile",
-                json=user_payload
-            )
+            # 🔥 FIXED VERSION
+            if "emailAppPassword" in user_data:
+                user_payload["email_app_password"] = user_data.get("emailAppPassword")
+
+            print("USER PAYLOAD:", user_payload)
+
+            response = cloud_request("PUT", "/user/profile", json=user_payload)
 
             if not response or response.status_code != 200:
                 return jsonify({
                     "success": False,
-                    "message": "User update failed"
+                    "message": "User profile update failed"
                 }), 400
-
+                
         # ---------------------------------------
         # 4️⃣ UPDATE INVOICE SETTINGS
         # ---------------------------------------

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Settings - Revolutionary Invoice System{% endblock %}
+{% block title %}Settings - Xenforte Invoice System{% endblock %}
 
 {% block content %}
 <style>
@@ -285,6 +285,35 @@
                                             value="{{ settings_data.user.email if settings_data.user else '' }}">
                                     </div>
                                 </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="emailAppPassword" class="form-label">
+                                                Email App Password
+                                            </label>
+                                            <input type="password"
+                                                class="form-control glass-input"
+                                                id="emailAppPassword"
+                                                placeholder="Enter new app password">
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="confirmEmailAppPassword" class="form-label">
+                                                Confirm App Password
+                                            </label>
+                                            <input type="password"
+                                                class="form-control glass-input"
+                                                id="confirmEmailAppPassword"
+                                                placeholder="Re-enter app password">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <small class="text-muted">
+                                    Leave blank if you don't want to change the saved app password.
+                                </small>
                             </div>
 
                             <div class="row">
@@ -1147,6 +1176,30 @@ function saveAllSettings() {
     const userData = collectFormData('userForm');
     const invoiceData = collectFormData('invoiceForm');
 
+    /* ============================
+    PASSWORD VALIDATION
+    ============================ */
+
+    // App password validation
+    if (userData.emailAppPassword && 
+        userData.emailAppPassword !== userData.confirmEmailAppPassword) {
+
+        showNotification("App passwords do not match", "danger");
+        saveBtn.innerHTML = originalText;
+        saveBtn.disabled = false;
+        return;
+    }
+
+    // Login password validation
+    if (userData.newPassword && 
+        userData.newPassword !== userData.confirmPassword) {
+
+        showNotification("Passwords do not match", "danger");
+        saveBtn.innerHTML = originalText;
+        saveBtn.disabled = false;
+        return;
+    }
+
     formData.append("company", JSON.stringify(companyData));
     formData.append("bank", JSON.stringify(bankData));
     formData.append("user", JSON.stringify(userData));
@@ -1209,7 +1262,7 @@ function resetSettings() {
         const data = {};
 
         // Collect text inputs
-        form.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], input[type="url"], input[type="number"], textarea, select').forEach(input => {
+        form.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], input[type="url"], input[type="number"], input[type="password"], textarea, select').forEach(input => {
             data[input.id] = input.value;
         });
 
@@ -1240,6 +1293,31 @@ function resetSettings() {
                 }
             }
         }
+
+
+        function validateAppPasswords() {
+    const pass = document.getElementById('emailAppPassword');
+    const confirm = document.getElementById('confirmEmailAppPassword');
+
+    if (pass.value || confirm.value) {
+        if (pass.value !== confirm.value) {
+            confirm.setCustomValidity('App passwords do not match');
+            confirm.classList.add('is-invalid');
+        } else {
+            confirm.setCustomValidity('');
+            confirm.classList.remove('is-invalid');
+            confirm.classList.add('is-valid');
+        }
+    } else {
+        confirm.setCustomValidity('');
+        confirm.classList.remove('is-invalid');
+        confirm.classList.remove('is-valid');
+    }
+}
+
+document.getElementById('confirmEmailAppPassword')
+        .addEventListener('input', validateAppPasswords);
+
 
     function setupFormValidation() {
         // Password confirmation validation
