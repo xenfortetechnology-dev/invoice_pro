@@ -306,9 +306,187 @@ class CustomPagination:
                 yield num
                 last = num
 
+
 @app.route('/invoices')
 @login_required
 def invoice_management():
+    try:
+        response = cloud_request("GET", "/invoices")
+
+        if response.status_code == 200:
+            data = response.json()
+        else:
+            flash("Failed to load invoices from API", "error")
+            data = []
+
+    except Exception as e:
+        flash(f"API connection error: {str(e)}", "error")
+        data = []
+
+    # =============================
+    # PREPARE CLIENT MAPS
+    # =============================
+
+    client_ids = list(set(int(inv["client_id"]) for inv in data if inv.get("client_id")))
+
+    cloud_clients_data = fetch_cloud_clients()
+    cloud_clients = [SimpleNamespace(**c) for c in cloud_clients_data]
+
+    local_clients = Client.query.filter(Client.id.in_(client_ids)).all()
+    client_risk_map = {c.id: c.ai_risk_score for c in local_clients}
+
+    client_name_map = {c.id: c.name for c in cloud_clients}
+
+    # =============================
+    # FILTERING
+    # =============================
+
+    search_query = request.args.get('search', '').lower().strip()
+    status_filter = request.args.get('status') or 'All Status'
+    client_filter = request.args.get('client_id') or 'All Clients'
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
+
+    filtered_data = []
+
+    for inv in data:
+
+        inv_number = str(inv.get('invoice_number', '')).lower()
+        client_name = str(inv.get('client_name') or '').lower()
+
+        # SEARCH FILTER
+        if search_query:
+            if search_query not in inv_number and search_query not in client_name:
+                continue
+
+        # STATUS FILTER
+        if status_filter != 'All Status' and inv.get('payment_status') != status_filter:
+            continue
+
+        # CLIENT FILTER
+        if client_filter != 'All Clients' and str(inv.get('client_id')) != client_filter:
+            continue
+
+        # DATE RANGE FILTER
+        if date_from or date_to:
+            inv_date_str = inv.get('invoice_date')
+            if inv_date_str:
+                try:
+                    inv_date = datetime.strptime(inv_date_str, '%Y-%m-%d').date()
+
+                    if date_from:
+                        d_from = datetime.strptime(date_from, '%Y-%m-%d').date()
+                        if inv_date < d_from:
+                            continue
+
+                    if date_to:
+                        d_to = datetime.strptime(date_to, '%Y-%m-%d').date()
+                        if inv_date > d_to:
+                            continue
+
+                except ValueError:
+                    pass
+
+        filtered_data.append(inv)
+
+    # =============================
+    # PAGINATION
+    # =============================
+
+    page = request.args.get('page', 1, type=int)
+    per_page = 15
+    total_invoices = len(filtered_data)
+
+    start = (page - 1) * per_page
+    end = start + per_page
+    paginated_data = filtered_data[start:end]
+
+    # =============================
+    # BUILD INVOICE OBJECTS
+    # =============================
+
+    ai_insights = {}
+    invoice_list = []
+
+    for inv in paginated_data:
+
+        # Risk logic
+        risk_score = client_risk_map.get(int(inv.get("client_id", 0)), 0.0)
+        risk_level = "High" if risk_score > 0.7 else "Medium" if risk_score > 0.3 else "Low"
+
+        try:
+            total_amount = float(inv.get("total_amount", 0))
+        except (ValueError, TypeError):
+            total_amount = 0.0
+
+        is_high_value = total_amount > 100000
+
+        # Overdue logic (NOW BASED ON DUE DATE)
+        is_overdue_risk = False
+        if inv.get("due_date") and inv.get("payment_status") != "Paid":
+            try:
+                due_date = datetime.strptime(inv["due_date"], "%Y-%m-%d").date()
+                if datetime.now().date() > due_date:
+                    is_overdue_risk = True
+            except ValueError:
+                pass
+
+        if is_overdue_risk:
+            risk_level = "High"
+
+        ai_insights[inv["id"]] = {
+            "payment_risk": risk_level,
+            "high_value": is_high_value,
+            "overdue_risk": is_overdue_risk,
+            "predicted_payment_date": None
+        }
+
+        # SAFE DATE PARSING
+        invoice_date_obj = None
+        if inv.get("invoice_date"):
+            try:
+                invoice_date_obj = datetime.strptime(inv["invoice_date"], "%Y-%m-%d")
+            except:
+                pass
+
+        due_date_obj = None
+        if inv.get("due_date"):
+            try:
+                due_date_obj = datetime.strptime(inv["due_date"], "%Y-%m-%d")
+            except:
+                pass
+
+        invoice_obj = SimpleNamespace(
+            id=inv["id"],
+            invoice_number=inv["invoice_number"],
+            invoice_date=invoice_date_obj,
+            due_date=due_date_obj,
+            total_amount=total_amount,
+            amount_paid=0,
+            payment_status=inv["payment_status"],
+            client=SimpleNamespace(
+                name=inv.get("client_name")
+            )
+        )
+
+        invoice_list.append(invoice_obj)
+
+    invoices_obj = CustomPagination(invoice_list, page, per_page, total_invoices)
+
+    return render_template(
+        "invoice_management.html",
+        invoices=invoices_obj,
+        ai_enabled=True,
+        ai_insights=ai_insights,
+        search=search_query,
+        status_filter=status_filter,
+        client_filter=client_filter,
+        clients=cloud_clients,
+        date_from=date_from,
+        date_to=date_to
+    )
+
+
     try:
         response = cloud_request("GET", "/invoices")
 
@@ -506,6 +684,7 @@ def invoice_management():
         date_from=date_from,
         date_to=date_to
     )
+
 @app.route('/create_invoice', methods=['GET', 'POST'])
 @login_required
 def create_invoice():
@@ -520,6 +699,7 @@ def create_invoice():
                 template_id = int(template_id)
 
             invoice_date_str = request.form.get('invoice_date')
+            due_date_str = request.form.get('due_date')
 
             invoice_number = generate_invoice_number()
 
@@ -538,6 +718,7 @@ def create_invoice():
                     "invoice_number": invoice_number,
                     "client_id": client_id,
                     "invoice_date": invoice_date_str,
+                    "due_date": due_date_str,
                     "total_amount": total_amount,
                     "payment_status": "Unpaid",
                     "line_items": line_items_data,
@@ -1000,11 +1181,11 @@ def download_invoice_pdf(id):
             phone=client_data.get('phone', ''),
             address=client_data.get('address', ''),
             city=client_data.get('city', ''),
-            state='',
-            pincode='',
-            gstin='',
-            pan='',
-            contact_person=''
+            state=client_data.get('state', ''),
+            pincode=client_data.get('pincode', ''),
+            gstin=client_data.get('gstin', ''),
+            pan=client_data.get('pan', ''),
+            contact_person=client_data.get('contact_person', '')
         )
 
         logging.info(f"Generating PDF for invoice {id}: {invoice_data.get('invoice_number')} with {len(line_items)} items")
@@ -1129,7 +1310,11 @@ def save_invoice_pdf_to_disk(id):
             phone=client_data.get('phone', ''),
             address=client_data.get('address', ''),
             city=client_data.get('city', ''),
-            state='', pincode='', gstin='', pan='', contact_person=''
+            state=client_data.get('state', ''),
+            pincode=client_data.get('pincode', ''),
+            gstin=client_data.get('gstin', ''),
+            pan=client_data.get('pan', ''),
+            contact_person=client_data.get('contact_person', '')
         )
 
         company_res = cloud_request("GET", "/company")
@@ -1420,14 +1605,16 @@ def delete_invoice1(id):
 
 
 
-
 @app.route('/invoice/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_invoice(id):
 
+    # =========================
+    # 🔥 POST (UPDATE)
+    # =========================
     if request.method == 'POST':
-        action = request.form.get('action', 'update')
 
+        action = request.form.get('action', 'update')
         update_data = {}
         send_payment_email = False
 
@@ -1441,100 +1628,45 @@ def edit_invoice(id):
             flash_msg = 'Invoice marked as Unpaid!'
 
         else:
-            if request.form.get('notes'):
-                update_data['notes'] = request.form.get('notes')
-            if request.form.get('terms_conditions'):
-                update_data['terms_conditions'] = request.form.get('terms_conditions')
-            if request.form.get('client_id'):
-                update_data['client_id'] = int(request.form.get('client_id'))
+            update_data['notes'] = request.form.get('notes', '')
+            update_data['terms_conditions'] = request.form.get('terms_conditions', '')
+            update_data['due_date'] = request.form.get('due_date')  # 🔥 ADD THIS
+
+            line_items_data = json.loads(request.form.get('line_items', '[]'))
+
+            total_amount = sum(
+                float(item.get("total_amount", 0))
+                for item in line_items_data
+            )
+
+            update_data['total_amount'] = total_amount
+            update_data['line_items'] = line_items_data
+
             flash_msg = 'Invoice updated successfully!'
 
         try:
-            response = cloud_request("PUT", f"/invoices/{id}", json=update_data)
+            response = cloud_request(
+                "PUT",
+                f"/invoices/{id}",
+                json=update_data
+            )
 
             if response and response.status_code in (200, 204):
-
-                # 🔥 SEND PAYMENT EMAIL IF MARKED AS PAID
-                if send_payment_email:
-                    try:
-                        from email_service import send_email
-
-                        # Fetch updated invoice
-                        invoice_data = fetch_cloud_invoice_by_id(id)
-                        client_data = fetch_cloud_client_by_id(invoice_data.get('client_id'))
-                        company_response = cloud_request("GET", "/company")
-
-                        if company_response and company_response.status_code == 200:
-                            company_data = company_response.json()
-
-                            company_name = company_data.get("name")
-                            company_email = company_data.get("email")
-                            company_phone = company_data.get("phone")
-
-                            client_name = client_data.get("name")
-                            client_email = client_data.get("email")
-
-                            subject = f"Payment Received - Invoice {invoice_data.get('invoice_number')}"
-
-                            body = f"""
-                            <html>
-                            <body style="font-family: Arial, sans-serif;">
-
-                            <h2 style="color:#2c3e50;">Payment Confirmation</h2>
-
-                            <p>Dear {client_name},</p>
-
-                            <p>We have successfully received your payment.</p>
-
-                            <table border="1" cellpadding="8" cellspacing="0" 
-                                   style="border-collapse: collapse; width: 100%;">
-                                <tr>
-                                    <td><b>Invoice Number</b></td>
-                                    <td>{invoice_data.get('invoice_number')}</td>
-                                </tr>
-                                <tr>
-                                    <td><b>Total Amount Paid</b></td>
-                                    <td>₹ {invoice_data.get('total_amount')}</td>
-                                </tr>
-                            </table>
-
-                            <br>
-
-                            <p>Thank you for your business.</p>
-
-                            <p>
-                            Regards,<br>
-                            <b>{company_name}</b><br>
-                            Email: {company_email}<br>
-                            Phone: {company_phone}
-                            </p>
-
-                            </body>
-                            </html>
-                            """
-
-                            email_status = send_email(client_email, subject, body)
-
-                            if email_status:
-                                print("Payment email sent successfully")
-                            else:
-                                print("Payment email failed")
-
-                    except Exception as e:
-                        print("Payment email error:", e)
-
                 flash(flash_msg, 'success')
-
             else:
-                flash(f'Failed to update invoice: {response.text if response else "No response"}', 'error')
+                flash(f'Failed to update invoice: {response.text}', 'error')
 
         except Exception as e:
-            flash(f'API connection error: {str(e)}', 'error')
+            flash(f'API error: {str(e)}', 'error')
 
         return redirect(url_for('invoice_management'))
 
-    # GET Request
+    # =========================
+    # 🔥 GET (LOAD EDIT PAGE)
+    # =========================
+
     invoice_data = fetch_cloud_invoice_by_id(id)
+
     if not invoice_data:
         flash('Invoice not found', 'error')
         return redirect(url_for('invoice_management'))
@@ -1548,22 +1680,46 @@ def edit_invoice(id):
         phone=client_data.get('phone', '')
     )
 
+    raw_items = invoice_data.get("line_items", [])
+    line_items = []
+
+    for item in raw_items:
+        line_items.append(SimpleNamespace(
+            hsn_code=item.get("hsn_code", ""),
+            description=item.get("description", ""),
+            quantity=item.get("quantity", 0),
+            unit=item.get("unit", "Nos"),
+            unit_price=item.get("unit_price", 0),
+            cgst_percentage=item.get("cgst_percentage", 0),
+            sgst_percentage=item.get("sgst_percentage", 0),
+            igst_percentage=item.get("igst_percentage", 0),
+            total_amount=item.get("total_amount", 0)
+        ))
+
     invoice = SimpleNamespace(
         id=invoice_data.get('id'),
-        invoice_number=invoice_data.get('invoice_number', 'N/A'),
+        invoice_number=invoice_data.get('invoice_number'),
         invoice_date=invoice_data.get('invoice_date'),
+        due_date=invoice_data.get('due_date'),   # 🔥 CRITICAL FIX
         client_id=invoice_data.get('client_id'),
         client=client,
         total_amount=invoice_data.get('total_amount', 0),
         payment_status=invoice_data.get('payment_status', 'Unpaid'),
         notes=invoice_data.get('notes', ''),
-        terms_conditions=invoice_data.get('terms_conditions', '')
+        terms_conditions=invoice_data.get('terms_conditions', ''),
+        line_items=line_items
     )
 
     client_list = fetch_cloud_clients()
     clients = [SimpleNamespace(**c) for c in client_list]
 
-    return render_template('edit_invoice.html', invoice=invoice, clients=clients)
+    return render_template(
+        'edit_invoice.html',
+        invoice=invoice,
+        clients=clients
+    )
+
+
 
 
 @app.route('/invoice/<int:id>/duplicate', methods=['POST'])
@@ -1917,6 +2073,12 @@ def create_client():
                 "phone": request.form.get('phone'),
                 "client_type": request.form.get('client_type'),
                 "lead_stage": request.form.get('lead_stage'),
+                "address": request.form.get('address'),
+                "city": request.form.get('city'),
+                "state": request.form.get('state'),
+                "pincode": request.form.get('pincode'),
+                "gstin": request.form.get('gstin'),
+                "pan": request.form.get('pan'),
                 # Add other fields if Cloud API supports them, otherwise they are lost or need local storage map
                 # For now assuming basic fields supported by the provided API
             }
@@ -2012,9 +2174,12 @@ def api_client_details(client_id):
                 'name': found.get('name'),
                 'email': found.get('email'),
                 'phone': found.get('phone'),
-                'address': "Cloud Record (Address N/A)", 
-                'gstin': "N/A",
-                'pan': "N/A",
+                'address': found.get('address'),
+                'city': found.get('city'),
+                'state': found.get('state'),
+                'pincode': found.get('pincode'),
+                'gstin': found.get('gstin'),
+                'pan': found.get('pan'),
                 'total_business': total_business,
                 'pending_amount': pending_amount,
                 'contact_person': found.get('name'),

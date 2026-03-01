@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Create Invoice - Revolutionary Invoice System{% endblock %}
+{% block title %}Create Invoice - Xenforte Invoice System{% endblock %}
 
 {% block head %}
 <style>
@@ -107,7 +107,7 @@
                         <div class="col-md-3">
                             <div class="mb-3">
                                 <label for="due_date" class="form-label">Due Date</label>
-                                <input type="date" class="form-control glass-input" id="due_date" name="due_date">
+                                <input type="date" class="form-control glass-input" id="due_date" name="due_date" required>
                             </div>
                         </div>
                     </div>
@@ -126,8 +126,8 @@
                                 <label for="terms_conditions" class="form-label">Terms & Conditions</label>
                                 <textarea class="form-control glass-input" id="terms_conditions" name="terms_conditions"
                                     rows="3" placeholder="Payment terms and conditions...">Payment due within 30 days of invoice date.
-Interest @ 2% per month will be charged on overdue amounts.
-Subject to local jurisdiction only.</textarea>
+                                                                                            Interest @ 2% per month will be charged on overdue amounts.
+                                                                                            Subject to local jurisdiction only.</textarea>
                             </div>
                         </div>
                     </div>
@@ -366,7 +366,7 @@ Subject to local jurisdiction only.</textarea>
             <span class="item-number">1</span>
         </td>
         <td>
-            <input type="text" class="form-control form-control-sm glass-input" placeholder="HSN" name="hsn_code">
+            <input type="text" class="form-control form-control-sm glass-input" placeholder="HSN" name="hsn_code" required>
         </td>
         <td>
             <input type="text" class="form-control form-control-sm glass-input" placeholder="Item description"
@@ -382,17 +382,14 @@ Subject to local jurisdiction only.</textarea>
                 <option value="Kg">Kg</option>
                 <option value="Ltr">Ltr</option>
                 <option value="Mtr">Mtr</option>
-                <option value="Hrs">Hrs</option>
-                <option value="Days">Days</option>
             </select>
         </td>
         <td>
-            <input type="number" class="form-control form-control-sm glass-input" placeholder="0.00" name="unit_price"
-                min="0" required>
+            <input type="number" class="form-control form-control-sm glass-input" placeholder="0.00" name="unit_price" min="0.01" step="0.01" value="" required>
         </td>
         <td>
             <input type="number" class="form-control form-control-sm glass-input" placeholder="..."
-                name="cgst_percentage">
+                name="cgst_percentage" required>
         </td>
         <td>
             <input type="number" class="form-control form-control-sm glass-input" placeholder="..."
@@ -471,6 +468,12 @@ Subject to local jurisdiction only.</textarea>
         // 4️⃣ Form submit
         document.getElementById('invoiceForm')
             .addEventListener('submit', function (e) {
+
+                if (!this.checkValidity()) {
+                    this.reportValidity();  // show browser validation
+                    return;
+                }
+
                 e.preventDefault();
                 saveInvoice();
             });
@@ -800,28 +803,18 @@ Subject to local jurisdiction only.</textarea>
 
     // Save button - opens format modal
     document.getElementById("saveInvoiceBtn").addEventListener("click", function () {
-        // Validate form first
-        const clientId = document.getElementById('client_id').value;
-        const rows = document.querySelectorAll('.item-row');
 
-        if (!clientId) {
-            alert('Please select a client');
-            return;
-        }
+    const form = document.getElementById('invoiceForm');
 
-        let hasItems = false;
-        rows.forEach(row => {
-            const description = row.querySelector('[name="description"]').value.trim();
-            if (description) hasItems = true;
-        });
+    // 🔥 Trigger HTML validation first
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
 
-        if (!hasItems) {
-            alert('Please add at least one item');
-            return;
-        }
+    openInvoiceFormatModal();
+});
 
-        openInvoiceFormatModal();
-    });
 
     // Preview button - submit to preview endpoint
     document.getElementById("previewBtn").addEventListener("click", function () {

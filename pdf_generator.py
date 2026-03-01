@@ -25,474 +25,334 @@ from analytics_engine import AnalyticsEngine
 import config
 
 def generate_invoice_pdf(invoice, company=None, bank=None, logo_bytes=None, signature_bytes=None):
-    """Generate invoice PDF matching the reference image layout."""
+    """Generate invoice PDF with bottom-fixed references + totals + bank/signature area.
+    Gap between items table and bottom block adjusts automatically."""
     try:
-        # ── Resolve company ────────────────────────────────────────────────
         if not company:
-            company = Company.query.first()
-        if not company:
-            company = type('Company', (), {
-                'name':    config.COMPANY_NAME,
-                'address': config.COMPANY_ADDRESS,
-                'city':    config.COMPANY_CITY,
-                'state':   config.COMPANY_STATE,
-                'pincode': config.COMPANY_PINCODE,
-                'phone':   config.COMPANY_PHONE,
-                'email':   config.COMPANY_EMAIL,
-                'gstin':   config.GSTIN,
-                'pan':     config.PAN,
+            company = Company.query.first() or type('Company', (), {
+                'name': config.COMPANY_NAME, 'address': config.COMPANY_ADDRESS,
+                'city': config.COMPANY_CITY, 'state': config.COMPANY_STATE,
+                'pincode': config.COMPANY_PINCODE, 'phone': config.COMPANY_PHONE,
+                'email': config.COMPANY_EMAIL, 'gstin': config.GSTIN, 'pan': config.PAN,
             })()
 
         client = invoice.client
 
-        # ── Canvas setup ───────────────────────────────────────────────────
         buffer = io.BytesIO()
-        page_w, page_h = A4          # 595.27 x 841.89 pt
+        page_w, page_h = A4
         c = canvas.Canvas(buffer, pagesize=A4)
 
-        # Margins
-        ML = 30   # left
-        MR = 30   # right
-        MT = 30   # top
-        full_w = page_w - ML - MR    # usable width  ≈ 535 pt
+        ML = MR = MT = 36
+        full_w = page_w - ML - MR
+        col_split = ML + full_w * 0.58
 
-        # Helper: thin black border line
-        def hline(y, x0=ML, x1=page_w - MR, lw=0.5):
-            c.setLineWidth(lw)
-            c.setStrokeColor(colors.black)
-            c.line(x0, y, x1, y)
+        def hline(y, x0=ML, x1=page_w-MR, lw=0.5):
+            c.setLineWidth(lw); c.setStrokeColor(colors.black); c.line(x0,y,x1,y)
 
         def vline(x, y0, y1, lw=0.5):
-            c.setLineWidth(lw)
-            c.setStrokeColor(colors.black)
-            c.line(x, y0, x, y1)
+            c.setLineWidth(lw); c.setStrokeColor(colors.black); c.line(x,y0,x,y1)
 
         def rect(x, y, w, h, fill=0):
-            c.setLineWidth(0.5)
-            c.setStrokeColor(colors.black)
-            c.rect(x, y, w, h, fill=fill)
+            c.setLineWidth(0.5); c.setStrokeColor(colors.black); c.rect(x,y,w,h,fill=fill)
 
-        # ── ROW 1: INVOICE title (left) | blank logo area (right) ─────────
-        row1_top  = page_h - MT
-        row1_h    = 40
-        row1_bot  = row1_top - row1_h
+        # ── 1. Draw top fixed parts ────────────────────────────────────────────
+        y = page_h - MT
 
-        # Outer border for row 1
-        rect(ML, row1_bot, full_w, row1_h)
+        # Row 1: INVOICE + logo (auto-scaled & centered)
+        row1_h = 48
+        rect(ML, y-row1_h, full_w, row1_h)
+        c.setFont("Helvetica-Bold", 24)
+        c.drawString(ML + 8, y - 30, "INVOICE")
+        vline(col_split, y-row1_h, y)
 
-        # "INVOICE" text
-        c.setFont("Helvetica-Bold", 22)
-        c.setFillColor(colors.black)
-        c.drawString(ML + 6, row1_bot + 12, "INVOICE")
-
-        # Divider between title and logo area
-        mid_x = ML + full_w * 0.6
-        vline(mid_x, row1_bot, row1_top)
-
-        # ================= COMPANY LOGO =================
         if logo_bytes:
             try:
-                logo_image = ImageReader(io.BytesIO(logo_bytes))
-
-                # Logo box dimensions (right side of row1)
-                logo_box_x = mid_x
-                logo_box_y = row1_bot
-                logo_box_w = page_w - MR - mid_x
-                logo_box_h = row1_h
-
-                img_width = 110
-                img_height = 35
-
-                # Center logo inside box
-                center_x = logo_box_x + (logo_box_w - img_width) / 2
-                center_y = logo_box_y + (logo_box_h - img_height) / 2
-
-                c.drawImage(
-                    logo_image,
-                    center_x,
-                    center_y,
-                    width=img_width,
-                    height=img_height,
-                    preserveAspectRatio=True,
-                    mask='auto'
-                )
-
+                logo = ImageReader(io.BytesIO(logo_bytes))
+                orig_w, orig_h = logo.getSize()
+                max_logo_w = (page_w - MR - col_split) - 20
+                max_logo_h = row1_h - 12
+                scale = min(max_logo_w / orig_w, max_logo_h / orig_h, 1.0)
+                draw_w = orig_w * scale
+                draw_h = orig_h * scale
+                logo_x = col_split + ((page_w - MR - col_split) - draw_w) / 2
+                logo_y = (y - row1_h) + (row1_h - draw_h) / 2
+                c.drawImage(logo, logo_x, logo_y, width=draw_w, height=draw_h,
+                            preserveAspectRatio=True, mask='auto')
             except Exception as e:
-                logging.error(f"Logo rendering failed: {e}")
+                print("Logo rendering failed:", e)
 
-        # ── ROW 2: Invoice No/Date (left) | Company Name + Address (right) ─
-        row2_top = row1_bot
-        row2_h   = 50
-        row2_bot = row2_top - row2_h
-        col_split = mid_x   # align exactly with Row 1 divider
+        y -= row1_h + 4
 
-        rect(ML, row2_bot, full_w, row2_h)
-        vline(col_split, row2_bot, row2_top)
+        # Row 2: Invoice info | Company
+        row2_h = 64
+        rect(ML, y-row2_h, full_w, row2_h)
+        vline(col_split, y-row2_h, y)
 
-        # Left: Invoice No / Date
-        c.setFont("Helvetica-Bold", 8)
-        c.drawString(ML + 4, row2_top - 13, "Invoice No :")
-        c.setFont("Helvetica", 8)
-        c.drawString(ML + 62, row2_top - 13, str(invoice.invoice_number))
-
-        c.setFont("Helvetica-Bold", 8)
-        c.drawString(ML + 4, row2_top - 27, "Date       :")
-        c.setFont("Helvetica", 8)
-        c.drawString(ML + 62, row2_top - 27, invoice.invoice_date.strftime('%d-%m-%Y'))
-
-        if invoice.due_date:
-            c.setFont("Helvetica-Bold", 8)
-            c.drawString(ML + 4, row2_top - 41, "Due Date   :")
-            c.setFont("Helvetica", 8)
-            c.drawString(ML + 62, row2_top - 41, invoice.due_date.strftime('%d-%m-%Y'))
-
-        # Right: Company Name centered, address right-aligned
-        right_w   = page_w - MR - col_split
-        right_cx  = col_split + right_w / 2
-
-        company_name = company.name.upper()
-        max_width = right_w - 10
-        base_font_size = 11
-
-        c.setFont("Helvetica-Bold", base_font_size)
-
-        text_width = c.stringWidth(company_name, "Helvetica-Bold", base_font_size)
-
-        if text_width <= max_width:
-            # Single line
-            c.drawCentredString(right_cx, row2_top - 14, company_name)
-        else:
-            # Split into two lines intelligently
-            words = company_name.split()
-            line1 = ""
-            line2 = ""
-
-            for word in words:
-                test_line = (line1 + " " + word).strip()
-                if c.stringWidth(test_line, "Helvetica-Bold", base_font_size) <= max_width:
-                    line1 = test_line
-                else:
-                    line2 += " " + word
-
-            line2 = line2.strip()
-
-            # Draw two centered lines
-            c.drawCentredString(right_cx, row2_top - 12, line1)
-            c.drawCentredString(right_cx, row2_top - 24, line2)
-
-        # ---------------- WRAPPED ADDRESS ----------------
-        address_text = f"{company.address}, {company.city} - {company.pincode}, {company.state}"
-
-        address_style = ParagraphStyle(
-            name='CompanyAddress',
-            fontSize=7.5,
-            alignment=TA_CENTER,
-            fontName='Helvetica'
-        )
-
-        address_para = Paragraph(address_text, address_style)
-
-        # Wrap inside right column width
-        w, h = address_para.wrap(right_w - 10, row2_h)
-
-        # Draw paragraph centered in right column
-        address_para.drawOn(
-            c,
-            col_split + 5,
-            row2_top - 28 - h
-        )
-
-        # ── ROW 3: To… (left) | Our Details (right) ───────────────────────
-        row3_top = row2_bot
-        row3_h   = 72
-        row3_bot = row3_top - row3_h
-
-        rect(ML, row3_bot, full_w, row3_h)
-        vline(col_split, row3_bot, row3_top)
-
-        # Left — "To:" header (bold, underline look via font)
-        c.setFont("Helvetica-Bold", 8)
-        c.drawString(ML + 4, row3_top - 12, "To,")
-
-        # Client name bold
         c.setFont("Helvetica-Bold", 9)
-        client_name = getattr(client, 'name', '') or ''
-        c.drawString(ML + 4, row3_top - 24, client_name)
+        c.drawString(ML+6, y-16, "Invoice No :"); c.setFont("Helvetica",9); c.drawString(ML+78, y-16, str(invoice.invoice_number))
+        c.setFont("Helvetica-Bold",9); c.drawString(ML+6, y-32, "Date       :"); c.setFont("Helvetica",9); c.drawString(ML+78, y-32, invoice.invoice_date.strftime('%d-%m-%Y'))
+        if invoice.due_date:
+            c.setFont("Helvetica-Bold",9); c.drawString(ML+6, y-48, "Due Date   :"); c.setFont("Helvetica",9); c.drawString(ML+78, y-48, invoice.due_date.strftime('%d-%m-%Y'))
 
-        c.setFont("Helvetica", 8)
-        y_cl = row3_top - 36
-        for part in [
-            getattr(client, 'address', '') or '',
-            f"{getattr(client, 'city', '') or ''}, {getattr(client, 'state', '') or ''}",
-            getattr(client, 'pincode', '') or '',
-        ]:
-            if part.strip().strip(','):
-                c.drawString(ML + 4, y_cl, part)
-                y_cl -= 11
+        right_w = page_w - MR - col_split
+        rcx = col_split + right_w / 2
+        cname = (company.name or "").upper()
+        c.setFont("Helvetica-Bold", 12)
+        if c.stringWidth(cname, "Helvetica-Bold", 12) <= right_w - 20:
+            c.drawCentredString(rcx, y-18, cname)
+            name_h = 18
+        else:
+            words = cname.split(); l1 = l2 = ""
+            for w in words:
+                test = (l1 + " " + w).strip()
+                if c.stringWidth(test, "Helvetica-Bold", 12) <= right_w - 20:
+                    l1 = test
+                else:
+                    l2 = (l2 + " " + w).strip()
+            c.drawCentredString(rcx, y-14, l1)
+            c.drawCentredString(rcx, y-30, l2.strip())
+            name_h = 34
 
-        # Right — "Our Details" box with black header
+        addr_str = f"{company.address or ''}, {company.city or ''} - {company.pincode or ''}, {company.state or ''}"
+        pstyle = ParagraphStyle('addr', fontName='Helvetica', fontSize=8.5, leading=10, alignment=1, spaceAfter=4)
+        para = Paragraph(addr_str, pstyle)
+        pw, ph = para.wrap(right_w-16, 9999)
+        para.drawOn(c, col_split+8, y - name_h - 8 - ph)
+
+        y -= row2_h + 6
+
+        # ── Row 3: To (with full client address) | Our Details ─────────────────
+        row3_h = 110   # Increased to fit address comfortably
+        rect(ML, y - row3_h, full_w, row3_h)
+        vline(col_split, y - row3_h, y)
+
+        # Left side – TO block (auto wrapped)
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(ML + 6, y - 16, "To,")
+
+        client_name = client.name or "—"
+
+        client_address = f"""
+        <b>{client_name}</b><br/>
+        {client.address or ""}<br/>
+        {client.city or ""}, {client.state or ""} - {client.pincode or ""}<br/>
+        GSTIN: {getattr(client, 'gstin', '') or "—"}
+        """
+
+        client_style = ParagraphStyle(
+            'client_addr',
+            fontName='Helvetica',
+            fontSize=9,
+            leading=12,
+        )
+
+        client_para = Paragraph(client_address, client_style)
+
+        available_width = col_split - ML - 14
+        pw, ph = client_para.wrap(available_width, row3_h - 20)
+
+        client_para.drawOn(
+            c,
+            ML + 6,
+            y - 34 - ph
+        )
+
+        # Right side – Our Details
         c.setFillColor(colors.black)
-        c.rect(col_split, row3_top - 14, right_w, 14, fill=1, stroke=0)
+        c.rect(col_split, y - 18, right_w, 18, fill=1, stroke=0)
         c.setFillColor(colors.white)
-        c.setFont("Helvetica-Bold", 8)
-        c.drawCentredString(right_cx, row3_top - 10, "Our Details")
+        c.setFont("Helvetica-Bold", 9)
+        c.drawCentredString(rcx, y - 13, "Our Details")
         c.setFillColor(colors.black)
 
-        # GSTIN
-        c.setFont("Helvetica-Bold", 8)
-        c.drawString(col_split + 4, row3_top - 26, "GSTIN :")
-        c.setFont("Helvetica", 8)
-        c.drawString(col_split + 48, row3_top - 26, company.gstin or '')
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(col_split + 8, y - 36, "GSTIN :")
+        c.setFont("Helvetica", 9)
+        c.drawString(col_split + 58, y - 36, company.gstin or "")
 
-        # PAN
-        c.setFont("Helvetica-Bold", 8)
-        c.drawString(col_split + 4, row3_top - 38, "PAN   :")
-        c.setFont("Helvetica", 8)
-        c.drawString(col_split + 48, row3_top - 38, getattr(company, 'pan', '') or '')
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(col_split + 8, y - 52, "PAN   :")
+        c.setFont("Helvetica", 9)
+        c.drawString(col_split + 58, y - 52, company.pan or "")
 
-        # ── ROW 4: Items table header ──────────────────────────────────────
-        row4_top = row3_bot
-        row4_h   = 20   # header row height
-        row4_bot = row4_top - row4_h
+        y -= row3_h + 8
 
-        # Column widths (must sum to full_w) — 8 columns
-        col_w = [
-            full_w * 0.048,   # Sl No
-            full_w * 0.08,    # HSM Code
-            full_w * 0.30,    # Description
-            full_w * 0.065,   # Qty
-            full_w * 0.065,   # Unit
-            full_w * 0.11,    # Rate
-            full_w * 0.065,   # Tax%
-            full_w * 0.167,   # Amount
-        ]
-        col_labels = ["Sl.\nNo.", "HSM\nCode", "Product Name / Description", "Qty.", "Unit", "Rate", "Tax\n%", "Amount"]
-        col_aligns = ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
-
-        # Draw header background
+        # ── Items table ────────────────────────────────────────────────────────
+        header_h = 22
+        rect(ML, y-header_h, full_w, header_h)
         c.setFillColor(colors.black)
-        c.rect(ML, row4_bot, full_w, row4_h, fill=1, stroke=0)
-        c.setStrokeColor(colors.black)
-        c.setLineWidth(0.5)
-        c.rect(ML, row4_bot, full_w, row4_h, fill=0)
-
-        # Header text + vertical dividers
-        x_cur = ML
+        c.rect(ML, y-header_h, full_w, header_h, fill=1, stroke=0)
         c.setFillColor(colors.white)
-        c.setFont("Helvetica-Bold", 7)
-        for i, (w, label) in enumerate(zip(col_w, col_labels)):
-            cx = x_cur + w / 2
-            # two-line labels: split on \n
-            parts = label.split('\n')
-            if len(parts) == 2:
-                c.drawCentredString(cx, row4_bot + 11, parts[0])
-                c.drawCentredString(cx, row4_bot + 3,  parts[1])
+
+        col_w = [full_w*0.05, full_w*0.09, full_w*0.30, full_w*0.07, full_w*0.07, full_w*0.115, full_w*0.07, full_w*0.185]
+        headers = ["Sl.\nNo", "HSN\nCode", "Product Name / Description", "Qty.", "Unit", "Rate", "Tax", "Amount"]
+
+        c.setFont("Helvetica-Bold", 8)
+        x = ML
+        for w, txt in zip(col_w, headers):
+            cx = x + w/2
+            ps = txt.split('\n')
+            if len(ps)==2:
+                c.drawCentredString(cx, y-14, ps[0])
+                c.drawCentredString(cx, y-7, ps[1])
             else:
-                c.drawCentredString(cx, row4_bot + 7, label)
-            if i < len(col_w) - 1:
-                c.setStrokeColor(colors.white)
-                c.setLineWidth(0.3)
-                vline(x_cur + w, row4_bot, row4_top, lw=0.3)
-                c.setStrokeColor(colors.black)
-            x_cur += w
+                c.drawCentredString(cx, y-10, txt)
+            x += w
+
         c.setFillColor(colors.black)
+        y -= header_h
 
-        # ── ROW 5: Item rows (only real items) ────────────────────────────
-        item_row_h = 18
-        line_items = list(invoice.line_items)
-        items_top  = row4_bot
-        items_bot  = items_top - item_row_h * len(line_items)
+        item_h = 19
+        items = list(invoice.line_items or [])
 
-        for idx, item in enumerate(line_items):
-            y_top = items_top - idx * item_row_h
-            y_bot = y_top - item_row_h
-            # alternating light background
-            if idx % 2 == 1:
-                c.setFillColor(colors.HexColor('#f5f5f5'))
-                c.rect(ML, y_bot, full_w, item_row_h, fill=1, stroke=0)
+        for i, item in enumerate(items):
+            top = y - i*item_h
+            bot = top - item_h
+
+            if i % 2 == 1:
+                c.setFillColor(colors.HexColor("#f8f9fa"))
+                c.rect(ML, bot, full_w, item_h, fill=1, stroke=0)
                 c.setFillColor(colors.black)
 
-            # outer border for this row
-            c.setStrokeColor(colors.black)
-            c.setLineWidth(0.4)
-            c.rect(ML, y_bot, full_w, item_row_h, fill=0)
+            rect(ML, bot, full_w, item_h, fill=0)
 
-            x_cur = ML
-            row_vals = [
-                str(item.sr_no),
-                item.hsn_code or '',
-                item.description or '',
+            vals = [
+                str(getattr(item,'sr_no',i+1)),
+                getattr(item,'hsn_code','') or '',
+                item.description or "",
                 f"{item.quantity:g}",
-                getattr(item, 'unit', '') or '',
+                getattr(item,'unit','Nos'),
                 f"{item.unit_price:,.2f}",
-                f"{getattr(item, 'tax_percentage', 0) or 0:g}%",
+                f"{getattr(item,'tax_percentage',0):g}",
                 f"{item.total_amount:,.2f}",
             ]
-            c.setFont("Helvetica", 7)
-            for i, (w, val) in enumerate(zip(col_w, row_vals)):
-                # vertical divider
-                if i < len(col_w) - 1:
-                    vline(x_cur + w, y_bot, y_top, lw=0.4)
-                # text align: description left, rate/amount right, others center
-                if i == 2:
-                    # Description — truncate if too long
-                    max_chars = int(w / 3.8)
-                    display = val if len(val) <= max_chars else val[:max_chars - 1] + '…'
-                    c.drawString(x_cur + 3, y_bot + 5, display)
-                elif i in (5, 7):  # Rate and Amount — right aligned
-                    c.drawRightString(x_cur + w - 3, y_bot + 5, val)
+
+            c.setFont("Helvetica", 8)
+            x = ML
+            for j, (w, v) in enumerate(zip(col_w, vals)):
+                if j < len(col_w)-1:
+                    vline(x+w, bot, top, 0.4)
+                if j == 2:
+                    maxc = int(w / 4.0)
+                    txt = v[:maxc-1]+"…" if len(v)>maxc else v
+                    c.drawString(x+4, bot+6, txt)
+                elif j in (5,7):
+                    c.drawRightString(x+w-4, bot+6, v)
                 else:
-                    c.drawCentredString(x_cur + w / 2, y_bot + 5, val)
-                x_cur += w
+                    c.drawCentredString(x + w/2, bot+6, v)
+                x += w
 
-        # ── If no items just draw an empty row placeholder ─────────────────
-        if not line_items:
-            items_bot = items_top - item_row_h
-            c.setLineWidth(0.4)
-            c.rect(ML, items_bot, full_w, item_row_h, fill=0)
+        items_bottom = y - len(items) * item_h if items else y - item_h
 
-        # ── Gap between items and totals section ────────────────────────
-        gap = 10
+        # ── Bottom fixed block ─────────────────────────────────────────────────
+        y_bottom = MT
 
-        # ── ROW 6: Reference fields (left) | Totals (right) ───────────────
-        ref_top = items_bot - gap
+        # Footer
+        footer_h = 22
+        rect(ML, y_bottom, full_w, footer_h)
+        c.setFont("Helvetica", 8)
+        foot = f"Ph. {company.phone or '—'} | Email: {company.email or '—'}"
+        c.drawCentredString(ML + full_w/2, y_bottom + 8, foot)
+        y_bottom += footer_h + 12
 
-        # Collect ref fields
-        ref_fields = [
-            ("Party GST NO", getattr(invoice, 'parts_gst_no', '') or ''),
-            ("Ref Dc",        getattr(invoice, 'ref_dc',       '') or ''),
-            ("Ref Dc Date",   getattr(invoice, 'ref_dc_date',  '') or ''),
-            ("PO No",         getattr(invoice, 'po_number',    '') or ''),
-            ("Date",          getattr(invoice, 'po_date',      '') or ''),
-            ("Vehicle No",    getattr(invoice, 'vehicle_no',   '') or ''),
+        # Bank + Signature (no box around signature)
+        bank_h = 100
+        rect(ML, y_bottom, full_w, bank_h)
+        vline(col_split, y_bottom, y_bottom + bank_h)
+
+        c.setFont("Helvetica-Bold", 9.5)
+        c.drawString(ML+6, y_bottom + bank_h - 18, "OUR BANK DETAILS")
+        hline(y_bottom + bank_h - 20, ML+6, ML+160, 0.8)
+
+        bdata = [
+            ("Bank Name", bank.bank_name if bank else ""),
+            ("A/C No", bank.account_number if bank else ""),
+            ("A/C Name", bank.account_name if bank else ""),
+            ("IFSC Code", bank.ifsc_code if bank else ""),
+            ("Branch", bank.branch if bank else ""),
         ]
-        # Totals
-        totals = [
-            ("Sub Total",   f"{invoice.subtotal:,.2f}"),
-            ("SGST 9%",     f"{invoice.sgst:,.2f}"),
-            ("CGST 9%",     f"{invoice.cgst:,.2f}"),
-            ("IGST 18%",    f"{invoice.igst:,.2f}"),
-            ("Grand Total", f"{invoice.total_amount:,.2f}"),
-        ]
-        ref_row_h = 13
-        n_rows    = max(len(ref_fields), len(totals))
-        ref_bot   = ref_top - ref_row_h * n_rows
 
-        # outer border
-        rect(ML, ref_bot, full_w, ref_top - ref_bot)
-        vline(col_split, ref_bot, ref_top)
+        yy = y_bottom + bank_h - 34
+        for lbl, val in bdata:
+            c.setFont("Helvetica-Bold", 8.5); c.drawString(ML+6, yy, lbl)
+            c.setFont("Helvetica", 8.5); c.drawString(ML+64, yy, f" : {val}")
+            yy -= 14
 
-        # Left: ref fields
-        for i, (label, val) in enumerate(ref_fields):
-            y = ref_top - (i + 1) * ref_row_h + 3
-            c.setFont("Helvetica-Bold", 7.5)
-            c.drawString(ML + 4, y, f"{label}:")
-            c.setFont("Helvetica", 7.5)
-            c.drawString(ML + 72, y, str(val))
-            if i < len(ref_fields) - 1:
-                hline(ref_top - (i + 1) * ref_row_h, x0=ML, x1=col_split, lw=0.3)
+        c.setFont("Helvetica-Bold", 9.5)
+        c.drawCentredString(col_split + right_w/2, y_bottom + bank_h - 18, f"For {company.name}")
 
-        # Right: totals
-        for i, (label, val) in enumerate(totals):
-            y = ref_top - (i + 1) * ref_row_h + 3
-            bold = (label == "Grand Total")
-            c.setFont("Helvetica-Bold" if bold else "Helvetica", 7.5)
-            c.drawString(col_split + 4, y, f"{label}:")
-            c.drawRightString(page_w - MR - 4, y, val)
-            if i < len(totals) - 1:
-                hline(ref_top - (i + 1) * ref_row_h, x0=col_split, x1=page_w - MR, lw=0.3)
+        # Signature – centered & scaled, no border
+        sx = col_split + 20
+        sy = y_bottom + 20
+        sw = right_w - 40
+        sh = bank_h - 50
 
-        # ── ROW 7: Bank Details (left) | Signature blank (right) ──────────
-        bank_top = ref_bot
-        bank_h   = 80
-        bank_bot = bank_top - bank_h
-
-        rect(ML, bank_bot, full_w, bank_h)
-        vline(col_split, bank_bot, bank_top)
-
-        # "OUR BANK DETAILS" header underlined style
-        c.setFont("Helvetica-Bold", 8)
-        c.drawString(ML + 4, bank_top - 12, "OUR BANK DETAILS")
-        # underline
-        txt_w = c.stringWidth("OUR BANK DETAILS", "Helvetica-Bold", 8)
-        hline(bank_top - 13, x0=ML + 4, x1=ML + 4 + txt_w, lw=0.6)
-
-        bank_fields = [
-            ("Bank Name", bank.bank_name        if bank else ''),
-            ("A/C No",    bank.account_number   if bank else ''),
-            ("A/C Name",  bank.account_name     if bank else ''),
-            ("IFSC Code", bank.ifsc_code        if bank else ''),
-            ("Branch",    bank.branch           if bank else ''),
-        ]
-        c.setFont("Helvetica", 7.5)
-        y_b = bank_top - 24
-        for label, val in bank_fields:
-            c.setFont("Helvetica-Bold", 7.5)
-            c.drawString(ML + 4, y_b, f"{label}")
-            c.setFont("Helvetica", 7.5)
-            c.drawString(ML + 52, y_b, f": {val}")
-            y_b -= 11
-
-        # Right: blank signature space + "For Company"
-        c.setFont("Helvetica-Bold", 8)
-        c.drawCentredString(right_cx, bank_top - 12, f"For {company.name}")
-        # blank signature box outline
-        sig_box_x = col_split + 10
-        sig_box_y = bank_bot + 10
-        sig_box_w = right_w - 20
-        sig_box_h = bank_h - 30
-        c.setStrokeColor(colors.HexColor('#cccccc'))
-        c.setLineWidth(0.4)
-        c.rect(sig_box_x, sig_box_y, sig_box_w, sig_box_h, fill=0)
-        c.setStrokeColor(colors.black)
-
-
-        # ================= SIGNATURE IMAGE =================
         if signature_bytes:
             try:
-                sign_image = ImageReader(io.BytesIO(signature_bytes))
-
-                img_width = 100
-                img_height = 40
-
-                # Calculate centered position
-                center_x = sig_box_x + (sig_box_w - img_width) / 2
-                center_y = sig_box_y + (sig_box_h - img_height) / 2
-
-                c.drawImage(
-                    sign_image,
-                    center_x,
-                    center_y,
-                    width=img_width,
-                    height=img_height,
-                    preserveAspectRatio=True,
-                    mask='auto'
-                )
-
+                sig = ImageReader(io.BytesIO(signature_bytes))
+                orig_w, orig_h = sig.getSize()
+                scale = min(sw / orig_w, sh / orig_h, 1.0)
+                draw_w = orig_w * scale
+                draw_h = orig_h * scale
+                ix = sx + (sw - draw_w) / 2
+                iy = sy + (sh - draw_h) / 2
+                c.drawImage(sig, ix, iy, width=draw_w, height=draw_h,
+                            preserveAspectRatio=True, mask='auto')
             except Exception as e:
-                logging.error(f"Signature rendering failed: {e}")
+                print("Signature rendering failed:", e)
 
-        # ── ROW 8: Footer ─────────────────────────────────────────────────
-        footer_top = bank_bot
-        footer_h   = 18
-        footer_bot = footer_top - footer_h
+        y_bottom += bank_h + 18
 
-        rect(ML, footer_bot, full_w, footer_h)
-        c.setFont("Helvetica", 7.5)
-        footer_txt = f"Ph. {company.phone}   |   Email: {company.email}"
-        c.drawCentredString(ML + full_w / 2, footer_bot + 5, footer_txt)
+        # References + Totals (clean labels without %)
+        ref_fields = [
+            ("Party GST NO", getattr(invoice, 'party_gst_no', '') or getattr(invoice, 'parts_gst_no', '') or "—"),
+            ("Ref Dc", getattr(invoice, 'ref_dc', '') or "—"),
+            ("Ref Dc Date", getattr(invoice, 'ref_dc_date', '') or "—"),
+            ("PO No", getattr(invoice, 'po_number', '') or "—"),
+            ("PO Date", getattr(invoice, 'po_date', '') or "—"),
+            ("Vehicle No.", getattr(invoice, 'vehicle_no', '') or "—"),
+        ]
 
-        # ── Outer page border ─────────────────────────────────────────────
+        totals = [
+            ("Sub Total",     f"{invoice.subtotal:,.2f}"),
+            ("SGST",          f"{getattr(invoice, 'sgst', 0):,.2f}"),
+            ("CGST",          f"{getattr(invoice, 'cgst', 0):,.2f}"),
+            ("IGST",          f"{getattr(invoice, 'igst', 0):,.2f}"),
+            ("Grand Total",   f"{invoice.total_amount:,.2f}"),
+        ]
+
+        row_h = 15
+        nrows = max(len(ref_fields), len(totals))
+        refs_h = nrows * row_h + 10
+
+        rect(ML, y_bottom, full_w, refs_h)
+        vline(col_split, y_bottom, y_bottom + refs_h)
+
+        for i, (lbl, val) in enumerate(ref_fields):
+            yy = y_bottom + refs_h - (i+1)*row_h - 3
+            c.setFont("Helvetica-Bold", 8.5); c.drawString(ML+6, yy, f"{lbl}:")
+            c.setFont("Helvetica", 8.5); c.drawString(ML+78, yy, str(val))
+
+        for i, (lbl, val) in enumerate(totals):
+            yy = y_bottom + refs_h - (i+1)*row_h - 3
+            bold = "Grand" in lbl
+            c.setFont("Helvetica-Bold" if bold else "Helvetica", 10 if bold else 9)
+            c.drawString(col_split+8, yy, f"{lbl}:")
+            c.drawRightString(page_w-MR-6, yy, val)
+
+        y_bottom += refs_h
+
+        # ── Outer page border ──────────────────────────────────────────────────
         c.setStrokeColor(colors.black)
-        c.setLineWidth(1)
-        c.rect(ML, footer_bot, full_w, page_h - MT - footer_bot, fill=0)
+        c.setLineWidth(1.0)
+        c.rect(ML, MT, full_w, page_h - MT - MT, fill=0)
 
         c.save()
         buffer.seek(0)
         return buffer
 
     except Exception as e:
-        logging.error(f"PDF generation failed: {e}")
+        logging.error(f"PDF generation failed: {e}", exc_info=True)
         raise
 
 

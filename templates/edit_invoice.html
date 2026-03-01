@@ -1,86 +1,297 @@
 {% extends "base.html" %}
-
 {% block title %}Edit Invoice{% endblock %}
 
 {% block content %}
+<div class="container-fluid">
 
-<style>
-    /* Full viewport container */
-    .edit-invoice-container {
-        height: 100vh;
-        /* full screen */
-        display: flex;
-        flex-direction: column;
-        padding: 20px 30px;
-        box-sizing: border-box;
-    }
+    <div class="glass-card p-4 mb-4">
+        <h2 class="fw-bold text-primary">
+            Edit Invoice {{ invoice.invoice_number }}
+        </h2>
+    </div>
 
-    /* Heading fixed at top */
-    .edit-invoice-header {
-        margin-bottom: 20px;
-        flex-shrink: 0;
-    }
+    <form method="POST" id="editInvoiceForm">
 
-    /* Scrollable form area */
-    .edit-invoice-form {
-        flex: 1 1 auto;
-        /* take remaining space */
-        overflow-y: auto;
-        /* scroll if content exceeds */
-        padding-right: 10px;
-        /* avoid scrollbar overlap */
-    }
+        <!-- Invoice Basic Info -->
+<!-- Invoice Basic Info -->
+<div class="glass-card p-4 mb-4">
 
-    /* Buttons container fixed at bottom */
-    .edit-buttons {
-        flex-shrink: 0;
-        display: flex;
-        gap: 15px;
-        margin-top: 20px;
-        padding-top: 10px;
-        border-top: 1px solid #e0e0e0;
-        /* removed background-color to make it transparent */
-        background-color: transparent;
-    }
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <label class="form-label">Client</label>
+            <input type="text" class="form-control"
+                   value="{{ invoice.client.name }}" disabled>
+        </div>
 
-    textarea {
-        width: 100%;
-        resize: vertical;
-    }
-</style>
+        <div class="col-md-3">
+            <label class="form-label">Invoice Date</label>
+            <input type="date"
+                   class="form-control"
+                   value="{{ invoice.invoice_date }}"
+                   readonly>
+        </div>
 
-<div class="edit-invoice-container">
-    <h2 class="edit-invoice-header">Edit Invoice {{ invoice.invoice_number }}</h2>
+        <div class="col-md-3">
+            <label class="form-label">Due Date</label>
+            <input type="date"
+                   name="due_date"
+                   class="form-control"
+                   value="{{ invoice.due_date or '' }}">
+        </div>
+    </div>
 
-    <form method="POST" class="edit-invoice-form">
-        <div class="mb-3">
-            <div class="mb-3">
-                <label class="form-label">Client</label>
-                <input type="text" class="form-control" value="{{ invoice.client.name }}" disabled>
+    <div class="row">
+        <div class="col-md-6">
+            <label class="form-label">Notes</label>
+            <textarea name="notes" class="form-control"
+                      rows="3">{{ invoice.notes }}</textarea>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Terms & Conditions</label>
+            <textarea name="terms_conditions" class="form-control"
+                      rows="3">{{ invoice.terms_conditions }}</textarea>
+        </div>
+    </div>
+
+</div>
+
+        <!-- Invoice Items -->
+        <div class="glass-card p-4 mb-4">
+
+            <div class="d-flex justify-content-between mb-3">
+                <h5 class="fw-bold">Invoice Items</h5>
+                <button type="button" class="btn btn-primary btn-sm"
+                        onclick="addItemRow()">
+                    + Add Item
+                </button>
             </div>
 
+            <div class="table-responsive">
+                <table class="table table-borderless">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>HSN</th>
+                            <th>Description</th>
+                            <th>Qty</th>
+                            <th>Unit</th>
+                            <th>Rate</th>
+                            <th>CGST %</th>
+                            <th>SGST %</th>
+                            <th>IGST %</th>
+                            <th>Amount</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsTableBody">
+
+                        {% for item in invoice.line_items %}
+                        <tr class="item-row">
+                            <td class="row-number">{{ loop.index }}</td>
+
+                            <td>
+                                <input type="text" name="hsn_code"
+                                       class="form-control"
+                                       value="{{ item.hsn_code }}" required>
+                            </td>
+
+                            <td>
+                                <input type="text" name="description"
+                                       class="form-control"
+                                       value="{{ item.description }}" required>
+                            </td>
+
+                            <td>
+                                <input type="number" name="quantity"
+                                       class="form-control"
+                                       value="{{ item.quantity }}" required>
+                            </td>
+
+                            <td>
+                                <input type="text" name="unit"
+                                       class="form-control"
+                                       value="{{ item.unit }}">
+                            </td>
+
+                            <td>
+                                <input type="number" step="0.01"
+                                       name="unit_price"
+                                       class="form-control"
+                                       value="{{ item.unit_price }}" required>
+                            </td>
+
+                            <td>
+                                <input type="number"
+                                       name="cgst_percentage"
+                                       class="form-control"
+                                       value="{{ item.cgst_percentage }}" required>
+                            </td>
+
+                            <td>
+                                <input type="number"
+                                       name="sgst_percentage"
+                                       class="form-control"
+                                       value="{{ item.sgst_percentage }}" readonly>
+                            </td>
+
+                            <td>
+                                <input type="number"
+                                       name="igst_percentage"
+                                       class="form-control"
+                                       value="{{ item.igst_percentage }}" readonly>
+                            </td>
+
+                            <td class="item-amount fw-bold">
+                                ₹{{ item.total_amount }}
+                            </td>
+
+                            <td>
+                                <button type="button"
+                                        class="btn btn-danger btn-sm"
+                                        onclick="removeRow(this)">
+                                    X
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+
+                    </tbody>
+                </table>
+            </div>
         </div>
 
-        <div class="mb-3">
-            <label for="notes" class="form-label">Notes</label>
-            <textarea class="form-control" name="notes" id="notes" rows="4">{{ invoice.notes }}</textarea>
+        <!-- Invoice Summary -->
+        <div class="glass-card p-4 mb-4">
+            <h5 class="fw-bold">Invoice Summary</h5>
+
+            <p>Subtotal: ₹<span id="subtotal">0.00</span></p>
+            <p>CGST: ₹<span id="totalCgst">0.00</span></p>
+            <p>SGST: ₹<span id="totalSgst">0.00</span></p>
+            <p>IGST: ₹<span id="totalIgst">0.00</span></p>
+            <h5 class="text-primary">
+                Total: ₹<span id="grandTotal">0.00</span>
+            </h5>
         </div>
 
-        <div class="mb-3">
-            <label for="terms_conditions" class="form-label">Terms & Conditions</label>
-            <textarea class="form-control" id="terms_conditions" name="terms_conditions"
-                rows="8">{{ invoice.terms_conditions }}</textarea>
+        <!-- Buttons -->
+        <div class="d-flex gap-3 mb-5">
+            <button type="submit" name="action" value="mark_paid"
+                    class="btn btn-success">Mark as Paid</button>
+
+            <button type="submit" name="action" value="mark_unpaid"
+                    class="btn btn-warning">Mark as Unpaid</button>
+
+            <button type="submit" name="action" value="update"
+                    class="btn btn-primary">Update Invoice</button>
+
+            <a href="{{ url_for('invoice_management') }}"
+               class="btn btn-secondary">Cancel</a>
         </div>
 
-        <!-- Buttons at bottom -->
-        <div class="edit-buttons" style="padding-bottom: 40px;">
-            <button type="submit" name="action" value="mark_paid" class="btn btn-success">Mark as Paid</button>
-            <button type="submit" name="action" value="mark_unpaid" class="btn btn-warning">Mark as Unpaid</button>
-            <button type="submit" name="action" value="update" class="btn btn-primary">Update Invoice</button>
-            <a href="{{ url_for('invoice_management') }}" class="btn btn-secondary">Cancel</a>
-        </div>
-        <div></div>
+        <input type="hidden" name="line_items" id="line_items">
+
     </form>
 </div>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    updateSummary();
+});
+
+function addItemRow() {
+    const tbody = document.getElementById("itemsTableBody");
+    const rowCount = tbody.rows.length + 1;
+
+    const row = `
+    <tr class="item-row">
+        <td class="row-number">${rowCount}</td>
+        <td><input type="text" name="hsn_code" class="form-control" required></td>
+        <td><input type="text" name="description" class="form-control" required></td>
+        <td><input type="number" name="quantity" class="form-control" required></td>
+        <td><input type="text" name="unit" class="form-control"></td>
+        <td><input type="number" step="0.01" name="unit_price" class="form-control" required></td>
+        <td><input type="number" name="cgst_percentage" class="form-control" required></td>
+        <td><input type="number" name="sgst_percentage" class="form-control" readonly></td>
+        <td><input type="number" name="igst_percentage" class="form-control" readonly></td>
+        <td class="item-amount fw-bold">₹0.00</td>
+        <td><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button></td>
+    </tr>`;
+
+    tbody.insertAdjacentHTML("beforeend", row);
+}
+
+function removeRow(btn) {
+    btn.closest("tr").remove();
+    updateSummary();
+}
+
+document.addEventListener("input", function(e) {
+    if (e.target.closest(".item-row")) {
+        calculateRow(e.target.closest(".item-row"));
+        updateSummary();
+    }
+});
+
+function calculateRow(row) {
+    const qty = parseFloat(row.querySelector('[name="quantity"]').value) || 0;
+    const rate = parseFloat(row.querySelector('[name="unit_price"]').value) || 0;
+    const cgst = parseFloat(row.querySelector('[name="cgst_percentage"]').value) || 0;
+
+    const sgst = cgst;
+    const igst = cgst * 2;
+
+    row.querySelector('[name="sgst_percentage"]').value = sgst.toFixed(2);
+    row.querySelector('[name="igst_percentage"]').value = igst.toFixed(2);
+
+    const line = qty * rate;
+    const tax = (line * igst) / 100;
+    const total = line + tax;
+
+    row.querySelector(".item-amount").innerText = "₹" + total.toFixed(2);
+}
+
+function updateSummary() {
+    let subtotal = 0, totalTax = 0;
+
+    document.querySelectorAll(".item-row").forEach(row => {
+        const qty = parseFloat(row.querySelector('[name="quantity"]').value) || 0;
+        const rate = parseFloat(row.querySelector('[name="unit_price"]').value) || 0;
+        const cgst = parseFloat(row.querySelector('[name="cgst_percentage"]').value) || 0;
+
+        const line = qty * rate;
+        const tax = (line * (cgst*2)) / 100;
+
+        subtotal += line;
+        totalTax += tax;
+    });
+
+    document.getElementById("subtotal").innerText = subtotal.toFixed(2);
+    document.getElementById("totalCgst").innerText = (totalTax/2).toFixed(2);
+    document.getElementById("totalSgst").innerText = (totalTax/2).toFixed(2);
+    document.getElementById("totalIgst").innerText = totalTax.toFixed(2);
+    document.getElementById("grandTotal").innerText = (subtotal + totalTax).toFixed(2);
+}
+
+document.getElementById("editInvoiceForm").addEventListener("submit", function() {
+    let items = [];
+
+    document.querySelectorAll(".item-row").forEach(row => {
+        items.push({
+            hsn_code: row.querySelector('[name="hsn_code"]').value,
+            description: row.querySelector('[name="description"]').value,
+            quantity: row.querySelector('[name="quantity"]').value,
+            unit: row.querySelector('[name="unit"]').value,
+            unit_price: row.querySelector('[name="unit_price"]').value,
+            cgst_percentage: row.querySelector('[name="cgst_percentage"]').value,
+            sgst_percentage: row.querySelector('[name="sgst_percentage"]').value,
+            igst_percentage: row.querySelector('[name="igst_percentage"]').value
+        });
+    });
+
+    document.getElementById("line_items").value = JSON.stringify(items);
+});
+</script>
 
 {% endblock %}
