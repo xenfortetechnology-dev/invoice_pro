@@ -2511,7 +2511,7 @@ def analytics():
 @app.route('/analytics/export/excel')
 @login_required
 def export_analytics_excel():
-    """Export analytics data to Excel and save to system"""
+    """Export analytics data to Excel and download it"""
     try:
         time_range = request.args.get('range', '12m')
         report_type = request.args.get('type', 'all')
@@ -2520,16 +2520,14 @@ def export_analytics_excel():
         
         prefix = report_type.title() if report_type != 'all' else 'Analytics'
         filename = f"{prefix}_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        file_path = _save_buffer_to_downloads(output, filename)
         
-        if file_path:
-            return jsonify({
-                "success": True, 
-                "message": f"Excel report saved to Downloads: {filename}",
-                "path": file_path
-            })
-        else:
-            return jsonify({"success": False, "message": "Failed to save file to system."}), 500
+        output.seek(0)
+        return send_file(
+            output,
+            download_name=filename,
+            as_attachment=True,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
             
     except Exception as e:
         logging.error(f"Excel export failed: {e}")
@@ -2538,7 +2536,7 @@ def export_analytics_excel():
 @app.route('/analytics/export/pdf')
 @login_required
 def export_analytics_pdf():
-    """Export analytics data to PDF and save to system"""
+    """Export analytics data to PDF and download it"""
     try:
         time_range = request.args.get('range', '12m')
         report_type = request.args.get('type', 'all')
@@ -2547,16 +2545,14 @@ def export_analytics_pdf():
         
         prefix = report_type.title() if report_type != 'all' else 'Analytics'
         filename = f"{prefix}_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-        file_path = _save_buffer_to_downloads(output, filename)
         
-        if file_path:
-            return jsonify({
-                "success": True, 
-                "message": f"PDF report saved to Downloads: {filename}",
-                "path": file_path
-            })
-        else:
-            return jsonify({"success": False, "message": "Failed to save file to system."}), 500
+        output.seek(0)
+        return send_file(
+            output,
+            download_name=filename,
+            as_attachment=True,
+            mimetype='application/pdf'
+        )
             
     except Exception as e:
         logging.error(f"PDF export failed: {e}")

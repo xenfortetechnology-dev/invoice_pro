@@ -434,14 +434,24 @@ System{% endblock %} {% block content %}
       fetch(`/analytics/export/pdf?range=${range}&type=${type}`)
           .then(response => {
               if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-              return response.json();
+              const disposition = response.headers.get('Content-Disposition');
+              let filename = 'Analytics_Report.pdf';
+              if (disposition && disposition.indexOf('filename=') !== -1) {
+                  const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+                  if (matches != null && matches[1]) filename = matches[1].replace(/['"]/g, '');
+              }
+              return response.blob().then(blob => ({ blob, filename }));
           })
           .then(data => {
-              if (data.success) {
-                  showToast(`✅ ${data.message}`, 'success');
-              } else {
-                  showToast(`❌ ${data.message}`, 'danger');
-              }
+              const url = window.URL.createObjectURL(data.blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = data.filename;
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              window.URL.revokeObjectURL(url);
+              showToast('✅ Report downloaded successfully', 'success');
           })
           .catch(error => {
               console.error('PDF Export Error:', error);
@@ -457,14 +467,24 @@ System{% endblock %} {% block content %}
       fetch(`/analytics/export/excel?range=${range}&type=${type}`)
           .then(response => {
               if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-              return response.json();
+              const disposition = response.headers.get('Content-Disposition');
+              let filename = 'Analytics_Report.xlsx';
+              if (disposition && disposition.indexOf('filename=') !== -1) {
+                  const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+                  if (matches != null && matches[1]) filename = matches[1].replace(/['"]/g, '');
+              }
+              return response.blob().then(blob => ({ blob, filename }));
           })
           .then(data => {
-              if (data.success) {
-                  showToast(`✅ ${data.message}`, 'success');
-              } else {
-                  showToast(`❌ ${data.message}`, 'danger');
-              }
+              const url = window.URL.createObjectURL(data.blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = data.filename;
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              window.URL.revokeObjectURL(url);
+              showToast('✅ Report downloaded successfully', 'success');
           })
           .catch(error => {
               console.error('Excel Export Error:', error);
