@@ -214,7 +214,21 @@ class AnalyticsReportGenerator:
     def generate_pdf_report(self, analytics_data, report_type='all'):
         """Generate PDF report from analytics data dictionary based on report_type"""
         buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+        type_label_map_title = {
+            'all': 'Analytics Report',
+            'monthly': 'Monthly Business Report',
+            'financial': 'Financial Analysis Report',
+            'clients': 'Client Performance Report'
+        }
+        pdf_title = type_label_map_title.get(report_type, 'Analytics Report')
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40,
+            title=pdf_title,
+            author='Invoice Pro',
+            subject='Business Analytics Report'
+        )
         
         # Register Arial font for Rupee symbol support
         try:

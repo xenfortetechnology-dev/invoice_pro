@@ -1224,11 +1224,13 @@ def download_invoice_pdf(id):
         filename = f'Invoice_{invoice_number}_{ts}_3copies.pdf'
 
         logging.info(f"Streaming PDF to browser as: {filename}")
+        from urllib.parse import quote
+        encoded_filename = quote(filename)
         return Response(
             pdf_buffer.getvalue(),
             mimetype='application/pdf',
             headers={
-                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Disposition': f'attachment; filename="{filename}"; filename*=UTF-8\'\'{encoded_filename}',
                 'Content-Type': 'application/pdf',
             }
         )
@@ -1574,11 +1576,13 @@ def invoice_pdf(id):
         if saved_path:
             flash(f"PDF saved to: {saved_path}", "success")
         
+        from urllib.parse import quote
+        encoded_filename = quote(filename)
         response = Response(
             pdf_buffer.getvalue(),
             mimetype='application/pdf',
             headers={
-                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Disposition': f'attachment; filename="{filename}"; filename*=UTF-8\'\'{encoded_filename}',
                 'Content-Type': 'application/pdf',
                 'Content-Length': buffer_size
             }
@@ -2340,7 +2344,8 @@ def export_clients_pdf():
 
     # --- 2. Generate PDF ---
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=18)
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=18,
+                            title='Client Directory Report', author='Invoice Pro', subject='Client Directory')
     elements = []
     styles = getSampleStyleSheet()
 
@@ -2406,12 +2411,15 @@ def export_clients_pdf():
     
     buffer.seek(0)
     filename = f"Client_Directory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-    
-    return send_file(
-        buffer,
-        download_name=filename,
-        as_attachment=True,
-        mimetype='application/pdf'
+    from urllib.parse import quote
+    encoded_filename = quote(filename)
+    return Response(
+        buffer.getvalue(),
+        mimetype='application/pdf',
+        headers={
+            'Content-Disposition': f'attachment; filename="{filename}"; filename*=UTF-8\'\'{encoded_filename}',
+            'Content-Type': 'application/pdf'
+        }
     )
 
 
@@ -2522,11 +2530,15 @@ def export_analytics_excel():
         filename = f"{prefix}_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         
         output.seek(0)
-        return send_file(
-            output,
-            download_name=filename,
-            as_attachment=True,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        from urllib.parse import quote
+        encoded_filename = quote(filename)
+        return Response(
+            output.getvalue(),
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"; filename*=UTF-8\'\'{encoded_filename}',
+                'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            }
         )
             
     except Exception as e:
@@ -2547,11 +2559,15 @@ def export_analytics_pdf():
         filename = f"{prefix}_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         
         output.seek(0)
-        return send_file(
-            output,
-            download_name=filename,
-            as_attachment=True,
-            mimetype='application/pdf'
+        from urllib.parse import quote
+        encoded_filename = quote(filename)
+        return Response(
+            output.getvalue(),
+            mimetype='application/pdf',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"; filename*=UTF-8\'\'{encoded_filename}',
+                'Content-Type': 'application/pdf'
+            }
         )
             
     except Exception as e:
@@ -4502,11 +4518,13 @@ def quotation_pdf(qid):
                 flash(f"PDF saved to: {saved_path}", "success")
             
             # Return as attachment for direct browser download
+            from urllib.parse import quote
+            encoded_filename = quote(filename)
             return Response(
                 pdf_buffer.getvalue(),
                 mimetype='application/pdf',
                 headers={
-                    'Content-Disposition': f'attachment; filename="{filename}"',
+                    'Content-Disposition': f'attachment; filename="{filename}"; filename*=UTF-8\'\'{encoded_filename}',
                     'Content-Type': 'application/pdf'
                 }
             )
@@ -5257,11 +5275,15 @@ def challan_pdf(id):
         if saved_path:
             flash(f"PDF saved to: {saved_path}", "success")
         
-        return send_file(
-            pdf_buffer,
-            download_name=filename,
-            as_attachment=True,
-            mimetype='application/pdf'
+        from urllib.parse import quote
+        encoded_filename = quote(filename)
+        return Response(
+            pdf_buffer.getvalue(),
+            mimetype='application/pdf',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"; filename*=UTF-8\'\'{encoded_filename}',
+                'Content-Type': 'application/pdf'
+            }
         )
         
     except Exception as e:

@@ -41,6 +41,9 @@ def generate_invoice_pdf(invoice, company=None, bank=None, logo_bytes=None, sign
         buffer = io.BytesIO()
         page_w, page_h = A4
         c = canvas.Canvas(buffer, pagesize=A4)
+        c.setTitle(f"Invoice {invoice.invoice_number}")
+        c.setAuthor(getattr(company, 'name', 'Invoice Pro') if company else 'Invoice Pro')
+        c.setSubject("Invoice")
 
         ML = MR = MT = 36
         full_w = page_w - ML - MR
@@ -399,6 +402,10 @@ def add_watermark_to_pdf(source_buffer, watermark_text="DUPLICATE"):
     src_reader = PdfReader(source_buffer)
     writer = PdfWriter()
 
+    # Clone metadata from source so title is preserved after merge
+    if src_reader.metadata:
+        writer.add_metadata(dict(src_reader.metadata))
+
     for page in src_reader.pages:
         page.merge_page(wm_page)   # merge watermark on top of content
         writer.add_page(page)
@@ -450,6 +457,14 @@ def generate_triple_invoice_pdf(invoice, company=None, bank=None, logo_bytes=Non
         for page in reader.pages:
             writer.add_page(page)
 
+    # Re-add metadata after merge (pypdf strips canvas metadata during merge)
+    inv_number = getattr(invoice, 'invoice_number', '')
+    writer.add_metadata({
+        '/Title': f'Invoice {inv_number}',
+        '/Author': 'Invoice Pro',
+        '/Subject': 'Invoice'
+    })
+
     merged = io.BytesIO()
     writer.write(merged)
     merged.seek(0)
@@ -460,13 +475,17 @@ def generate_challan_pdf(challan, company=None):
     #Generate delivery challan PDF
     try:
         buffer = io.BytesIO()
+        challan_title = f"Delivery Challan {challan.challan_number}"
         doc = SimpleDocTemplate(
             buffer,
             pagesize=A4,
             topMargin=0.5 * inch,
             bottomMargin=0.5 * inch,
             leftMargin=0.5 * inch,
-            rightMargin=0.5 * inch
+            rightMargin=0.5 * inch,
+            title=challan_title,
+            author=getattr(company, 'name', 'Invoice Pro') if company else 'Invoice Pro',
+            subject='Delivery Challan'
         )
 
         styles = getSampleStyleSheet()
@@ -695,7 +714,10 @@ def generate_quotation_pdf(q):
         rightMargin=30,
         leftMargin=30,
         topMargin=40,
-        bottomMargin=30
+        bottomMargin=30,
+        title=f"Quotation {q.quotation_number}",
+        author='Invoice Pro',
+        subject='Quotation'
     )
 
     styles = getSampleStyleSheet()
@@ -835,7 +857,13 @@ class AnalyticsReportGenerator:
         # build pdf
 
         buffer = BytesIO()
-        pdf = SimpleDocTemplate(buffer, pagesize=A4)
+        pdf = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            title='Analytics Report',
+            author='Invoice Pro',
+            subject='Business Analytics Report'
+        )
         styles = getSampleStyleSheet()
         elements = []
 
