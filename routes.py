@@ -2284,19 +2284,12 @@ def export_clients_excel():
 
     # Use desktop integration
     filename = f"clients_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-    filepath = _save_buffer_to_downloads(output, filename)
-    
-    if filepath:
-        return jsonify({
-            'success': True,
-            'message': f'Excel report generated and saved to Downloads: {filename}',
-            'filename': filename
-        })
-    else:
-        return jsonify({
-            'success': False,
-            'message': 'Failed to save file to system Downloads folder.'
-        }), 500
+    return send_file(
+        output,
+        download_name=filename,
+        as_attachment=True,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
 
 @app.route('/api/export/clients/pdf')
 @login_required
@@ -2414,16 +2407,12 @@ def export_clients_pdf():
     buffer.seek(0)
     filename = f"Client_Directory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     
-    filepath = _save_buffer_to_downloads(buffer, filename)
-    
-    if filepath:
-        return jsonify({
-            'success': True,
-            'message': f'PDF report generated: {filename}',
-            'filename': filename
-        })
-    else:
-        return jsonify({'success': False, 'message': 'Failed to save PDF'}), 500
+    return send_file(
+        buffer,
+        download_name=filename,
+        as_attachment=True,
+        mimetype='application/pdf'
+    )
 
 
 def _get_analytics_data_dict(time_range='12m'):

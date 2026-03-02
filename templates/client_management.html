@@ -567,34 +567,12 @@
 
     async function exportClientsToExcel() {
         showToast('Generating Excel report...', 'info');
-        try {
-            const response = await fetch('/api/export/clients/excel' + window.location.search);
-            const data = await response.json();
-            if (data.success) {
-                showToast(data.message, 'success');
-            } else {
-                showToast(data.message || 'Export failed', 'error');
-            }
-        } catch (error) {
-            showToast('System error during export', 'error');
-            console.error('Export error:', error);
-        }
+        window.location.href = '/api/export/clients/excel' + window.location.search;
     }
 
     async function exportClientsToPDF() {
         showToast('Generating PDF report...', 'info');
-        try {
-            const response = await fetch('/api/export/clients/pdf' + window.location.search);
-            const data = await response.json();
-            if (data.success) {
-                showToast(data.message, 'success');
-            } else {
-                showToast(data.message || 'Export failed', 'error');
-            }
-        } catch (error) {
-            showToast('System error during export', 'error');
-            console.error('Export error:', error);
-        }
+        window.location.href = '/api/export/clients/pdf' + window.location.search;
     }
 
 
