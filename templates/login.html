@@ -14,8 +14,8 @@
                     <img src="{{ url_for('static', filename='Xen_logo.png') }}" alt="Xen Logo"
                         class="mb-4 glow xen-logo" />
 
-                    <!-- MULTI SHINE TEXT -->
-                    <h1 class="display-4 fw-bold ultra-shine-text">
+                    <!-- HEADING -->
+                    <h1 class="display-4 fw-bold text-white">
                         Xenforte Invoice
                     </h1>
 
@@ -185,26 +185,7 @@
         /* keeps aspect ratio */
     }
 
-    /* ================= ULTRA SHINE TEXT ================= */
-    .ultra-shine-text {
-        background: linear-gradient(120deg,
-                #ffffff 10%,
-                #93c5fd 30%,
-                #6366f1 50%,
-                #93c5fd 70%,
-                #ffffff 90%);
-        background-size: 300% auto;
-        color: transparent;
-        background-clip: text;
-        -webkit-background-clip: text;
-        animation: shine 4s linear infinite;
-    }
 
-    @keyframes shine {
-        to {
-            background-position: -300% center;
-        }
-    }
 
     /* Glossy + Highlight */
     .glossy-text {
