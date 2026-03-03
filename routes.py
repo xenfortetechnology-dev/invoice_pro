@@ -2840,70 +2840,101 @@ def company_signature():
 
     return "", 404
 
-@app.route("/create-challan", methods=['GET', 'POST'])
+@app.route("/create-challan", methods=["GET", "POST"])
 @login_required
 def create_challan():
-    if request.method == 'POST':
-        try:
-            client_id = request.form.get('client_id')
-            challan_date_str = request.form.get('challan_date')
-            delivery_date_str = request.form.get('delivery_date')
-            vehicle_number = request.form.get('vehicle_number')
-            transport_mode = request.form.get('transport_mode')
-            notes = request.form.get('notes', '')
-            line_items_json = request.form.get('line_items')
 
-            # Build notes with transport meta
+    if request.method == "POST":
+        try:
+            client_id = request.form.get("client_id")
+            challan_date_str = request.form.get("challan_date")
+            delivery_date_str = request.form.get("delivery_date")
+            vehicle_number = request.form.get("vehicle_number")
+            transport_mode = request.form.get("transport_mode")
+            notes = request.form.get("notes", "")
+            line_items_json = request.form.get("line_items")
+
+            # 🔹 Append transport metadata into notes
             meta_notes = []
             if transport_mode:
                 meta_notes.append(f"Mode: {transport_mode}")
             if vehicle_number:
                 meta_notes.append(f"Vehicle: {vehicle_number}")
-            if meta_notes:
-                notes = (notes or '') + ('\n' if notes else '') + ' | '.join(meta_notes)
 
+            if meta_notes:
+                notes = (notes or "") + ("\n" if notes else "") + " | ".join(meta_notes)
+
+            # 🔹 Build line items list
             line_items = []
+
             if line_items_json:
-                items = json.loads(line_items_json)
+                try:
+                    items = json.loads(line_items_json)
+                except Exception:
+                    items = []
+
                 for idx, item in enumerate(items, start=1):
+
                     line_items.append({
-                        'sr_no': item.get('sr_no', idx),
-                        'hsn_code': item.get('hsn_code', ''),
-                        'description': item.get('description', ''),
-                        'quantity': float(item.get('quantity', 0)),
-                        'unit': item.get('unit', 'Nos'),
-                        'unit_price': float(item.get('unit_price', 0)),
-                        'total_amount': float(item.get('quantity', 0)) * float(item.get('unit_price', 0))
+                        "sr_no": item.get("sr_no", idx),
+                        "hsn_code": item.get("hsn_code", ""),
+                        "description": item.get("description", "") or "Item",
+                        "quantity": float(item.get("quantity", 0) or 0),
+                        "unit": item.get("unit", "Nos"),
+                        "unit_price": float(item.get("unit_price", 0) or 0),
+
+                        # 🔥 SEND TAX PERCENTAGES (Cloud will calculate totals)
+                        "cgst_percentage": float(item.get("cgst_percentage", 0) or 0),
+                        "sgst_percentage": float(item.get("sgst_percentage", 0) or 0),
+                        "igst_percentage": float(item.get("igst_percentage", 0) or 0),
                     })
 
+            # 🔹 Prepare payload for cloud API
             payload = {
-                'client_id': client_id,
-                'challan_date': challan_date_str,
-                'delivery_date': delivery_date_str,
-                'notes': notes,
-                'status': 'Open',
-                'line_items': line_items
+                "client_id": client_id,
+                "challan_date": challan_date_str,
+                "delivery_date": delivery_date_str,
+                "notes": notes,
+                "status": "Open",
+                "line_items": line_items
             }
 
-            response = cloud_request('POST', '/challans', json=payload)
+            # 🔹 Send to cloud
+            response = cloud_request(
+                "POST",
+                "/challans",
+                json=payload,
+                timeout=10
+            )
 
             if response and response.status_code in (200, 201):
                 resp_json = response.json()
-                challan_number = resp_json.get('challan_number', 'DC')
-                flash(f'Delivery Challan {challan_number} created successfully!', 'success')
+                challan_number = resp_json.get("challan_number", "DC")
+                flash(
+                    f"Delivery Challan {challan_number} created successfully!",
+                    "success"
+                )
             else:
-                error = response.text if response else 'No response from server'
-                flash(f'Error creating challan: {error}', 'error')
+                error = response.text if response else "No response from server"
+                flash(f"Error creating challan: {error}", "error")
 
-            return redirect(url_for('delivery_challan'))
+            return redirect(url_for("delivery_challan"))
 
         except Exception as e:
             logging.error(f"Error creating challan: {e}")
-            flash(f"Error creating challan: {e}", 'error')
+            flash(f"Error creating challan: {e}", "error")
+            return redirect(url_for("delivery_challan"))
 
+    # 🔹 GET Request – Load Clients
     client_list = fetch_cloud_clients()
     clients = [SimpleNamespace(**c) for c in client_list]
-    return render_template("create_challan.html", clients=clients, today=datetime.now())
+
+    return render_template(
+        "create_challan.html",
+        clients=clients,
+        today=datetime.now()
+    )
+
 
 @app.route('/challan/preview', methods=['POST'])
 @login_required
@@ -4876,32 +4907,32 @@ def voice_session_clear():
 
 
 
-@app.route('/challan/<int:id>/details')
+@app.route("/challan/<int:id>/details")
 @login_required
 def challan_details(id):
-    """Fetch challan details from cloud API and return HTML fragment for modal"""
     try:
-        challan_data = fetch_cloud_challan_by_id(id)
-        if not challan_data:
-            return '<div class="text-danger">Challan not found in cloud database.</div>', 404
-        
-        # Fetch client info
-        client_id = challan_data.get('client_id')
-        client_data = fetch_cloud_client_by_id(client_id) if client_id else None
-        client_name = challan_data.get('client_name') or (client_data.get('name', 'Unknown') if client_data else 'Unknown')
-        client_phone = client_data.get('phone', 'N/A') if client_data else 'N/A'
-        client_email = client_data.get('email', 'N/A') if client_data else 'N/A'
-        client_address = client_data.get('address', 'N/A') if client_data else 'N/A'
-        
-        # Build HTML response for modal
-        line_items = challan_data.get('line_items', [])
-        items_html = ""
+        response = cloud_request("GET", f"/challans/{id}")
+
+        if not response or response.status_code != 200:
+            return "<div class='text-danger'>Failed to fetch challan details.</div>"
+
+        challan = response.json()
+        line_items = challan.get("line_items", [])
+
         total = 0
+        items_html = ""
+
         for item in line_items:
-            qty = float(item.get('quantity', 0))
-            price = float(item.get('unit_price', 0))
-            amt = qty * price
-            total += amt
+            qty = float(item.get("quantity", 0))
+            price = float(item.get("unit_price", 0))
+            cgst = float(item.get("cgst_percentage", 0))
+            sgst = float(item.get("sgst_percentage", 0))
+            igst = float(item.get("igst_percentage", 0))
+            tax_amt = float(item.get("tax_amount", 0))
+            total_amt = float(item.get("total_amount", 0))
+
+            total += total_amt
+
             items_html += f"""
             <tr>
                 <td>{item.get('sr_no', '')}</td>
@@ -4910,30 +4941,38 @@ def challan_details(id):
                 <td>{qty}</td>
                 <td>{item.get('unit', '')}</td>
                 <td>₹{price:,.2f}</td>
-                <td>₹{amt:,.2f}</td>
-            </tr>"""
-        
-        html = f"""
-        <div class="row mb-3">
+                <td>{cgst:.2f}%</td>
+                <td>{sgst:.2f}%</td>
+                <td>{igst:.2f}%</td>
+                <td>₹{tax_amt:,.2f}</td>
+                <td>₹{total_amt:,.2f}</td>
+            </tr>
+            """
+
+        return f"""
+        <div class="row">
             <div class="col-md-6">
-                <h6 class="fw-bold">Challan Info</h6>
-                <p class="mb-1"><strong>Number:</strong> {challan_data.get('challan_number', 'N/A')}</p>
-                <p class="mb-1"><strong>Date:</strong> {challan_data.get('challan_date', 'N/A')}</p>
-                <p class="mb-1"><strong>Delivery Date:</strong> {challan_data.get('delivery_date', 'N/A')}</p>
-                <p class="mb-1"><strong>Status:</strong> <span class="badge bg-info">{challan_data.get('status', 'N/A')}</span></p>
+                <h6><strong>Challan Info</strong></h6>
+                <p><strong>Number:</strong> {challan.get('challan_number')}</p>
+                <p><strong>Date:</strong> {challan.get('challan_date')}</p>
+                <p><strong>Delivery Date:</strong> {challan.get('delivery_date')}</p>
+                <p><strong>Status:</strong> {challan.get('status')}</p>
             </div>
             <div class="col-md-6">
-                <h6 class="fw-bold">Client Info</h6>
-                <p class="mb-1"><strong>Name:</strong> {client_name}</p>
-                <p class="mb-1"><strong>Phone:</strong> {client_phone}</p>
-                <p class="mb-1"><strong>Email:</strong> {client_email}</p>
-                <p class="mb-1"><strong>Address:</strong> {client_address}</p>
+                <h6><strong>Client Info</strong></h6>
+                <p><strong>Name:</strong> {challan.get('client', {}).get('name')}</p>
+                <p><strong>Phone:</strong> {challan.get('client', {}).get('phone')}</p>
+                <p><strong>Email:</strong> {challan.get('client', {}).get('email')}</p>
+                <p><strong>Address:</strong> {challan.get('client', {}).get('address')}</p>
             </div>
         </div>
-        <h6 class="fw-bold">Line Items</h6>
+
+        <hr>
+
+        <h6><strong>Line Items</strong></h6>
         <div class="table-responsive">
-            <table class="table table-sm table-bordered">
-                <thead>
+            <table class="table table-bordered">
+                <thead class="table-light">
                     <tr>
                         <th>Sr</th>
                         <th>Description</th>
@@ -4941,7 +4980,11 @@ def challan_details(id):
                         <th>Qty</th>
                         <th>Unit</th>
                         <th>Price</th>
-                        <th>Amount</th>
+                        <th>CGST %</th>
+                        <th>SGST %</th>
+                        <th>IGST %</th>
+                        <th>Tax</th>
+                        <th>Total</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -4949,67 +4992,48 @@ def challan_details(id):
                 </tbody>
                 <tfoot>
                     <tr>
-                        <td colspan="6" class="text-end fw-bold">Total:</td>
-                        <td class="fw-bold">₹{total:,.2f}</td>
+                        <td colspan="10" class="text-end"><strong>Grand Total:</strong></td>
+                        <td><strong>₹{total:,.2f}</strong></td>
                     </tr>
                 </tfoot>
             </table>
         </div>
-        {f'<p class="text-muted"><strong>Notes:</strong> {challan_data.get("notes", "")}</p>' if challan_data.get('notes') else ''}
+
+        <p><strong>Notes:</strong> {challan.get('notes', '')}</p>
         """
-        return html
-        
+
     except Exception as e:
-        logging.error(f"Challan details error: {e}")
-        return f'<div class="text-danger">Error loading challan details: {str(e)}</div>', 500
+        return f"<div class='text-danger'>Error loading challan details: {str(e)}</div>"
+
 
 
 @app.route('/convert_challan_to_invoice/<int:id>')
 @login_required
 def convert_challan_to_invoice(id):
     try:
-        # Fetch challan from cloud
+        # 🔹 Fetch challan from cloud
         challan_data = fetch_cloud_challan_by_id(id)
+
         if not challan_data:
             flash('Challan not found in cloud database.', 'error')
             return redirect(url_for('delivery_challan'))
-        
+
         if challan_data.get('status') == 'Billed':
             flash('This challan has already been converted to an invoice.', 'warning')
             return redirect(url_for('delivery_challan'))
-        
-        # Fetch client data
+
         client_id = challan_data.get('client_id')
-        client_data = fetch_cloud_client_by_id(client_id) if client_id else None
-        
-        # Build invoice data from challan
         line_items = challan_data.get('line_items', [])
-        total_amt = 0
-        invoice_items = []
-        for item in line_items:
-            qty = float(item.get('quantity', 0))
-            price = float(item.get('unit_price', 0))
-            total = qty * price
-            total_amt += total
-            invoice_items.append({
-                'sr_no': item.get('sr_no', 0),
-                'hsn_code': item.get('hsn_code', ''),
-                'description': item.get('description', ''),
-                'quantity': qty,
-                'unit': item.get('unit', ''),
-                'unit_price': price,
-                'total_amount': total
-            })
-        
-        # Create invoice via cloud API
-        due_date = request.args.get('due_date', '')
-        notes = request.args.get('notes', '')
-        
-        # Determine next invoice number from cloud data
+
+        if not line_items:
+            flash('Challan has no line items.', 'error')
+            return redirect(url_for('delivery_challan'))
+
+        # 🔹 Generate Invoice Number
         cloud_invoices = fetch_cloud_invoices()
         current_year = datetime.now().year
         max_seq = 0
-        
+
         if cloud_invoices:
             for inv in cloud_invoices:
                 inv_num = inv.get('invoice_number', '')
@@ -5020,9 +5044,32 @@ def convert_challan_to_invoice(id):
                             max_seq = seq
                     except:
                         pass
-        
+
         new_seq = max_seq + 1
         invoice_number = f"INV-{current_year}-{new_seq:04d}"
+
+        # 🔹 Build invoice line items
+        invoice_items = []
+
+        for item in line_items:
+
+            invoice_items.append({
+                'sr_no': item.get('sr_no', 0),
+                'hsn_code': item.get('hsn_code', ''),
+                'description': item.get('description', ''),
+                'quantity': float(item.get('quantity', 0) or 0),
+                'unit': item.get('unit', 'Nos'),
+                'unit_price': float(item.get('unit_price', 0) or 0),
+
+                # ✅ SEND GST % ONLY (invoice API will calculate totals)
+                'cgst_percentage': float(item.get('cgst_percentage', 0) or 0),
+                'sgst_percentage': float(item.get('sgst_percentage', 0) or 0),
+                'igst_percentage': float(item.get('igst_percentage', 0) or 0)
+            })
+
+        # 🔹 Optional fields
+        due_date = request.args.get('due_date', '')
+        notes = request.args.get('notes', '')
 
         invoice_data = {
             'invoice_number': invoice_number,
@@ -5031,38 +5078,46 @@ def convert_challan_to_invoice(id):
             'due_date': due_date if due_date else None,
             'notes': f"Converted from Challan {challan_data.get('challan_number', '')}. {notes}".strip(),
             'terms_conditions': 'Standard Terms Applied',
-            'total_amount': total_amt,
-            'subtotal': total_amt,
             'payment_status': 'Unpaid',
             'line_items': invoice_items
         }
-        
+
+        # 🔹 Create Invoice via Cloud API
         response = cloud_request(
             "POST",
             "/invoices",
             json=invoice_data,
             timeout=10
         )
-        
+
         if response and response.status_code in (200, 201):
-            # Update challan status to Billed
+
+            # 🔹 Update Challan Status to Billed
             cloud_request(
                 "PUT",
                 f"/challans/{id}",
                 json={'status': 'Billed'},
                 timeout=5
             )
-            flash(f'Challan {challan_data.get("challan_number", "")} converted to invoice successfully!', 'success')
+
+            flash(
+                f'Challan {challan_data.get("challan_number", "")} converted to invoice successfully!',
+                'success'
+            )
             return redirect(url_for('invoice_management'))
+
         else:
             error_msg = response.text if response else "Cloud server not reachable"
             flash(f'Failed to create invoice: {error_msg}', 'error')
             return redirect(url_for('delivery_challan'))
-        
+
     except Exception as e:
         logging.error(f"Conversion failed: {e}")
         flash(f'Error converting challan: {str(e)}', 'error')
         return redirect(url_for('delivery_challan'))
+
+
+
 
 @app.route('/convert_multiple_challans_to_invoice')
 @login_required
@@ -5290,6 +5345,8 @@ def challan_pdf(id):
         logging.error(f"Challan PDF generation failed: {e}")
         flash(f'Error generating PDF: {str(e)}', 'error')
         return redirect(url_for('delivery_challan'))
+
+
 @app.route("/test_email")
 def test_email():
     from email_service import send_email
