@@ -4503,7 +4503,20 @@ def quotation_pdf(qid):
                 revision_policy=q_data.get("revision_policy", ""),
                 dependencies=q_data.get("dependencies", ""),
                 terms=q_data.get("terms", ""),
-                line_items=[] # Quotations currently don't have separate line items in this API version
+                        line_items=[
+                    SimpleNamespace(
+                        sr_no=item.get("sr_no", i+1),
+                        hsn_code=item.get("hsn_code", ""),
+                        description = item.get("description", item.get("item_name", "")),
+                        quantity=item.get("quantity", 0),
+                        unit=item.get("unit", "Nos"),
+                        unit_price=item.get("unit_price", 0),
+                        tax_percentage=item.get("tax_percentage", 0),
+                        tax_amount=item.get("tax_amount", 0),
+                        total_amount=item.get("total_amount", 0)
+                    )
+                    for i, item in enumerate(q_data.get("line_items", []))
+                ]
             )
             
             # Use specific quotation PDF generator
