@@ -2857,17 +2857,23 @@ def create_challan():
             notes = request.form.get("notes", "")
             line_items_json = request.form.get("line_items")
 
-            # 🔹 Append transport metadata into notes
+            # -----------------------------
+            # Transport metadata in notes
+            # -----------------------------
             meta_notes = []
+
             if transport_mode:
                 meta_notes.append(f"Mode: {transport_mode}")
+
             if vehicle_number:
                 meta_notes.append(f"Vehicle: {vehicle_number}")
 
             if meta_notes:
                 notes = (notes or "") + ("\n" if notes else "") + " | ".join(meta_notes)
 
-            # 🔹 Build line items list
+            # -----------------------------
+            # Parse line items
+            # -----------------------------
             line_items = []
 
             if line_items_json:
@@ -2886,15 +2892,17 @@ def create_challan():
                         "unit": item.get("unit", "Nos"),
                         "unit_price": float(item.get("unit_price", 0) or 0),
 
-                        # 🔥 SEND TAX PERCENTAGES (Cloud will calculate totals)
+                        # tax percentages only
                         "cgst_percentage": float(item.get("cgst_percentage", 0) or 0),
                         "sgst_percentage": float(item.get("sgst_percentage", 0) or 0),
                         "igst_percentage": float(item.get("igst_percentage", 0) or 0),
                     })
 
-            # 🔹 Prepare payload for cloud API
+            # -----------------------------
+            # Prepare payload for cloud
+            # -----------------------------
             payload = {
-                "client_id": client_id,
+                "client_id": int(client_id),   # 🔴 important fix
                 "challan_date": challan_date_str,
                 "delivery_date": delivery_date_str,
                 "notes": notes,
@@ -2902,34 +2910,59 @@ def create_challan():
                 "line_items": line_items
             }
 
-            # 🔹 Send to cloud
-            response = cloud_request(
-                "POST",
-                "/challans",
-                json=payload,
-                timeout=10
-            )
+            # -----------------------------
+            # Send request to cloud API
+            # -----------------------------
+            try:
+                response = cloud_request(
+                    "POST",
+                    "/challans",
+                    json=payload,
+                    timeout=10
+                )
 
+                print("CLOUD RESPONSE:", response)
+
+            except Exception as e:
+                print("CLOUD ERROR:", str(e))
+                flash(f"Cloud API error: {str(e)}", "error")
+                return redirect(url_for("delivery_challan"))
+
+            # -----------------------------
+            # Handle response
+            # -----------------------------
             if response and response.status_code in (200, 201):
+
                 resp_json = response.json()
+
                 challan_number = resp_json.get("challan_number", "DC")
+
                 flash(
                     f"Delivery Challan {challan_number} created successfully!",
                     "success"
                 )
+
             else:
+
                 error = response.text if response else "No response from server"
+
                 flash(f"Error creating challan: {error}", "error")
 
             return redirect(url_for("delivery_challan"))
 
         except Exception as e:
+
             logging.error(f"Error creating challan: {e}")
+
             flash(f"Error creating challan: {e}", "error")
+
             return redirect(url_for("delivery_challan"))
 
-    # 🔹 GET Request – Load Clients
+    # -----------------------------
+    # GET request - load clients
+    # -----------------------------
     client_list = fetch_cloud_clients()
+
     clients = [SimpleNamespace(**c) for c in client_list]
 
     return render_template(
@@ -2937,6 +2970,7 @@ def create_challan():
         clients=clients,
         today=datetime.now()
     )
+
 
 
 @app.route('/challan/preview', methods=['POST'])
