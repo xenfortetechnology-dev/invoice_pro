@@ -4504,6 +4504,33 @@ def quotation_pdf(qid):
         q_data = fetch_cloud_quotation_by_id(qid)
         
         if q_data:
+            # Build client object from quotation API data
+            client_obj = SimpleNamespace(
+                name=q_data.get("client_name") or q_data.get("party_name") or "—",
+                address=q_data.get("client_address") or q_data.get("party_address") or "",
+                city=q_data.get("client_city") or q_data.get("party_city") or "",
+                state=q_data.get("client_state") or q_data.get("party_state") or "",
+                pincode=q_data.get("client_pincode") or q_data.get("party_pincode") or "",
+                gstin=q_data.get("client_gstin") or q_data.get("party_gstin") or "—",
+            )
+            # If quotation has a client_id, fetch full client details
+            client_id = q_data.get("client_id")
+            if client_id:
+                try:
+                    client_res = cloud_request("GET", f"/clients/{client_id}")
+                    if client_res and client_res.status_code == 200:
+                        cd = client_res.json()
+                        client_obj = SimpleNamespace(
+                            name=cd.get("name") or "—",
+                            address=cd.get("address") or "",
+                            city=cd.get("city") or "",
+                            state=cd.get("state") or "",
+                            pincode=cd.get("pincode") or "",
+                            gstin=cd.get("gstin") or "—",
+                        )
+                except Exception as ce:
+                    logging.warning(f"Could not fetch client details for quotation PDF: {ce}")
+
             # Convert API data to SimpleNamespace for PDF generator
             quotation = SimpleNamespace(
                 id=q_data["id"],
@@ -4534,11 +4561,12 @@ def quotation_pdf(qid):
                 revision_policy=q_data.get("revision_policy", ""),
                 dependencies=q_data.get("dependencies", ""),
                 terms=q_data.get("terms", ""),
-                        line_items=[
+                client=client_obj,
+                line_items=[
                     SimpleNamespace(
                         sr_no=item.get("sr_no", i+1),
                         hsn_code=item.get("hsn_code", ""),
-                        description = item.get("description", item.get("item_name", "")),
+                        description=item.get("description", item.get("item_name", "")),
                         quantity=item.get("quantity", 0),
                         unit=item.get("unit", "Nos"),
                         unit_price=item.get("unit_price", 0),
@@ -4549,14 +4577,28 @@ def quotation_pdf(qid):
                     for i, item in enumerate(q_data.get("line_items", []))
                 ]
             )
-            
-            # Use specific quotation PDF generator
-            pdf_buffer = generate_quotation_pdf(quotation)
+
+            # Fetch company, bank, logo and signature (same as invoice PDF route)
+            company_res = cloud_request("GET", "/company")
+            company = SimpleNamespace(**company_res.json()) if company_res and company_res.status_code == 200 else None
+
+            bank_res = cloud_request("GET", "/bank-details")
+            bank = SimpleNamespace(**bank_res.json()) if bank_res and bank_res.status_code == 200 else None
+
+            logo_res = cloud_request("GET", "/company/logo")
+            logo_bytes = logo_res.content if logo_res and logo_res.status_code == 200 else None
+
+            signature_res = cloud_request("GET", "/company/signature")
+            signature_bytes = signature_res.content if signature_res and signature_res.status_code == 200 else None
+
+            # Generate quotation PDF with invoice-style layout
+            pdf_buffer = generate_quotation_pdf(quotation, company=company, bank=bank,
+                                                logo_bytes=logo_bytes, signature_bytes=signature_bytes)
             pdf_buffer.seek(0)
             
             filename = f'Quotation_{quotation.quotation_number}.pdf'
             
-            # 🔥 Save to local Downloads for Desktop EXE support
+            # Save to local Downloads for Desktop EXE support
             saved_path = save_pdf_to_downloads(pdf_buffer, filename)
             if saved_path:
                 flash(f"PDF saved to: {saved_path}", "success")

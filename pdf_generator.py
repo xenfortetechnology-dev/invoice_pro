@@ -705,121 +705,354 @@ def export_excel(invoices, filename="invoices_export.xlsx"):
         raise
 
 
-def generate_quotation_pdf(q):
-    buffer = io.BytesIO()
+def generate_quotation_pdf(q, company=None, bank=None, logo_bytes=None, signature_bytes=None):
+    """Generate quotation PDF matching the professional invoice layout.
+    Same canvas-based drawing style as generate_invoice_pdf."""
+    try:
+        if not company:
+            company = Company.query.first() or type('Company', (), {
+                'name': config.COMPANY_NAME, 'address': config.COMPANY_ADDRESS,
+                'city': config.COMPANY_CITY, 'state': config.COMPANY_STATE,
+                'pincode': config.COMPANY_PINCODE, 'phone': config.COMPANY_PHONE,
+                'email': config.COMPANY_EMAIL, 'gstin': config.GSTIN, 'pan': config.PAN,
+            })()
 
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        rightMargin=30,
-        leftMargin=30,
-        topMargin=40,
-        bottomMargin=30,
-        title=f"Quotation {q.quotation_number}",
-        author='Invoice Pro',
-        subject='Quotation'
-    )
+        buffer = io.BytesIO()
+        page_w, page_h = A4
+        c = canvas.Canvas(buffer, pagesize=A4)
+        c.setTitle(f"Quotation {q.quotation_number}")
+        c.setAuthor(getattr(company, 'name', 'Invoice Pro') if company else 'Invoice Pro')
+        c.setSubject("Quotation")
 
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        "title",
-        fontSize=20,
-        alignment=TA_CENTER,
-        spaceAfter=10,
-        textColor=colors.HexColor("#2c3e50")
-    )
+        ML = MR = MT = 36
+        full_w = page_w - ML - MR
+        col_split = ML + full_w * 0.58
 
-    label_style = ParagraphStyle(
-        "label",
-        fontSize=10,
-        textColor=colors.grey
-    )
+        def hline(y, x0=ML, x1=page_w - MR, lw=0.5):
+            c.setLineWidth(lw); c.setStrokeColor(colors.black); c.line(x0, y, x1, y)
 
-    value_style = ParagraphStyle(
-        "value",
-        fontSize=11
-    )
+        def vline(x, y0, y1, lw=0.5):
+            c.setLineWidth(lw); c.setStrokeColor(colors.black); c.line(x, y0, x, y1)
 
-    elements = []
+        def rect(x, y, w, h, fill=0):
+            c.setLineWidth(0.5); c.setStrokeColor(colors.black); c.rect(x, y, w, h, fill=fill)
 
-    # ================= TITLE =================
-    elements.append(Paragraph("QUOTATION", title_style))
-    elements.append(Spacer(1, 10))
+        # ── 1. Draw top fixed parts ────────────────────────────────────────────
+        y = page_h - MT
 
-    # ================= QUOTATION INFO =================
-    info_data = [
-        ["Quotation No", q.quotation_number, "Status", q.status],
-        ["Quotation Date", str(q.quotation_date), "Sales Person", q.sales_person],
-        ["Validity (Days)", str(q.validity_days), "Grand Total", f"Rs. {q.grand_total:,.2f}"],
-    ]
+        # Row 1: QUOTATION + logo
+        row1_h = 48
+        rect(ML, y - row1_h, full_w, row1_h)
+        c.setFont("Helvetica-Bold", 24)
+        c.drawString(ML + 8, y - 30, "QUOTATION")
+        vline(col_split, y - row1_h, y)
 
-    info_table = Table(info_data, colWidths=[90, 180, 90, 150])
-    info_table.setStyle(TableStyle([
-        ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
-        ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
-        ("FONT", (0,0), (-1,-1), "Helvetica"),
-        ("ALIGN", (-1,0), (-1,-1), "RIGHT"),
-        ("BOTTOMPADDING", (0,0), (-1,-1), 8),
-        ("TOPPADDING", (0,0), (-1,-1), 8),
-    ]))
+        if logo_bytes:
+            try:
+                logo = ImageReader(io.BytesIO(logo_bytes))
+                orig_w, orig_h = logo.getSize()
+                max_logo_w = (page_w - MR - col_split) - 20
+                max_logo_h = row1_h - 12
+                scale = min(max_logo_w / orig_w, max_logo_h / orig_h, 1.0)
+                draw_w = orig_w * scale
+                draw_h = orig_h * scale
+                logo_x = col_split + ((page_w - MR - col_split) - draw_w) / 2
+                logo_y = (y - row1_h) + (row1_h - draw_h) / 2
+                c.drawImage(logo, logo_x, logo_y, width=draw_w, height=draw_h,
+                            preserveAspectRatio=True, mask='auto')
+            except Exception as e:
+                print("Logo rendering failed:", e)
 
-    elements.append(info_table)
-    elements.append(Spacer(1, 20))
+        y -= row1_h + 4
 
-    # ================= PRICING SUMMARY =================
-    pricing_data = [
-        ["Subtotal", f"Rs. {q.subtotal:,.2f}"],
-        ["Discount", f"Rs. {q.discount:,.2f}"],
-        ["Taxable Value", f"Rs. {q.taxable_value:,.2f}"],
-        ["CGST", f"Rs. {q.cgst:,.2f}"],
-        ["SGST", f"Rs. {q.sgst:,.2f}"],
-        ["Shipping", f"Rs. {q.shipping:,.2f}"],
-        ["Rounding", f"Rs. {q.rounding:,.2f}"],
-        ["Grand Total", f"Rs. {q.grand_total:,.2f}"],
-    ]
+        # Row 2: Quotation info | Company name + address
+        row2_h = 64
+        rect(ML, y - row2_h, full_w, row2_h)
+        vline(col_split, y - row2_h, y)
 
-    pricing_table = Table(pricing_data, colWidths=[200, 150])
-    pricing_table.setStyle(TableStyle([
-        ("BACKGROUND", (0,-1), (-1,-1), colors.lightgrey),
-        ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
-        ("ALIGN", (1,0), (1,-1), "RIGHT"),
-        ("FONT", (0,-1), (-1,-1), "Helvetica-Bold"),
-        ("BOTTOMPADDING", (0,0), (-1,-1), 6),
-        ("TOPPADDING", (0,0), (-1,-1), 6),
-    ]))
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(ML + 6, y - 16, "Quotation No :")
+        c.setFont("Helvetica", 9)
+        c.drawString(ML + 90, y - 16, str(q.quotation_number))
 
-    elements.append(Paragraph("Pricing Summary", styles["Heading3"]))
-    elements.append(pricing_table)
-    elements.append(Spacer(1, 20))
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(ML + 6, y - 32, "Date          :")
+        c.setFont("Helvetica", 9)
+        q_date_str = q.quotation_date.strftime('%d-%m-%Y') if q.quotation_date else "—"
+        c.drawString(ML + 90, y - 32, q_date_str)
 
-    # ================= DELIVERY TERMS =================
-    terms_text = f"""
-    <b>Delivery Timeline:</b> {q.delivery_timeline}<br/>
-    <b>Project Scope:</b> {q.project_scope}<br/>
-    <b>Milestones:</b> {q.milestones}<br/>
-    <b>Warranty:</b> {q.warranty}<br/>
-    <b>Revision Policy:</b> {q.revision_policy}<br/>
-    <b>Dependencies:</b> {q.dependencies}<br/>
-    """
+        if getattr(q, 'validity_days', None):
+            c.setFont("Helvetica-Bold", 9)
+            c.drawString(ML + 6, y - 48, "Valid (Days)  :")
+            c.setFont("Helvetica", 9)
+            c.drawString(ML + 90, y - 48, str(q.validity_days))
 
-    elements.append(Paragraph("Delivery & Project Terms", styles["Heading3"]))
-    elements.append(Paragraph(terms_text, styles["Normal"]))
-    elements.append(Spacer(1, 15))
+        right_w = page_w - MR - col_split
+        rcx = col_split + right_w / 2
+        cname = (getattr(company, 'name', '') or "").upper()
+        c.setFont("Helvetica-Bold", 12)
+        if c.stringWidth(cname, "Helvetica-Bold", 12) <= right_w - 20:
+            c.drawCentredString(rcx, y - 18, cname)
+            name_h = 18
+        else:
+            words = cname.split(); l1 = l2 = ""
+            for w in words:
+                test = (l1 + " " + w).strip()
+                if c.stringWidth(test, "Helvetica-Bold", 12) <= right_w - 20:
+                    l1 = test
+                else:
+                    l2 = (l2 + " " + w).strip()
+            c.drawCentredString(rcx, y - 14, l1)
+            c.drawCentredString(rcx, y - 30, l2.strip())
+            name_h = 34
 
-    # ================= TERMS & CONDITIONS =================
-    elements.append(Paragraph("Terms & Conditions", styles["Heading3"]))
-    elements.append(Paragraph(q.terms or "-", styles["Normal"]))
+        addr_str = f"{getattr(company, 'address', '') or ''}, {getattr(company, 'city', '') or ''} - {getattr(company, 'pincode', '') or ''}, {getattr(company, 'state', '') or ''}"
+        pstyle = ParagraphStyle('addr', fontName='Helvetica', fontSize=8.5, leading=10, alignment=1, spaceAfter=4)
+        para = Paragraph(addr_str, pstyle)
+        pw, ph = para.wrap(right_w - 16, 9999)
+        para.drawOn(c, col_split + 8, y - name_h - 8 - ph)
 
-    # ================= PAGE BORDER =================
-    def draw_border(canvas, doc):
-        canvas.setStrokeColor(colors.grey)
-        canvas.setLineWidth(1)
-        canvas.rect(20, 20, A4[0]-40, A4[1]-40)
+        y -= row2_h + 6
 
-    doc.build(elements, onFirstPage=draw_border, onLaterPages=draw_border)
+        # ── Row 3: To (client info) | Our Details ─────────────────────────────
+        row3_h = 110
+        rect(ML, y - row3_h, full_w, row3_h)
+        vline(col_split, y - row3_h, y)
 
-    buffer.seek(0)
-    return buffer
+        # Left side – TO block
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(ML + 6, y - 16, "To,")
+
+        client = getattr(q, 'client', None)
+        if client:
+            client_name = getattr(client, 'name', '') or "—"
+            client_addr = getattr(client, 'address', '') or ""
+            client_city = getattr(client, 'city', '') or ""
+            client_state = getattr(client, 'state', '') or ""
+            client_pincode = getattr(client, 'pincode', '') or ""
+            client_gstin = getattr(client, 'gstin', '') or "—"
+        else:
+            client_name = getattr(q, 'client_name', '') or "—"
+            client_addr = getattr(q, 'client_address', '') or ""
+            client_city = getattr(q, 'client_city', '') or ""
+            client_state = getattr(q, 'client_state', '') or ""
+            client_pincode = getattr(q, 'client_pincode', '') or ""
+            client_gstin = getattr(q, 'client_gstin', '') or "—"
+
+        client_address_html = f"""
+        <b>{client_name}</b><br/>
+        {client_addr}<br/>
+        {client_city}, {client_state} - {client_pincode}<br/>
+        GSTIN: {client_gstin}
+        """
+
+        client_style = ParagraphStyle(
+            'client_addr',
+            fontName='Helvetica',
+            fontSize=9,
+            leading=12,
+        )
+        client_para = Paragraph(client_address_html, client_style)
+        available_width = col_split - ML - 14
+        pw, ph = client_para.wrap(available_width, row3_h - 20)
+        client_para.drawOn(c, ML + 6, y - 34 - ph)
+
+        # Right side – Our Details
+        c.setFillColor(colors.black)
+        c.rect(col_split, y - 18, right_w, 18, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica-Bold", 9)
+        c.drawCentredString(rcx, y - 13, "Our Details")
+        c.setFillColor(colors.black)
+
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(col_split + 8, y - 36, "GSTIN :")
+        c.setFont("Helvetica", 9)
+        c.drawString(col_split + 58, y - 36, getattr(company, 'gstin', '') or "")
+
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(col_split + 8, y - 52, "PAN   :")
+        c.setFont("Helvetica", 9)
+        c.drawString(col_split + 58, y - 52, getattr(company, 'pan', '') or "")
+
+        y -= row3_h + 8
+
+        # ── Items table ────────────────────────────────────────────────────────
+        header_h = 22
+        rect(ML, y - header_h, full_w, header_h)
+        c.setFillColor(colors.black)
+        c.rect(ML, y - header_h, full_w, header_h, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+
+        col_w = [full_w * 0.05, full_w * 0.09, full_w * 0.30, full_w * 0.07, full_w * 0.07, full_w * 0.115, full_w * 0.07, full_w * 0.185]
+        headers = ["Sl.\nNo", "HSN\nCode", "Product Name / Description", "Qty.", "Unit", "Rate", "Tax", "Amount"]
+
+        c.setFont("Helvetica-Bold", 8)
+        x = ML
+        for w, txt in zip(col_w, headers):
+            cx = x + w / 2
+            ps = txt.split('\n')
+            if len(ps) == 2:
+                c.drawCentredString(cx, y - 14, ps[0])
+                c.drawCentredString(cx, y - 7, ps[1])
+            else:
+                c.drawCentredString(cx, y - 10, txt)
+            x += w
+
+        c.setFillColor(colors.black)
+        y -= header_h
+
+        item_h = 19
+        items = list(getattr(q, 'line_items', []) or [])
+
+        for i, item in enumerate(items):
+            top = y - i * item_h
+            bot = top - item_h
+
+            if i % 2 == 1:
+                c.setFillColor(colors.HexColor("#f8f9fa"))
+                c.rect(ML, bot, full_w, item_h, fill=1, stroke=0)
+                c.setFillColor(colors.black)
+
+            rect(ML, bot, full_w, item_h, fill=0)
+
+            vals = [
+                str(getattr(item, 'sr_no', i + 1)),
+                getattr(item, 'hsn_code', '') or '',
+                item.description or "",
+                f"{item.quantity:g}",
+                getattr(item, 'unit', 'Nos'),
+                f"{item.unit_price:,.2f}",
+                f"{getattr(item, 'tax_percentage', 0):g}",
+                f"{item.total_amount:,.2f}",
+            ]
+
+            c.setFont("Helvetica", 8)
+            x = ML
+            for j, (w, v) in enumerate(zip(col_w, vals)):
+                if j < len(col_w) - 1:
+                    vline(x + w, bot, top, 0.4)
+                if j == 2:
+                    maxc = int(w / 4.0)
+                    txt = v[:maxc - 1] + "…" if len(v) > maxc else v
+                    c.drawString(x + 4, bot + 6, txt)
+                elif j in (5, 7):
+                    c.drawRightString(x + w - 4, bot + 6, v)
+                else:
+                    c.drawCentredString(x + w / 2, bot + 6, v)
+                x += w
+
+        items_bottom = y - len(items) * item_h if items else y - item_h
+
+        # ── Bottom fixed block ─────────────────────────────────────────────────
+        y_bottom = MT
+
+        # Footer
+        footer_h = 22
+        rect(ML, y_bottom, full_w, footer_h)
+        c.setFont("Helvetica", 8)
+        foot = f"Ph. {getattr(company, 'phone', '') or '—'} | Email: {getattr(company, 'email', '') or '—'}"
+        c.drawCentredString(ML + full_w / 2, y_bottom + 8, foot)
+        y_bottom += footer_h + 12
+
+        # Bank + Signature
+        bank_h = 100
+        rect(ML, y_bottom, full_w, bank_h)
+        vline(col_split, y_bottom, y_bottom + bank_h)
+
+        c.setFont("Helvetica-Bold", 9.5)
+        c.drawString(ML + 6, y_bottom + bank_h - 18, "OUR BANK DETAILS")
+        hline(y_bottom + bank_h - 20, ML + 6, ML + 160, 0.8)
+
+        bdata = [
+            ("Bank Name", bank.bank_name if bank else ""),
+            ("A/C No", bank.account_number if bank else ""),
+            ("A/C Name", bank.account_name if bank else ""),
+            ("IFSC Code", bank.ifsc_code if bank else ""),
+            ("Branch", bank.branch if bank else ""),
+        ]
+
+        yy = y_bottom + bank_h - 34
+        for lbl, val in bdata:
+            c.setFont("Helvetica-Bold", 8.5); c.drawString(ML + 6, yy, lbl)
+            c.setFont("Helvetica", 8.5); c.drawString(ML + 64, yy, f" : {val}")
+            yy -= 14
+
+        c.setFont("Helvetica-Bold", 9.5)
+        c.drawCentredString(col_split + right_w / 2, y_bottom + bank_h - 18, f"For {getattr(company, 'name', '')}")
+
+        # Signature
+        sx = col_split + 20
+        sy = y_bottom + 20
+        sw = right_w - 40
+        sh = bank_h - 50
+
+        if signature_bytes:
+            try:
+                sig = ImageReader(io.BytesIO(signature_bytes))
+                orig_w, orig_h = sig.getSize()
+                scale = min(sw / orig_w, sh / orig_h, 1.0)
+                draw_w = orig_w * scale
+                draw_h = orig_h * scale
+                ix = sx + (sw - draw_w) / 2
+                iy = sy + (sh - draw_h) / 2
+                c.drawImage(sig, ix, iy, width=draw_w, height=draw_h,
+                            preserveAspectRatio=True, mask='auto')
+            except Exception as e:
+                print("Signature rendering failed:", e)
+
+        y_bottom += bank_h + 18
+
+        # References + Totals
+        ref_fields = [
+            ("Sales Person", getattr(q, 'sales_person', '') or "—"),
+            ("Reference ID", getattr(q, 'reference_id', '') or "—"),
+            ("Validity (Days)", str(getattr(q, 'validity_days', '') or "—")),
+            ("Expiry Date", q.expiry_date.strftime('%d-%m-%Y') if getattr(q, 'expiry_date', None) else "—"),
+            ("Status", getattr(q, 'status', '') or "—"),
+        ]
+
+        totals = [
+            ("Sub Total",   f"{getattr(q, 'subtotal', 0):,.2f}"),
+            ("SGST",        f"{getattr(q, 'sgst', 0):,.2f}"),
+            ("CGST",        f"{getattr(q, 'cgst', 0):,.2f}"),
+            ("IGST",        f"{getattr(q, 'igst', 0):,.2f}"),
+            ("Grand Total", f"{getattr(q, 'grand_total', 0):,.2f}"),
+        ]
+
+        row_h = 15
+        nrows = max(len(ref_fields), len(totals))
+        refs_h = nrows * row_h + 10
+
+        rect(ML, y_bottom, full_w, refs_h)
+        vline(col_split, y_bottom, y_bottom + refs_h)
+
+        for i, (lbl, val) in enumerate(ref_fields):
+            yy = y_bottom + refs_h - (i + 1) * row_h - 3
+            c.setFont("Helvetica-Bold", 8.5); c.drawString(ML + 6, yy, f"{lbl}:")
+            c.setFont("Helvetica", 8.5); c.drawString(ML + 90, yy, str(val))
+
+        for i, (lbl, val) in enumerate(totals):
+            yy = y_bottom + refs_h - (i + 1) * row_h - 3
+            bold = "Grand" in lbl
+            c.setFont("Helvetica-Bold" if bold else "Helvetica", 10 if bold else 9)
+            c.drawString(col_split + 8, yy, f"{lbl}:")
+            c.drawRightString(page_w - MR - 6, yy, val)
+
+        y_bottom += refs_h
+
+        # ── Outer page border ──────────────────────────────────────────────────
+        c.setStrokeColor(colors.black)
+        c.setLineWidth(1.0)
+        c.rect(ML, MT, full_w, page_h - MT - MT, fill=0)
+
+        c.save()
+        buffer.seek(0)
+        return buffer
+
+    except Exception as e:
+        logging.error(f"Quotation PDF generation failed: {e}", exc_info=True)
+        raise
 class AnalyticsReportGenerator:
     def __init__(self):
         self.engine = AnalyticsEngine(db.session)
