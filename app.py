@@ -170,9 +170,9 @@ with app.app_context():
             phone='+91-9999999999',
             email='hello@revolutionaryinvoice.ai',
             gstin='33REVAA0000A1Z5',
-            pan='REVAA0000A',
+    #       pan='REVAA0000A',
             website='https://revolutionaryinvoice.ai',
-            logo_path='/static/images/logo.svg'
+    #       logo_path='/static/images/logo.svg'
         )
         db.session.add(company)
         db.session.commit()

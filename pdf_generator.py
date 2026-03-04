@@ -470,207 +470,196 @@ def generate_triple_invoice_pdf(invoice, company=None, bank=None, logo_bytes=Non
     merged.seek(0)
     return merged
 
-
 def generate_challan_pdf(challan, company=None):
-    #Generate delivery challan PDF
-    try:
-        buffer = io.BytesIO()
-        challan_title = f"Delivery Challan {challan.challan_number}"
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=A4,
-            topMargin=0.5 * inch,
-            bottomMargin=0.5 * inch,
-            leftMargin=0.5 * inch,
-            rightMargin=0.5 * inch,
-            title=challan_title,
-            author=getattr(company, 'name', 'Invoice Pro') if company else 'Invoice Pro',
-            subject='Delivery Challan'
-        )
 
-        styles = getSampleStyleSheet()
-        content = []
+    buffer = io.BytesIO()
 
-        # Custom styles (reused/adapted)
-        title_style = ParagraphStyle(
-            name='ChallanTitle',
-            fontSize=18,
-            alignment=TA_CENTER,
-            fontName='Helvetica-Bold',
-            textColor=colors.HexColor('#dc2626'),
-            spaceAfter=20
-        )
-        
-        header_style = ParagraphStyle(
-            name='Header',
-            fontSize=12,
-            fontName='Helvetica-Bold',
-            textColor=colors.HexColor('#1f2937')
-        )
-        
-        normal_style = ParagraphStyle(
-            name='Normal',
-            fontSize=10,
-            fontName='Helvetica',
-            textColor=colors.HexColor('#374151')
-        )
+    page_w, page_h = A4
+    c = canvas.Canvas(buffer, pagesize=A4)
 
-        content.append(Paragraph("DELIVERY CHALLAN", title_style))
-        content.append(Spacer(1, 10))
+    ML = MR = MT = 36
+    full_w = page_w - ML - MR
+    col_split = ML + full_w * 0.58
+    BOTTOM_MARGIN = MT
+    y = page_h - MT
 
-        # Company Header (similar to invoice)
-        if not company:
-            company = Company.query.first()
-            
-        if not company:
-            company = type('Company', (), {
-                'name': config.COMPANY_NAME,
-                'address': config.COMPANY_ADDRESS,
-                'city': config.COMPANY_CITY,
-                'state': config.COMPANY_STATE,
-                'pincode': config.COMPANY_PINCODE,
-                'phone': config.COMPANY_PHONE,
-                'email': config.COMPANY_EMAIL,
-                'gstin': config.GSTIN
-            })()
+    # ================= HEADER =================
+    row1_h = 48
+    c.rect(ML, y-row1_h, full_w, row1_h)
 
-        # Challan Details
-        # Try to get client from preview_client (transient) or standard relationship
-        client = getattr(challan, 'preview_client', None) or challan.client
-        
-        # Fallback if client is missing (should not happen in preview flow)
-        if not client:
-             client = type('Client', (), {
-                'name': 'Unknown Client',
-                'address': '',
-                'city': '', 
-                'state': '',
-                'pincode': '',
-                'phone': '',
-                'email': ''
-            })()
+    c.setFont("Helvetica-Bold", 24)
+    c.drawString(ML + 8, y - 30, "DELIVERY CHALLAN")
 
-        header_data = [
-            [
-                Paragraph(f"<b>Challan No:</b> {challan.challan_number}<br/>"
-                          f"<b>Date:</b> {challan.challan_date.strftime('%d-%m-%Y')}<br/>"
-                          f"<b>Delivery Date:</b> {challan.delivery_date.strftime('%d-%m-%Y') if challan.delivery_date else 'N/A'}", 
-                          normal_style),
-                Paragraph(f"<b>{company.name}</b><br/>"
-                          f"{company.address}<br/>"
-                          f"{company.city}, {company.state} - {company.pincode}<br/>"
-                          f"Phone: {company.phone}", 
-                          normal_style)
-            ]
+    y -= row1_h + 6
+
+
+    # ================= CHALLAN INFO =================
+    row2_h = 64
+    c.rect(ML, y-row2_h, full_w, row2_h)
+
+    c.setFont("Helvetica-Bold", 9)
+
+    c.drawString(ML+6, y-16, "Challan No :")
+    c.setFont("Helvetica",9)
+    c.drawString(ML+90, y-16, str(challan.challan_number))
+
+    c.setFont("Helvetica-Bold",9)
+    c.drawString(ML+6, y-32, "Challan Date :")
+    c.setFont("Helvetica",9)
+    c.drawString(ML+90, y-32, challan.challan_date.strftime('%d-%m-%Y'))
+
+    c.setFont("Helvetica-Bold",9)
+    c.drawString(ML+6, y-48, "Delivery Date :")
+    c.setFont("Helvetica",9)
+    c.drawString(
+        ML+90,
+        y-48,
+        challan.delivery_date.strftime('%d-%m-%Y') if challan.delivery_date else "N/A"
+    )
+
+    y -= row2_h + 10
+
+
+    # ================= CLIENT / TRANSPORT =================
+    row3_h = 100
+    c.rect(ML, y-row3_h, full_w, row3_h)
+    c.line(col_split, y-row3_h, col_split, y)
+
+    client = getattr(challan, 'preview_client', None) or challan.client
+
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(ML+6, y-16, "Ship To")
+
+    c.setFont("Helvetica", 9)
+
+    style = ParagraphStyle(
+        "client",
+        fontName="Helvetica",
+        fontSize=9,
+        leading=12
+    )
+
+    client_text = f"""
+    <b>{client.name}</b><br/>
+    {getattr(client,'address','')}<br/>
+    {getattr(client,'city','')}, {getattr(client,'state','')} - {getattr(client,'pincode','')}
+    """
+
+    para = Paragraph(client_text, style)
+
+    pw, ph = para.wrap(col_split - ML - 12, row3_h)
+
+    para.drawOn(c, ML + 6, y - 28 - ph)
+
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(col_split+6, y-16, "Vehicle / Transport")
+
+    c.setFont("Helvetica", 9)
+    vehicle_para = Paragraph(
+    challan.notes or "No instructions",
+    style
+    )
+
+    pw, ph = vehicle_para.wrap(page_w - MR - col_split - 12, row3_h)
+
+    vehicle_para.drawOn(c, col_split + 6, y - 30 - ph)
+
+    y -= row3_h + 10
+
+
+    # ================= ITEMS TABLE =================
+
+    header_h = 22
+    c.rect(ML, y-header_h, full_w, header_h)
+
+    c.setFillColor(colors.black)
+    c.rect(ML, y-header_h, full_w, header_h, fill=1)
+    c.setFillColor(colors.white)
+
+    headers = ["S.No", "HSN", "Description", "Qty", "Unit"]
+
+    col_w = [
+    40,   # S.No
+    80,   # HSN
+    full_w - 260,  # Description
+    70,   # Qty
+    70    # Unit
+    ]
+
+    c.setFont("Helvetica-Bold", 9)
+
+    x = ML
+    for w, h in zip(col_w, headers):
+        c.drawCentredString(x + w/2, y-14, h)
+        x += w
+
+    c.setFillColor(colors.black)
+
+    y -= header_h
+
+    row_h = 20
+
+    for i, item in enumerate(challan.line_items):
+
+        top = y - i*row_h
+        bottom = top - row_h
+
+        c.rect(ML, bottom, full_w, row_h)
+
+        values = [
+            str(item.sr_no),
+            item.hsn_code or "",
+            item.description,
+            f"{item.quantity:g}",
+            item.unit
         ]
-        
-        header_table = Table(header_data, colWidths=[3.5 * inch, 3.5 * inch])
-        header_table.setStyle(TableStyle([
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f9fafb')),
-            ('LEFTPADDING', (0, 0), (-1, -1), 12),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 12),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ]))
-        content.append(header_table)
-        content.append(Spacer(1, 20))
 
-        # Ship To / Bill To
-        client_details = (
-            f"<b>{getattr(client, 'name', 'Unknown Client')}</b><br/>"
-            f"{getattr(client, 'contact_person', '')}<br/>"
-            f"{getattr(client, 'address', '')}<br/>"
-            f"{getattr(client, 'city', '')}, {getattr(client, 'state', '')} - {getattr(client, 'pincode', '')}<br/>"
-            f"Phone: {getattr(client, 'phone', '')}"
-        )
+        x = ML
 
-        ship_data = [
-            [
-                Paragraph("<b>Ship To</b>", header_style),
-                Paragraph("<b>Vehicle / Transport Details</b>", header_style)
-            ],
-            [
-                Paragraph(client_details, normal_style),
-                Paragraph(challan.notes or "No specific instructions", normal_style)
-            ]
-        ]
-        
-        ship_table = Table(ship_data, colWidths=[3.5 * inch, 3.5 * inch])
-        ship_table.setStyle(TableStyle([
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('BACKGROUND', (0, 0), (1, 0), colors.HexColor('#dc2626')), # Red theme for challan
-            ('TEXTCOLOR', (0, 0), (1, 0), colors.white),
-            ('LEFTPADDING', (0, 0), (-1, -1), 12),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 12),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ]))
-        content.append(ship_table)
-        content.append(Spacer(1, 20))
+        for j,(w,val) in enumerate(zip(col_w, values)):
 
-        # Items Table
-        items_data = [['S.No', 'HSN', 'Description', 'Qty', 'Unit']]
-        
-        for item in challan.line_items:
-            items_data.append([
-                str(item.sr_no),
-                item.hsn_code or '',
-                Paragraph(item.description, normal_style),
-                f"{item.quantity:g}",
-                item.unit
-            ])
+            if j < len(col_w)-1:
+                c.line(x+w, bottom, x+w, top)
 
-        # Fill empty rows
-        while len(items_data) < 10:
-            items_data.append(['', '', '', '', ''])
+            if j == 2:
+                c.drawString(x+4, bottom+6, val[:40])
+            else:
+                c.drawCentredString(x+w/2, bottom+6, val)
 
-        items_table = Table(items_data, colWidths=[
-            0.5*inch, 1*inch, 4*inch, 0.8*inch, 0.7*inch
-        ])
-        
-        items_table.setStyle(TableStyle([
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dc2626')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('ALIGN', (2, 1), (2, -1), 'LEFT'), # Description left align
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 6),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ]))
-        content.append(items_table)
-        content.append(Spacer(1, 30))
+            x += w
 
-        # Footer / Signatures
-        signature_data = [
-            ['', f"For {company.name}"],
-            ['', ''],
-            ['', ''],
-            ['Receiver\'s Signature', 'Authorized Signatory']
-        ]
-        
-        signature_table = Table(signature_data, colWidths=[3.5*inch, 3.5*inch])
-        signature_table.setStyle(TableStyle([
-            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
-            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-            ('LINEABOVE', (0, -1), (-1, -1), 0.5, colors.HexColor('#6b7280')),
-        ]))
-        content.append(signature_table)
+    
 
-        doc.build(content)
-        buffer.seek(0)
-        
-        return buffer
 
-    except Exception as e:
-        logging.error(f"Challan PDF generation failed: {e}")
-        raise
+    # ================= SIGNATURE =================
+
+    sig_h = 80
+
+    # place signature block at bottom
+    sig_y = BOTTOM_MARGIN + sig_h
+
+    c.rect(ML, sig_y - sig_h, full_w, sig_h)
+    c.line(col_split, sig_y - sig_h, col_split, sig_y)
+
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(col_split+10, sig_y - 20, f"For {company.name if company else ''}")
+
+    c.setFont("Helvetica", 9)
+    c.drawString(ML+10, sig_y - 60, "Receiver's Signature")
+    c.drawString(col_split+10, sig_y - 60, "Authorized Signatory")
+
+    y -= sig_h
+
+
+    # ================= PAGE BORDER =================
+
+    c.setLineWidth(1)
+    c.rect(ML, MT, full_w, page_h - MT - MT)
+
+    c.save()
+    buffer.seek(0)
+
+    return buffer
 
 def export_excel(invoices, filename="invoices_export.xlsx"):
     """Export invoices to Excel format"""
@@ -704,122 +693,153 @@ def export_excel(invoices, filename="invoices_export.xlsx"):
         logging.error(f"Excel export failed: {e}")
         raise
 
+def generate_quotation_pdf(quotation, company=None, logo_bytes=None):
 
-def generate_quotation_pdf(q):
     buffer = io.BytesIO()
 
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        rightMargin=30,
-        leftMargin=30,
-        topMargin=40,
-        bottomMargin=30,
-        title=f"Quotation {q.quotation_number}",
-        author='Invoice Pro',
-        subject='Quotation'
-    )
+    page_w, page_h = A4
+    c = canvas.Canvas(buffer, pagesize=A4)
 
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        "title",
-        fontSize=20,
-        alignment=TA_CENTER,
-        spaceAfter=10,
-        textColor=colors.HexColor("#2c3e50")
-    )
+    ML = MR = MT = 36
+    full_w = page_w - ML - MR
 
-    label_style = ParagraphStyle(
-        "label",
-        fontSize=10,
-        textColor=colors.grey
-    )
+    y = page_h - MT
 
-    value_style = ParagraphStyle(
-        "value",
-        fontSize=11
-    )
+    # ================= HEADER =================
+    row1_h = 48
+    c.rect(ML, y-row1_h, full_w, row1_h)
 
-    elements = []
+    c.setFont("Helvetica-Bold", 24)
+    c.drawString(ML + 8, y - 30, "QUOTATION")
 
-    # ================= TITLE =================
-    elements.append(Paragraph("QUOTATION", title_style))
-    elements.append(Spacer(1, 10))
+    y -= row1_h + 6
+
 
     # ================= QUOTATION INFO =================
-    info_data = [
-        ["Quotation No", q.quotation_number, "Status", q.status],
-        ["Quotation Date", str(q.quotation_date), "Sales Person", q.sales_person],
-        ["Validity (Days)", str(q.validity_days), "Grand Total", f"Rs. {q.grand_total:,.2f}"],
-    ]
+    row2_h = 64
+    c.rect(ML, y-row2_h, full_w, row2_h)
 
-    info_table = Table(info_data, colWidths=[90, 180, 90, 150])
-    info_table.setStyle(TableStyle([
-        ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
-        ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
-        ("FONT", (0,0), (-1,-1), "Helvetica"),
-        ("ALIGN", (-1,0), (-1,-1), "RIGHT"),
-        ("BOTTOMPADDING", (0,0), (-1,-1), 8),
-        ("TOPPADDING", (0,0), (-1,-1), 8),
-    ]))
+    c.setFont("Helvetica-Bold", 9)
 
-    elements.append(info_table)
-    elements.append(Spacer(1, 20))
+    c.drawString(ML+6, y-16, "Quotation No :")
+    c.setFont("Helvetica",9)
+    c.drawString(ML+90, y-16, str(quotation.quotation_number))
+
+    c.setFont("Helvetica-Bold",9)
+    c.drawString(ML+6, y-32, "Quotation Date :")
+    c.setFont("Helvetica",9)
+    c.drawString(ML+90, y-32, quotation.quotation_date.strftime('%d-%m-%Y'))
+
+    c.setFont("Helvetica-Bold",9)
+    c.drawString(ML+6, y-48, "Validity (Days) :")
+    c.setFont("Helvetica",9)
+    c.drawString(ML+90, y-48, str(quotation.validity_days))
+
+    y -= row2_h + 10
+
 
     # ================= PRICING SUMMARY =================
-    pricing_data = [
-        ["Subtotal", f"Rs. {q.subtotal:,.2f}"],
-        ["Discount", f"Rs. {q.discount:,.2f}"],
-        ["Taxable Value", f"Rs. {q.taxable_value:,.2f}"],
-        ["CGST", f"Rs. {q.cgst:,.2f}"],
-        ["SGST", f"Rs. {q.sgst:,.2f}"],
-        ["Shipping", f"Rs. {q.shipping:,.2f}"],
-        ["Rounding", f"Rs. {q.rounding:,.2f}"],
-        ["Grand Total", f"Rs. {q.grand_total:,.2f}"],
+    split = ML + full_w * 0.7
+
+    # Header row
+    header_h = 18
+    c.rect(ML, y-header_h, full_w, header_h)
+    c.line(split, y-header_h, split, y)
+
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(ML + 6, y - 13, "Pricing Summary")
+
+    y -= header_h
+
+
+    pricing = [
+        ("Subtotal", quotation.subtotal),
+        ("Discount", quotation.discount),
+        ("Taxable Value", quotation.taxable_value),
+        ("CGST", quotation.cgst),
+        ("SGST", quotation.sgst),
+        ("Shipping", quotation.shipping),
+        ("Rounding", quotation.rounding),
+        ("Grand Total", quotation.grand_total)
     ]
 
-    pricing_table = Table(pricing_data, colWidths=[200, 150])
-    pricing_table.setStyle(TableStyle([
-        ("BACKGROUND", (0,-1), (-1,-1), colors.lightgrey),
-        ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
-        ("ALIGN", (1,0), (1,-1), "RIGHT"),
-        ("FONT", (0,-1), (-1,-1), "Helvetica-Bold"),
-        ("BOTTOMPADDING", (0,0), (-1,-1), 6),
-        ("TOPPADDING", (0,0), (-1,-1), 6),
-    ]))
+    row_h = 18
 
-    elements.append(Paragraph("Pricing Summary", styles["Heading3"]))
-    elements.append(pricing_table)
-    elements.append(Spacer(1, 20))
+    for label, value in pricing:
+
+        c.rect(ML, y-row_h, split-ML, row_h)
+        c.rect(split, y-row_h, page_w-MR-split, row_h)
+
+        if label == "Grand Total":
+            c.setFont("Helvetica-Bold", 10)
+        else:
+            c.setFont("Helvetica", 9)
+
+        c.drawString(ML + 6, y - 12, label)
+        c.drawRightString(page_w - MR - 6, y - 12, f"Rs. {value:,.2f}")
+
+        y -= row_h
+
+    y -= 20
+
 
     # ================= DELIVERY TERMS =================
-    terms_text = f"""
-    <b>Delivery Timeline:</b> {q.delivery_timeline}<br/>
-    <b>Project Scope:</b> {q.project_scope}<br/>
-    <b>Milestones:</b> {q.milestones}<br/>
-    <b>Warranty:</b> {q.warranty}<br/>
-    <b>Revision Policy:</b> {q.revision_policy}<br/>
-    <b>Dependencies:</b> {q.dependencies}<br/>
-    """
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(ML + 6, y, "Delivery & Project Terms")
 
-    elements.append(Paragraph("Delivery & Project Terms", styles["Heading3"]))
-    elements.append(Paragraph(terms_text, styles["Normal"]))
-    elements.append(Spacer(1, 15))
+    y -= 16
+
+    c.setFont("Helvetica", 9)
+
+    terms = [
+        f"Delivery Timeline: {quotation.delivery_timeline}",
+        f"Project Scope: {quotation.project_scope}",
+        f"Milestones: {quotation.milestones}",
+        f"Warranty: {quotation.warranty}",
+        f"Revision Policy: {quotation.revision_policy}",
+        f"Dependencies: {quotation.dependencies}",
+    ]
+
+    for t in terms:
+        c.drawString(ML + 6, y, t)
+        y -= 12
+
+    y -= 10
+
 
     # ================= TERMS & CONDITIONS =================
-    elements.append(Paragraph("Terms & Conditions", styles["Heading3"]))
-    elements.append(Paragraph(q.terms or "-", styles["Normal"]))
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(ML + 6, y, "Terms & Conditions")
+
+    y -= 16
+
+    text_width = full_w - 12
+
+    style = ParagraphStyle(
+        "terms",
+        fontName="Helvetica",
+        fontSize=9,
+        leading=12
+    )
+
+    terms_para = Paragraph(quotation.terms or "-", style)
+
+    w, h = terms_para.wrap(text_width, 100)
+    terms_para.drawOn(c, ML + 6, y - h)
+
+    y -= h + 10
+
 
     # ================= PAGE BORDER =================
-    def draw_border(canvas, doc):
-        canvas.setStrokeColor(colors.grey)
-        canvas.setLineWidth(1)
-        canvas.rect(20, 20, A4[0]-40, A4[1]-40)
+    c.setLineWidth(1)
+    c.rect(ML, MT, full_w, page_h - MT - MT)
 
-    doc.build(elements, onFirstPage=draw_border, onLaterPages=draw_border)
+    c.save()
 
     buffer.seek(0)
+
     return buffer
+
 class AnalyticsReportGenerator:
     def __init__(self):
         self.engine = AnalyticsEngine(db.session)
