@@ -244,7 +244,26 @@
             </div>
         </div>
     </div>
+    <style>
+/* Fix challan modal for dark theme */
+[data-theme="dark"] #challanModal .modal-content {
+    background-color: #1e293b;
+    color: white;
+}
 
+[data-theme="dark"] #challanModal .modal-body {
+    color: white;
+}
+
+[data-theme="dark"] #challanModal .modal-header {
+    color: white;
+}
+
+/* Make close icon visible */
+[data-theme="dark"] #challanModal .btn-close {
+    filter: invert(1);
+}
+</style>
     <!-- Challan Details Modal -->
     <div class="modal fade" id="challanModal" tabindex="-1">
         <div class="modal-dialog modal-lg">

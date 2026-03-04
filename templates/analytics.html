@@ -26,11 +26,26 @@ System{% endblock %} {% block content %}
             <div class="d-flex gap-2 justify-content-end">
               <div class="dropdown time-range-dropdown">
                 <button
-                  class="btn btn-outline-primary glass-btn dropdown-toggle"
-                  data-bs-toggle="dropdown"
+                class="btn btn-outline-primary glass-btn dropdown-toggle"
+                data-bs-toggle="dropdown"
                 >
-                  <i data-feather="calendar" class="me-1"></i> Time Range
-                </button>
+                <i data-feather="calendar" class="me-1"></i>
+
+                {% if current_range == '7d' %}
+                Last 7 Days
+                {% elif current_range == '30d' %}
+                Last 30 Days
+                {% elif current_range == '90d' %}
+                Last 3 Months
+                {% elif current_range == '12m' %}
+                 Last 12 Months
+                {% elif current_range == 'all' %}
+                All Time
+                {% else %}
+                Time Range
+                {% endif %}
+
+  </button>
                 <ul class="dropdown-menu glass-dropdown dropdown-menu-end">
                   <li>
                     <a

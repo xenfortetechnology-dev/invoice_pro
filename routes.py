@@ -2503,8 +2503,11 @@ def analytics():
         print("Full Analytics Data:", analytics_data)
 
 
-        return render_template('analytics.html', analytics_data=analytics_data)
-    
+        return render_template(
+            'analytics.html',
+             analytics_data=analytics_data,
+             current_range=request.args.get('range')
+        )
     except Exception as e:
         logging.error(f"Analytics error: {e}")
         flash('Error loading analytics data.', 'error')
@@ -2521,7 +2524,7 @@ def analytics():
 def export_analytics_excel():
     """Export analytics data to Excel and download it"""
     try:
-        time_range = request.args.get('range', '12m')
+        time_range = request.args.get('range')
         report_type = request.args.get('type', 'all')
         analytics_data = _get_analytics_data_dict(time_range)
         output = report_generator.generate_excel_report(analytics_data, report_type)
@@ -2854,17 +2857,23 @@ def create_challan():
             notes = request.form.get("notes", "")
             line_items_json = request.form.get("line_items")
 
-            # 🔹 Append transport metadata into notes
+            # -----------------------------
+            # Transport metadata in notes
+            # -----------------------------
             meta_notes = []
+
             if transport_mode:
                 meta_notes.append(f"Mode: {transport_mode}")
+
             if vehicle_number:
                 meta_notes.append(f"Vehicle: {vehicle_number}")
 
             if meta_notes:
                 notes = (notes or "") + ("\n" if notes else "") + " | ".join(meta_notes)
 
-            # 🔹 Build line items list
+            # -----------------------------
+            # Parse line items
+            # -----------------------------
             line_items = []
 
             if line_items_json:
@@ -2883,15 +2892,17 @@ def create_challan():
                         "unit": item.get("unit", "Nos"),
                         "unit_price": float(item.get("unit_price", 0) or 0),
 
-                        # 🔥 SEND TAX PERCENTAGES (Cloud will calculate totals)
+                        # tax percentages only
                         "cgst_percentage": float(item.get("cgst_percentage", 0) or 0),
                         "sgst_percentage": float(item.get("sgst_percentage", 0) or 0),
                         "igst_percentage": float(item.get("igst_percentage", 0) or 0),
                     })
 
-            # 🔹 Prepare payload for cloud API
+            # -----------------------------
+            # Prepare payload for cloud
+            # -----------------------------
             payload = {
-                "client_id": client_id,
+                "client_id": int(client_id),   # 🔴 important fix
                 "challan_date": challan_date_str,
                 "delivery_date": delivery_date_str,
                 "notes": notes,
@@ -2899,34 +2910,59 @@ def create_challan():
                 "line_items": line_items
             }
 
-            # 🔹 Send to cloud
-            response = cloud_request(
-                "POST",
-                "/challans",
-                json=payload,
-                timeout=10
-            )
+            # -----------------------------
+            # Send request to cloud API
+            # -----------------------------
+            try:
+                response = cloud_request(
+                    "POST",
+                    "/challans",
+                    json=payload,
+                    timeout=10
+                )
 
+                print("CLOUD RESPONSE:", response)
+
+            except Exception as e:
+                print("CLOUD ERROR:", str(e))
+                flash(f"Cloud API error: {str(e)}", "error")
+                return redirect(url_for("delivery_challan"))
+
+            # -----------------------------
+            # Handle response
+            # -----------------------------
             if response and response.status_code in (200, 201):
+
                 resp_json = response.json()
+
                 challan_number = resp_json.get("challan_number", "DC")
+
                 flash(
                     f"Delivery Challan {challan_number} created successfully!",
                     "success"
                 )
+
             else:
+
                 error = response.text if response else "No response from server"
+
                 flash(f"Error creating challan: {error}", "error")
 
             return redirect(url_for("delivery_challan"))
 
         except Exception as e:
+
             logging.error(f"Error creating challan: {e}")
+
             flash(f"Error creating challan: {e}", "error")
+
             return redirect(url_for("delivery_challan"))
 
-    # 🔹 GET Request – Load Clients
+    # -----------------------------
+    # GET request - load clients
+    # -----------------------------
     client_list = fetch_cloud_clients()
+
     clients = [SimpleNamespace(**c) for c in client_list]
 
     return render_template(
@@ -2934,6 +2970,7 @@ def create_challan():
         clients=clients,
         today=datetime.now()
     )
+
 
 
 @app.route('/challan/preview', methods=['POST'])
@@ -4504,6 +4541,33 @@ def quotation_pdf(qid):
         q_data = fetch_cloud_quotation_by_id(qid)
         
         if q_data:
+            # Build client object from quotation API data
+            client_obj = SimpleNamespace(
+                name=q_data.get("client_name") or q_data.get("party_name") or "—",
+                address=q_data.get("client_address") or q_data.get("party_address") or "",
+                city=q_data.get("client_city") or q_data.get("party_city") or "",
+                state=q_data.get("client_state") or q_data.get("party_state") or "",
+                pincode=q_data.get("client_pincode") or q_data.get("party_pincode") or "",
+                gstin=q_data.get("client_gstin") or q_data.get("party_gstin") or "—",
+            )
+            # If quotation has a client_id, fetch full client details
+            client_id = q_data.get("client_id")
+            if client_id:
+                try:
+                    client_res = cloud_request("GET", f"/clients/{client_id}")
+                    if client_res and client_res.status_code == 200:
+                        cd = client_res.json()
+                        client_obj = SimpleNamespace(
+                            name=cd.get("name") or "—",
+                            address=cd.get("address") or "",
+                            city=cd.get("city") or "",
+                            state=cd.get("state") or "",
+                            pincode=cd.get("pincode") or "",
+                            gstin=cd.get("gstin") or "—",
+                        )
+                except Exception as ce:
+                    logging.warning(f"Could not fetch client details for quotation PDF: {ce}")
+
             # Convert API data to SimpleNamespace for PDF generator
             quotation = SimpleNamespace(
                 id=q_data["id"],
@@ -4534,11 +4598,12 @@ def quotation_pdf(qid):
                 revision_policy=q_data.get("revision_policy", ""),
                 dependencies=q_data.get("dependencies", ""),
                 terms=q_data.get("terms", ""),
-                        line_items=[
+                client=client_obj,
+                line_items=[
                     SimpleNamespace(
                         sr_no=item.get("sr_no", i+1),
                         hsn_code=item.get("hsn_code", ""),
-                        description = item.get("description", item.get("item_name", "")),
+                        description=item.get("description", item.get("item_name", "")),
                         quantity=item.get("quantity", 0),
                         unit=item.get("unit", "Nos"),
                         unit_price=item.get("unit_price", 0),
@@ -4549,14 +4614,28 @@ def quotation_pdf(qid):
                     for i, item in enumerate(q_data.get("line_items", []))
                 ]
             )
-            
-            # Use specific quotation PDF generator
-            pdf_buffer = generate_quotation_pdf(quotation)
+
+            # Fetch company, bank, logo and signature (same as invoice PDF route)
+            company_res = cloud_request("GET", "/company")
+            company = SimpleNamespace(**company_res.json()) if company_res and company_res.status_code == 200 else None
+
+            bank_res = cloud_request("GET", "/bank-details")
+            bank = SimpleNamespace(**bank_res.json()) if bank_res and bank_res.status_code == 200 else None
+
+            logo_res = cloud_request("GET", "/company/logo")
+            logo_bytes = logo_res.content if logo_res and logo_res.status_code == 200 else None
+
+            signature_res = cloud_request("GET", "/company/signature")
+            signature_bytes = signature_res.content if signature_res and signature_res.status_code == 200 else None
+
+            # Generate quotation PDF with invoice-style layout
+            pdf_buffer = generate_quotation_pdf(quotation, company=company, bank=bank,
+                                                logo_bytes=logo_bytes, signature_bytes=signature_bytes)
             pdf_buffer.seek(0)
             
             filename = f'Quotation_{quotation.quotation_number}.pdf'
             
-            # 🔥 Save to local Downloads for Desktop EXE support
+            # Save to local Downloads for Desktop EXE support
             saved_path = save_pdf_to_downloads(pdf_buffer, filename)
             if saved_path:
                 flash(f"PDF saved to: {saved_path}", "success")
