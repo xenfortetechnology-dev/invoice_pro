@@ -693,7 +693,6 @@ def export_excel(invoices, filename="invoices_export.xlsx"):
         logging.error(f"Excel export failed: {e}")
         raise
 
-def generate_quotation_pdf(quotation, company=None, logo_bytes=None):
 
 def generate_quotation_pdf(q, company=None, bank=None, logo_bytes=None, signature_bytes=None):
     """Generate quotation PDF matching the professional invoice layout.
