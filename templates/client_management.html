@@ -342,48 +342,58 @@
             </div>
 
 
-            <!-- Pagination -->
-            {% if clients.pages and clients.pages > 1 %}
-            <nav aria-label="Client pagination" class="mt-4">
-                <ul class="pagination justify-content-center">
-                    <li class="page-item {% if not clients.has_prev %}disabled{% endif %}">
-                        <a class="page-link glass-btn"
-                            href="{{ url_for('client_management', page=clients.prev_num, search=search, type=client_type, view=view_mode) }}">
-                            <i data-feather="chevron-left" size="16"></i>
-                        </a>
-                    </li>
+           <!-- Pagination -->
+{% if clients.pages and clients.pages > 1 %}
+<nav aria-label="Client pagination" class="mt-4">
+    <ul class="pagination justify-content-center">
 
-                    {% for page_num in clients.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
-                    {% if page_num %}
-                    {%if page_num != clients.page %}
-                    <li class="page-item">
-                        <a class="page-link glass-btn"
-                            href="{{ url_for('client_management', page=page_num, search=search, type=client_type, view=view_mode) }}">
-                            {{ page_num }}
-                        </a>
-                    </li>
-                    {% else %}
-                    <li class="page-item active">
-                        <span class="page-link bg-primary border-primary">{{ page_num }}</span>
-                    </li>
-                    {% endif %}
-                    {% else %}
-                    <li class="page-item disabled">
-                        <span class="page-link">...</span>
-                    </li>
-                    {% endif %}
-                    {% endfor %}
+        <!-- Previous Button -->
+        <li class="page-item {% if not clients.has_prev %}disabled{% endif %}">
+            <a class="page-link"
+               href="{{ url_for('client_management', page=clients.prev_num, search=search, type=client_type, view=view_mode) }}">
+                <i data-feather="chevron-left" size="16"></i>
+            </a>
+        </li>
 
-                    <li class="page-item {% if not clients.has_next %}disabled{% endif %}">
-                        <a class="page-link glass-btn"
-                            href="{{ url_for('client_management', page=clients.next_num, search=search, type=client_type, view=view_mode) }}">
-                            <i data-feather="chevron-right" size="16"></i>
-                        </a>
-                    </li>
-                </ul>
-            </nav>
+        <!-- Page Numbers -->
+        {% for page_num in clients.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+
+            {% if page_num %}
+
+                {% if page_num != clients.page %}
+                <li class="page-item">
+                    <a class="page-link"
+                       href="{{ url_for('client_management', page=page_num, search=search, type=client_type, view=view_mode) }}">
+                        {{ page_num }}
+                    </a>
+                </li>
+                {% else %}
+                <li class="page-item active">
+                    <span class="page-link">
+                        {{ page_num }}
+                    </span>
+                </li>
+                {% endif %}
+
+            {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">...</span>
+            </li>
             {% endif %}
 
+        {% endfor %}
+
+        <!-- Next Button -->
+        <li class="page-item {% if not clients.has_next %}disabled{% endif %}">
+            <a class="page-link"
+               href="{{ url_for('client_management', page=clients.next_num, search=search, type=client_type, view=view_mode) }}">
+                <i data-feather="chevron-right" size="16"></i>
+            </a>
+        </li>
+
+    </ul>
+</nav>
+{% endif %}
 
 
 
@@ -679,5 +689,29 @@
         position: relative;
         z-index: 1;
     }
+    /* Hover effect */
+.pagination .page-link:hover {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: #ffffff !important;
+}
+
+/* Active page */
+.pagination .page-item.active .page-link {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: #ffffff !important;
+}
+
+/* When clicking (focus state) */
+.pagination .page-link:focus {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: #ffffff !important;
+}
+.pagination .page-link{
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
 </style>
 {% endblock %}
