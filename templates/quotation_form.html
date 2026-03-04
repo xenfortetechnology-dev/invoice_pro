@@ -203,10 +203,16 @@
 
             </div>
         </div>
+<!-- Terms & Conditions -->
+<div class="card shadow mb-3">
+    <div class="card-header fw-bold text-body">
+        Terms & Conditions
+    </div>
 
-        <!-- Terms Template -->
-        <div class="col-md-12 mb-3">
-            <label>Terms &amp; Conditions</label>
+    <div class="card-body row g-3">
+
+        <div class="col-md-12">
+            <label class="form-label text-body fw-bold">Terms Template</label>
 
             <select class="form-select mb-2" onchange="loadTerms(this.value)">
                 <option value="">Select Terms Template</option>
@@ -215,11 +221,16 @@
                 <option value="strict">Strict Payment Terms</option>
             </select>
 
-            <textarea name="terms" id="termsBox" class="form-control" rows="8"
+            <textarea name="terms" id="termsBox"
+                class="form-control bg-body text-body"
+                rows="8"
                 placeholder="Terms will auto load here... You can edit if needed."
                 required>{{ q.terms if q else '' }}</textarea>
+
         </div>
 
+    </div>
+</div>
         <!-- ================= ACTIONS ================= -->
         <div class="d-flex gap-2 mb-4">
             <button class="btn btn-success">{{ 'Update' if is_edit else 'Save' }} Quotation</button>
