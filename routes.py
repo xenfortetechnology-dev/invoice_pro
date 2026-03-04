@@ -2503,8 +2503,11 @@ def analytics():
         print("Full Analytics Data:", analytics_data)
 
 
-        return render_template('analytics.html', analytics_data=analytics_data)
-    
+        return render_template(
+            'analytics.html',
+             analytics_data=analytics_data,
+             current_range=request.args.get('range')
+        )
     except Exception as e:
         logging.error(f"Analytics error: {e}")
         flash('Error loading analytics data.', 'error')
@@ -2521,7 +2524,7 @@ def analytics():
 def export_analytics_excel():
     """Export analytics data to Excel and download it"""
     try:
-        time_range = request.args.get('range', '12m')
+        time_range = request.args.get('range')
         report_type = request.args.get('type', 'all')
         analytics_data = _get_analytics_data_dict(time_range)
         output = report_generator.generate_excel_report(analytics_data, report_type)
