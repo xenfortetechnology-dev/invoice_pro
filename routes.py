@@ -862,18 +862,11 @@ def preview_invoice():
 
         # Fetch client from cloud
         client_data = fetch_cloud_client_by_id(client_id)
+        print("CLIENT DATA FROM CLOUD:", client_data) 
         if not client_data:
             return "Client not found", 404
 
-        client = SimpleNamespace(
-            id=client_data.get('id'),
-            name=client_data.get('name', 'N/A'),
-            email=client_data.get('email', ''),
-            phone=client_data.get('phone', ''),
-            address='',
-            gstin='',
-            pan=''
-        )
+        client = SimpleNamespace(**client_data)
 
         invoice_date = datetime.strptime(
             invoice_date_str, '%Y-%m-%d'
@@ -1074,7 +1067,10 @@ def invoice_detail(id):
         name=client_data.get('name'),
         email=client_data.get('email'),
         phone=client_data.get('phone'),
-        address=''
+        address=client_data.get('address', ''),
+        city=client_data.get('city', ''),
+        state=client_data.get('state', ''),
+        pincode=client_data.get('pincode', '')
     )
 
     # Fetch company
@@ -2994,6 +2990,7 @@ def preview_challan():
         # 3. Create Transient Client (or fetch)
         # We need client details for the PDF.
         client_data = fetch_cloud_client_by_id(client_id)
+        
         if not client_data:
              return "Client not found", 404
         
