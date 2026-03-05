@@ -246,21 +246,40 @@
     </div>
     <style>
 /* Fix challan modal for dark theme */
-[data-theme="dark"] #challanModal .modal-content {
+/* Dark theme modal fix (works for all modals) */
+[data-theme="dark"] .modal-content {
     background-color: #1e293b;
-    color: white;
+    color: #ffffff;
 }
 
-[data-theme="dark"] #challanModal .modal-body {
-    color: white;
+[data-theme="dark"] .modal-header,
+[data-theme="dark"] .modal-body,
+[data-theme="dark"] .modal-footer {
+    border-color: #334155;
+    color: #ffffff;
 }
 
-[data-theme="dark"] #challanModal .modal-header {
-    color: white;
+/* Inputs inside modal */
+[data-theme="dark"] .modal-content .form-control,
+[data-theme="dark"] .modal-content .form-select {
+    background-color: #0f172a;
+    color: #ffffff;
+    border: 1px solid #334155;
 }
 
-/* Make close icon visible */
-[data-theme="dark"] #challanModal .btn-close {
+/* Placeholder text */
+[data-theme="dark"] .modal-content .form-control::placeholder {
+    color: #94a3b8;
+}
+
+/* Dropdown options */
+[data-theme="dark"] .modal-content select option {
+    background-color: #0f172a;
+    color: #ffffff;
+}
+
+/* Close button visibility */
+[data-theme="dark"] .btn-close {
     filter: invert(1);
 }
 </style>
