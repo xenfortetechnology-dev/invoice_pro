@@ -3303,36 +3303,52 @@ def crm():
                     inv['created_at'] = datetime.combine(inv_date, datetime.min.time())
                     overdue_invoices.append(inv)
     
-    # 5. Reminders (Local)
+    # 5. Reminders (Cloud)
+
+
     reminders = []
+
     try:
-        from models import Reminder
-        from types import SimpleNamespace
-        
-        db_reminders = Reminder.query.filter(Reminder.status != 'Completed') \
-            .order_by(Reminder.reminder_date.asc()) \
-            .all()
-            
-        for r in db_reminders:
-            client_dict = next((c for c in processed_clients if c['id'] == r.client_id), None)
-            if client_dict:
-                c_obj = SimpleNamespace(
-                    id=client_dict['id'], 
-                    name=client_dict['name'], 
-                    email=client_dict.get('email', '')
+        url = "http://44.208.164.236:5000/api/reminders"
+
+        headers = {
+            "Authorization": f"Bearer {session['token']}"
+        }
+
+        response = requests.get(url, headers=headers)
+
+        if response.status_code == 200:
+            api_reminders = response.json()
+
+            for r in api_reminders:
+
+                client_dict = next(
+                    (c for c in processed_clients if c['id'] == r.get('client_id')),
+                    None
                 )
-                rem = SimpleNamespace(
-                    id=r.id,
-                    client=c_obj,
-                    reminder_date=r.reminder_date,
-                    note=r.notes,
-                    status=r.status,
-                    reminder_type=r.reminder_type
-                )
-                reminders.append(rem)
-                
+
+                if client_dict:
+                    c_obj = SimpleNamespace(
+                        id=client_dict['id'],
+                        name=client_dict['name'],
+                        email=client_dict.get('email', '')
+                    )
+
+                    rem = SimpleNamespace(
+                        id=r.get("id"),
+                        client=c_obj,
+                        reminder_date=datetime.fromisoformat(r.get("reminder_date")),
+                        note=r.get("notes"),
+                        status=r.get("status"),
+                        reminder_type=r.get("reminder_type")
+                    )
+
+                    reminders.append(rem)
+
     except Exception as e:
-        app.logger.error(f"Error fetching local reminders: {e}")
+        app.logger.error(f"Error fetching cloud reminders: {e}")
+                    
+
 
     # 6. Follow-ups
     follow_ups = [r for r in reminders if r.reminder_type == 'Follow-up']
@@ -3366,6 +3382,8 @@ def crm():
 def create_reminder_page():
     return render_template('create_reminder.html', title='Create Reminder')
 
+import requests
+
 @app.route('/reminder/create', methods=['POST'])
 @login_required
 def create_reminder():
@@ -3374,41 +3392,69 @@ def create_reminder():
         reminder_date_str = request.form.get('reminder_date')
         reminder_type = request.form.get('reminder_type')
         notes = request.form.get('notes', '')
-        
-        reminder_date = datetime.strptime(reminder_date_str, '%Y-%m-%dT%H:%M') if reminder_date_str else None
-        
-        reminder = Reminder(
-            client_id=client_id,
-            reminder_date=reminder_date,
-            reminder_type=reminder_type,
-            notes=notes,
-            status='Pending'
-        )
-        
-        db.session.add(reminder)
-        db.session.commit()
-        flash('Reminder created successfully!', 'success')
+
+        # Convert date
+        reminder_date = None
+        if reminder_date_str:
+            reminder_date = datetime.strptime(reminder_date_str, '%Y-%m-%dT%H:%M').isoformat()
+
+        # API request
+        url = "http://44.208.164.236:5000/api/reminders"
+
+        headers = {
+            "Authorization": f"Bearer {session['token']}",
+            "Content-Type": "application/json"
+        }
+
+        data = {
+            "client_id": int(client_id),
+            "reminder_date": reminder_date,
+            "reminder_type": reminder_type,
+            "notes": notes
+        }
+
+        response = requests.post(url, json=data, headers=headers)
+
+        if response.status_code == 200 or response.status_code == 201:
+            flash('Reminder created successfully!', 'success')
+        else:
+            flash('Failed to create reminder in cloud.', 'error')
+
     except Exception as e:
-        db.session.rollback()
         flash(f'Error creating reminder: {str(e)}', 'error')
-    
+
     return redirect(url_for('crm'))
 
 @app.route('/reminder/<int:id>/complete', methods=['POST'])
 @login_required
 def complete_reminder(id):
     try:
+
         if id == 0:
             flash('System-generated follow-up acknowledged.', 'success')
             return redirect(url_for('crm'))
-            
-        reminder = Reminder.query.get_or_404(id)
-        reminder.status = 'Completed'
-        db.session.commit()
-        flash('Reminder marked as completed.', 'success')
+
+        url = f"http://44.208.164.236:5000/api/reminders/{id}"
+
+        headers = {
+            "Authorization": f"Bearer {session['token']}",
+            "Content-Type": "application/json"
+        }
+
+        data = {
+            "status": "Completed"
+        }
+
+        response = requests.put(url, json=data, headers=headers)
+
+        if response.status_code == 200:
+            flash('Reminder marked as completed.', 'success')
+        else:
+            flash('Failed to update reminder.', 'error')
+
     except Exception as e:
-        db.session.rollback()
         flash(f'Error updating reminder: {str(e)}', 'error')
+
     return redirect(url_for('crm'))
 
 @app.route('/api/contact_client_whatsapp', methods=['POST'])

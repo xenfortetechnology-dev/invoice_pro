@@ -890,7 +890,7 @@ def generate_quotation_pdf(q, company=None, bank=None, logo_bytes=None, signatur
 
         c.setFillColor(colors.black)
         y -= header_h
-
+        print("DEBUG quotation items:", q.line_items)
         item_h = 19
         items = list(getattr(q, 'line_items', []) or [])
 
