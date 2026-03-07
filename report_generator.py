@@ -10,7 +10,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 import os
 from datetime import datetime
-
+from flask_login import current_user
 
 def safe_dict(value):
     return value if isinstance(value, dict) else {}
@@ -211,7 +211,7 @@ class AnalyticsReportGenerator:
         output.seek(0)
         return output
 
-    def generate_pdf_report(self, analytics_data, report_type='all'):
+    def generate_pdf_report(self, analytics_data, report_type='all', company_name=None):
         """Generate PDF report from analytics data dictionary based on report_type"""
         buffer = io.BytesIO()
         type_label_map_title = {
@@ -279,12 +279,13 @@ class AnalyticsReportGenerator:
             fontName=font_normal
         )
         # Try to get organization name from config if possible, else "Xenforte"
-        try:
-            import config
-            org_name = getattr(config, 'COMPANY_NAME', 'Xenforte')
-        except:
-            org_name = 'Xenforte'
-            
+        # try:
+        #     import config
+        #     org_name = getattr(config, 'COMPANY_NAME', 'Xenforte')
+        # except:
+        #     org_name = 'Xenforte'
+        org_name = company_name if company_name else "Unknown Company"
+        print("DEBUG COMPANY NAME:", current_user.company_name)
         elements.append(Paragraph(f"Organization: {org_name}", org_style))
         elements.append(Paragraph(f"Generated On: {datetime.now().strftime('%d-%m-%Y %H:%M')}", org_style))
         

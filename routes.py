@@ -45,7 +45,7 @@ import ai_client
 from types import SimpleNamespace
 import requests
 from flask import session
-
+from flask_login import current_user
 # Initialize analytics engine
 analytics_engine = AnalyticsEngine(db.session)
 from report_generator import AnalyticsReportGenerator
@@ -2337,7 +2337,15 @@ def export_clients_pdf():
         filtered.append(c)
         
     filtered.sort(key=lambda x: x['name'])
-
+    
+    # Fetch company info
+    # Fetch company info
+    try:
+        company_info = fetch_cloud_company()
+        user_org = company_info.get("name", "Unknown Company")
+    except Exception as e:
+        print(f"Company fetch error: {e}")
+        user_org = "Unknown Company"
     # --- 2. Generate PDF ---
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(letter), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=18,
@@ -2358,7 +2366,7 @@ def export_clients_pdf():
     
     # Org Details (Hardcoded for now or fetch from settings if available)
     org_style = ParagraphStyle('Org', parent=styles['Normal'], fontSize=10, spaceAfter=20)
-    user_org = "Revolutionary Invoice System" # Placeholder
+    #user_org = company_info.get("name", "Unknown Company")
     gen_date = datetime.now().strftime("%d-%b-%Y")
     
     elements.append(Paragraph(f"<b>Organization Name:</b> {user_org}", org_style))
@@ -2418,6 +2426,16 @@ def export_clients_pdf():
         }
     )
 
+def fetch_cloud_company():
+    token = session.get("token")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = requests.get("http://44.208.164.236:5000/api/company", headers=headers)
+
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return {}
 
 def _get_analytics_data_dict(time_range='12m'):
     """Helper to gather all analytics data as a dictionary"""
